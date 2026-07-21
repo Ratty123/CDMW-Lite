@@ -9,7 +9,7 @@ public sealed class ArchiveItemNameIndexService(
     ArchiveSessionManager sessions,
     NativeArchiveCore native)
 {
-    private const int CacheSchemaVersion = 2;
+    private const int CacheSchemaVersion = 3;
     private const int NativeCatalogSchemaVersion = 1;
     private const int MaximumDiagnosticCharacters = 64 * 1024;
     private static readonly TimeSpan IndexerTimeout = TimeSpan.FromMinutes(3);

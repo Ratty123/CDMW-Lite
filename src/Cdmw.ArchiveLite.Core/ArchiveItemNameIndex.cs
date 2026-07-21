@@ -16,6 +16,10 @@ public sealed class ArchiveItemNameIndex
         "_(?:index|sub)\\d{2}$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private static readonly Regex TrailingLetterVariant = new(
+        "(?<=\\d)[a-z]$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly Regex CharacterEquipmentComponent = new(
         "^(?<root>cd_[a-z]\\d{4}_\\d{2}_.+?)_(?:ub|lb|hel|sho|hand|foot|belt|vest|mask|cloak|cape|hair|head|face|acc|body|arm|leg)(?:_[a-z0-9]+)*_\\d{4}(?:_\\d+)?$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -23,6 +27,28 @@ public sealed class ArchiveItemNameIndex
     private static readonly Regex PlateHelmModel = new(
         "^(?<prefix>cd_)ptm_\\d{2}_hel_(?<rest>.+)$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly string[] ItemIconPrefixes =
+    [
+        "itemicon_prefab_", "itemicon_", "icon_prefab_", "icon_",
+    ];
+
+    private static readonly string[] SidecarQualifiers =
+    [
+        ".prefabdata", ".material", ".pamlod", ".sockets", ".prefab", ".app", ".pac", ".pam",
+    ];
+
+    private static readonly string[] TextureSuffixes =
+    [
+        "_normal_directx", "_normal_green_up", "_normal_greenup", "_detailmaterial", "_colorblendingmask",
+        "_detaildiffuse", "_detailnormal", "_grimediffuse", "_grimematerial", "_grimenormal", "_displacement",
+        "_detailcolor", "_mixed_ao", "_base_color", "_basecolor", "_normalmap", "_roughness", "_smoothness",
+        "_specular", "_emissive", "_material", "_subsurface", "_metallic", "_metalness", "_opacity",
+        "_parallax", "_diffuse", "_colour", "_albedo", "_normal", "_height", "_disp", "_bump", "_rough",
+        "_smooth", "_spec", "_gloss", "_mask", "_masks", "_orm", "_mra", "_rma", "_arm", "_ao",
+        "_metal", "_alpha", "_glow", "_illum", "_color", "_col", "_dif", "_diff",
+        "_wn", "_nor", "_nrm", "_norm", "_ct", "_sp", "_ma", "_mg", "_em", "_emi", "_n", "_m", "_d", "_c", "_o",
+    ];
 
     private readonly IReadOnlyDictionary<string, string> _exactNames;
     private readonly IReadOnlyDictionary<string, string> _relatedNames;
@@ -68,7 +94,7 @@ public sealed class ArchiveItemNameIndex
                 return entry with
                 {
                     KnownName = string.Empty,
-                    NameEvidence = $"Name hint: {relatedName}",
+                    NameEvidence = relatedName,
                 };
             }
         }
@@ -95,28 +121,57 @@ public sealed class ArchiveItemNameIndex
 
     private static IEnumerable<string> RelatedCandidates(string stem)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var candidates = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         void Add(string value)
         {
-            var normalized = value.Trim().ToLowerInvariant();
-            if (!string.IsNullOrWhiteSpace(normalized) && seen.Add(normalized))
+            value = value.Trim().ToLowerInvariant();
+            if (value.Length > 0 && seen.Add(value))
             {
-                candidates.Add(normalized);
+                candidates.Add(value);
             }
         }
 
         Add(stem);
-        var family = StripVariantSuffix(stem);
-        Add(family);
-        foreach (var value in candidates.ToArray())
+        for (var index = 0; index < candidates.Count; index++)
         {
-            var equipment = CharacterEquipmentComponent.Match(value);
+            var candidate = candidates[index];
+            foreach (var prefix in ItemIconPrefixes)
+            {
+                if (candidate.Length > prefix.Length && candidate.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    Add(candidate[prefix.Length..]);
+                    break;
+                }
+            }
+            foreach (var qualifier in SidecarQualifiers)
+            {
+                if (candidate.Length > qualifier.Length && candidate.EndsWith(qualifier, StringComparison.Ordinal))
+                {
+                    Add(candidate[..^qualifier.Length]);
+                    break;
+                }
+            }
+
+            Add(StripVariantSuffix(candidate));
+
+            var textureBase = candidate;
+            foreach (var suffix in TextureSuffixes)
+            {
+                if (textureBase.Length > suffix.Length && textureBase.EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    Add(textureBase[..^suffix.Length]);
+                    break;
+                }
+            }
+
+            var equipment = CharacterEquipmentComponent.Match(candidate);
             if (equipment.Success)
             {
                 Add(equipment.Groups["root"].Value);
             }
-            var helm = PlateHelmModel.Match(value);
+            var helm = PlateHelmModel.Match(candidate);
             if (helm.Success)
             {
                 var descriptor = $"{helm.Groups["prefix"].Value}phm_00_hel_{helm.Groups["rest"].Value}";
@@ -151,9 +206,10 @@ public sealed class ArchiveItemNameIndex
                 normalized = stripped;
                 continue;
             }
-            if (normalized.Length >= 2 && char.IsDigit(normalized[^2]) && char.IsLetter(normalized[^1]))
+            stripped = TrailingLetterVariant.Replace(normalized, string.Empty);
+            if (!string.IsNullOrWhiteSpace(stripped) && !stripped.Equals(normalized, StringComparison.Ordinal))
             {
-                normalized = normalized[..^1];
+                normalized = stripped;
                 continue;
             }
             return normalized;

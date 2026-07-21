@@ -50,7 +50,8 @@ internal static class ArchiveLiteTestRunner
             ("native preview core parses PAT LOD0 geometry", TestNativePatGeometryAsync),
             ("native model packages adapt safely and export Blender interchange formats", TestNativeModelPreviewPackageAsync),
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
-            ("known item names distinguish exact names from related hints", TestArchiveItemNamesAsync),
+            ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
+            ("native item-name discovery handles shifted records and semantic icon links", TestArchiveItemNameDiscoveryAsync),
             ("Item Finder shares the Full catalog contract and keeps icon work bounded", TestItemFinderCatalogAsync),
             ("Item Finder debounce, facet refresh, icons, close, and session changes stay latest-wins", TestItemFinderViewModelLifecycleAsync),
             ("DDS file type and terminal-suffix usage classification stay explicit", TestDdsTextureClassificationAsync),
@@ -2494,15 +2495,73 @@ internal static class ArchiveLiteTestRunner
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["cd_phm_02_sword_0042"] = "Ashen Greatsword",
+                ["cd_m1234_01_ashen"] = "Ashen Outfit",
             });
         var exact = names.Enrich(CreateArchiveEntry("equipment/cd_phm_01_sword_0016.pac"));
         Require(exact.KnownName == "Gilded Longsword", "exact localized name was not attached");
         Require(exact.NameEvidence == "Exact localization", "exact localized name evidence is wrong");
 
-        var related = names.Enrich(CreateArchiveEntry("equipment/cd_phm_02_sword_0042_l.pac"));
+        var related = names.Enrich(CreateArchiveEntry("equipment/cd_phm_02_sword_0042_in.pac"));
         Require(string.IsNullOrEmpty(related.KnownName), "related family hint was presented as an exact name");
-        Require(related.NameEvidence == "Name hint: Ashen Greatsword", "related family hint was not attached");
+        Require(related.NameEvidence == "Ashen Greatsword", "related model-variant evidence was not attached directly");
+        var icon = names.Enrich(CreateArchiveEntry("ui/itemicon/itemicon_prefab_cd_phm_02_sword_0042_n.dds"));
+        Require(icon.NameEvidence == "Ashen Greatsword", "item-icon texture name evidence was not propagated");
+        var texture = names.Enrich(CreateArchiveEntry("character/texture/cd_phm_02_sword_0042_base_color.dds"));
+        Require(texture.NameEvidence == "Ashen Greatsword", "texture-family name evidence was not propagated");
+        var sidecar = names.Enrich(CreateArchiveEntry("equipment/cd_phm_02_sword_0042.pac.xml"));
+        Require(sidecar.NameEvidence == "Ashen Greatsword", "compound sidecar name evidence was not propagated");
+        var component = names.Enrich(CreateArchiveEntry("equipment/cd_m1234_01_ashen_ub_0001.pac"));
+        Require(component.NameEvidence == "Ashen Outfit", "equipment-component name evidence was not propagated");
         return Task.CompletedTask;
+    }
+
+    private static async Task TestArchiveItemNameDiscoveryAsync()
+    {
+        await using var fixture = await SyntheticArchiveFixture.CreateNameIndexAsync().ConfigureAwait(false);
+        var native = new NativeArchiveCore();
+        using var sessions = new ArchiveSessionManager(native);
+        var opened = await sessions.OpenAsync(
+            new OpenArchiveRequest(fixture.Root, ForceRefresh: true),
+            CancellationToken.None).ConfigureAwait(false);
+        Directory.CreateDirectory(ArchiveLiteDataPaths.NameIndexCache);
+        var staleCachePath = Path.Combine(ArchiveLiteDataPaths.NameIndexCache, $"{opened.Fingerprint}.json");
+        await File.WriteAllTextAsync(
+            staleCachePath,
+            """{"schema_version":2,"exact_names":{"stale":"Stale Name"},"related_names":{},"items":[]}""")
+            .ConfigureAwait(false);
+        var service = new ArchiveItemNameIndexService(sessions, native);
+        var result = await service.BuildAsync(
+            new BuildNameIndexRequest(opened.SessionId),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(!result.UsedCache, "the pre-discovery name cache schema was reused instead of rebuilding");
+        Require(result.Available && result.ExactNameCount > 0 && result.RelatedNameCount > 0,
+            $"synthetic item-name discovery did not publish both mapping kinds: {result.Warning}");
+
+        var session = sessions.GetRequired(opened.SessionId);
+        var queries = new ArchiveQueryService(sessions);
+        async Task<ArchiveEntryDto> ReadAsync(string path)
+        {
+            var entry = session.Index.FindEntriesByPath(path).Single();
+            var page = await queries.QueryAsync(
+                new ArchiveQuerySpec(opened.SessionId, EntryIds: [entry.EntryId]),
+                1,
+                CancellationToken.None).ConfigureAwait(false);
+            return page.Entries.Single();
+        }
+
+        var exact = await ReadAsync("character/model/cd_test_01_sword.pac").ConfigureAwait(false);
+        Require(
+            exact.KnownName == "Synthetic Blade" && exact.NameEvidence == "Exact localization",
+            "shifted ItemInfo localization or the later bounded prefab list did not recover the exact name");
+        var related = await ReadAsync("character/model/cd_marni_laser_hel_0001_index01.pac").ConfigureAwait(false);
+        Require(
+            string.IsNullOrEmpty(related.KnownName) && related.NameEvidence == "Synthetic Blade",
+            "alternate StringInfo prefix and semantic item/model tokens did not recover related evidence");
+        var icon = await ReadAsync("ui/itemicon/itemicon_prefab_cd_marni_laser_hel_0001_n.dds").ConfigureAwait(false);
+        Require(
+            string.IsNullOrEmpty(icon.KnownName) && icon.NameEvidence == "Synthetic Blade",
+            "recovered related evidence did not propagate to the derived item-icon texture");
     }
 
     private static async Task TestItemFinderCatalogAsync()

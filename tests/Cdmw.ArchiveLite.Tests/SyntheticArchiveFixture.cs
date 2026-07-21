@@ -102,6 +102,46 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         return fixture;
     }
 
+    public static async Task<SyntheticArchiveFixture> CreateNameIndexAsync()
+    {
+        const uint exactModelHash = 0x1D586E71;
+        const uint relatedModelHash = 0xA1B2C3D4;
+        const string localizationId = "12345678";
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-names-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var fixture = new SyntheticArchiveFixture(root);
+
+        var itemInfo = BuildItemInfo(
+            itemId: 1234,
+            internalName: "Item_Marni_Laser_Helm",
+            localizationId,
+            exactModelHash,
+            relatedModelHash);
+        var stringInfo = BuildStringInfo("Icon_Prefab_cd_marni_laser_hel_0001", relatedModelHash);
+        var localization = BuildLocalization(localizationId, "Synthetic Blade");
+
+        await BuildPackageAsync(
+            root,
+            "0008",
+            [
+                ("gamecommon/item/iteminfo.pabgb", itemInfo),
+                ("gamecommon/item/stringinfo.pabgb", stringInfo),
+            ]).ConfigureAwait(false);
+        await BuildPackageAsync(
+            root,
+            "0009",
+            [
+                ("character/model/cd_test_01_sword.pac", new byte[] { 0x50, 0x41, 0x43, 0x00 }),
+                ("character/model/cd_marni_laser_hel_0001_index01.pac", new byte[] { 0x50, 0x41, 0x43, 0x01 }),
+                ("ui/itemicon/itemicon_prefab_cd_marni_laser_hel_0001_n.dds", new byte[] { 0x44, 0x44, 0x53, 0x20 }),
+            ]).ConfigureAwait(false);
+        await BuildPackageAsync(
+            root,
+            "0020",
+            [("localization/localizationstring_eng.pabgb", localization)]).ConfigureAwait(false);
+        return fixture;
+    }
+
     public async Task AddSingleEntryPackageAsync(string packageName, string virtualPath, byte[] payload)
     {
         var packageDirectory = Path.Combine(Root, packageName);
@@ -243,6 +283,107 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
             WriteUInt16(output, 0);
             WriteUInt16(output, entry.Flags);
         }
+        return output.ToArray();
+    }
+
+    private static async Task BuildPackageAsync(
+        string root,
+        string package,
+        IReadOnlyList<(string Path, byte[] Bytes)> payloads)
+    {
+        var packageRoot = Path.Combine(root, package);
+        Directory.CreateDirectory(packageRoot);
+        var pazPath = Path.Combine(packageRoot, "0.paz");
+        var entries = new List<EntrySpec>(payloads.Count);
+        uint offset = 0;
+        await using (var stream = new FileStream(
+            pazPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            4096,
+            FileOptions.Asynchronous))
+        {
+            foreach (var payload in payloads)
+            {
+                await stream.WriteAsync(payload.Bytes).ConfigureAwait(false);
+                entries.Add(new EntrySpec(
+                    payload.Path,
+                    offset,
+                    checked((uint)payload.Bytes.Length),
+                    checked((uint)payload.Bytes.Length),
+                    0));
+                offset = checked(offset + (uint)payload.Bytes.Length);
+            }
+            await stream.FlushAsync().ConfigureAwait(false);
+            stream.Flush(flushToDisk: true);
+        }
+        await File.WriteAllBytesAsync(Path.Combine(packageRoot, "0.pamt"), BuildPamt(entries)).ConfigureAwait(false);
+    }
+
+    private static byte[] BuildItemInfo(
+        uint itemId,
+        string internalName,
+        string localizationId,
+        uint exactModelHash,
+        uint relatedModelHash)
+    {
+        ReadOnlySpan<byte> marker =
+        [
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x07, 0x70, 0x00, 0x00, 0x00,
+        ];
+        using var output = new MemoryStream();
+        var name = Encoding.ASCII.GetBytes(internalName);
+        WriteUInt32(output, itemId);
+        WriteUInt32(output, checked((uint)name.Length));
+        output.Write(name);
+        output.Write(marker);
+        output.Write(new byte[16]);
+        var localization = Encoding.ASCII.GetBytes(localizationId);
+        WriteUInt32(output, checked((uint)localization.Length));
+        output.Write(localization);
+        output.WriteByte(0x0E);
+        output.WriteByte(0);
+        output.WriteByte(0);
+        WriteUInt32(output, 6);
+        WriteUInt32(output, 6);
+        WriteUInt32(output, 0x11111111);
+        WriteUInt32(output, 0x22222222);
+        WriteUInt32(output, 0x33333333);
+        WriteUInt32(output, 0x44444444);
+        WriteUInt32(output, 0x55555555);
+        WriteUInt32(output, 0x66666666);
+        output.WriteByte(0x0F);
+        output.WriteByte(0);
+        output.WriteByte(0);
+        WriteUInt32(output, 1);
+        WriteUInt32(output, 1);
+        WriteUInt32(output, exactModelHash);
+        WriteUInt32(output, relatedModelHash);
+        output.Write(new byte[32]);
+        return output.ToArray();
+    }
+
+    private static byte[] BuildStringInfo(string value, uint storedHash)
+    {
+        using var output = new MemoryStream();
+        var bytes = Encoding.UTF8.GetBytes(value);
+        WriteUInt32(output, checked((uint)bytes.Length));
+        output.Write(bytes);
+        WriteUInt32(output, storedHash);
+        return output.ToArray();
+    }
+
+    private static byte[] BuildLocalization(string id, string value)
+    {
+        using var output = new MemoryStream();
+        var idBytes = Encoding.ASCII.GetBytes(id);
+        var valueBytes = Encoding.UTF8.GetBytes(value);
+        WriteUInt32(output, checked((uint)idBytes.Length));
+        output.Write(idBytes);
+        WriteUInt32(output, checked((uint)valueBytes.Length));
+        output.Write(valueBytes);
         return output.ToArray();
     }
 
