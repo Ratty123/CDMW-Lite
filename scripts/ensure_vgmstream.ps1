@@ -82,7 +82,12 @@ try {
         throw "Downloaded vgmstream archive did not contain the expected runtime files."
     }
 
-    $versionJson = (& $cli.FullName -V 2>$null | Out-String).Trim() | ConvertFrom-Json
+    $versionJsonOutput = (& $cli.FullName -V 2>$null | Out-String).Trim()
+    $probeExitCode = $LASTEXITCODE
+    if ($probeExitCode -ne 1) {
+        throw "Downloaded vgmstream runtime probe returned unexpected exit code $probeExitCode."
+    }
+    $versionJson = $versionJsonOutput | ConvertFrom-Json
     if ([string]$versionJson.version -ne $version) {
         throw "Downloaded vgmstream runtime did not report version $version."
     }
@@ -115,3 +120,4 @@ if (-not (Test-PinnedRuntime)) {
     throw "The downloaded vgmstream runtime failed its pinned-file verification."
 }
 Write-Host "Pinned vgmstream runtime installed ($version)."
+exit 0

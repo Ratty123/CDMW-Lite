@@ -1217,6 +1217,27 @@ internal static class ArchiveLiteTestRunner
             repositoryRoot,
             "scripts",
             "verify_archive_lite_standalone.ps1"));
+        var dependencyBootstrapSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "scripts",
+            "ensure_vgmstream.ps1"));
+        Require(
+            buildSource.Contains("function Invoke-CheckedPowerShellScript", StringComparison.Ordinal)
+            && buildSource.Contains(
+                "Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot \"ensure_vgmstream.ps1\")",
+                StringComparison.Ordinal)
+            && buildSource.Contains(
+                "Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot \"verify_archive_lite_artifact.ps1\")",
+                StringComparison.Ordinal)
+            && buildSource.Contains(
+                "Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot \"verify_archive_lite_standalone.ps1\")",
+                StringComparison.Ordinal),
+            "the release builder can misattribute a child PowerShell script's retained native exit code");
+        Require(
+            dependencyBootstrapSource.Contains("$probeExitCode = $LASTEXITCODE", StringComparison.Ordinal)
+            && dependencyBootstrapSource.Contains("if ($probeExitCode -ne 1)", StringComparison.Ordinal)
+            && dependencyBootstrapSource.TrimEnd().EndsWith("exit 0", StringComparison.Ordinal),
+            "the vgmstream bootstrap does not normalize its intentionally nonzero version-probe exit code");
         Require(
             buildSource.Contains("\"Cdmw.Archive.Content.dll\"", StringComparison.Ordinal)
             && artifactGuardSource.Contains("\"Cdmw.Archive.Content.dll\"", StringComparison.Ordinal)

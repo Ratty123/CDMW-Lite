@@ -59,6 +59,24 @@ function Assert-LastExitCode([string]$Operation) {
     }
 }
 
+function Invoke-CheckedPowerShellScript {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+        [Parameter(Mandatory)]
+        [string]$Operation,
+        [hashtable]$ScriptArguments = @{}
+    )
+
+    # A successful child script can retain an accepted nonzero exit code from
+    # one of its native probes. $? describes the script invocation itself;
+    # $LASTEXITCODE is reserved for native commands invoked directly below.
+    & $Path @ScriptArguments
+    if (-not $?) {
+        throw "$Operation failed."
+    }
+}
+
 Assert-ContainedOutput $stage
 Assert-ContainedOutput $workerStage
 Assert-ContainedOutput $rendererStage
@@ -89,8 +107,8 @@ New-Item -ItemType Directory -Path $standaloneStage -Force | Out-Null
 
 Push-Location $repositoryRoot
 try {
-    & (Join-Path $PSScriptRoot "verify_repository_independence.ps1")
-    & (Join-Path $PSScriptRoot "verify_archive_lite_source.ps1")
+    Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot "verify_repository_independence.ps1") -Operation "Repository independence guard"
+    Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot "verify_archive_lite_source.ps1") -Operation "Archive Lite source guard"
 
     & cmake -S $nativeRoot -B $nativeBuild
     Assert-LastExitCode "Native archive-core configure"
@@ -164,7 +182,9 @@ finally {
     Pop-Location
 }
 
-& (Join-Path $PSScriptRoot "ensure_vgmstream.ps1") -RuntimeDirectory $vgmstreamRoot
+Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot "ensure_vgmstream.ps1") -Operation "Pinned vgmstream bootstrap" -ScriptArguments @{
+    RuntimeDirectory = $vgmstreamRoot
+}
 
 $workerPayload = @(
     "CdmwArchiveLite.Worker.exe",
@@ -229,8 +249,9 @@ $contents = Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullN
 }
 $contents | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $stage "PACKAGE-CONTENTS.json") -Encoding utf8
 
-& (Join-Path $PSScriptRoot "verify_archive_lite_artifact.ps1") -ArtifactDirectory $stage
-Assert-LastExitCode "Archive Lite artifact guard"
+Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot "verify_archive_lite_artifact.ps1") -Operation "Archive Lite artifact guard" -ScriptArguments @{
+    ArtifactDirectory = $stage
+}
 
 Compress-Archive -LiteralPath $stage -DestinationPath $zipStaging -CompressionLevel Optimal
 Move-Item -LiteralPath $zipStaging -Destination $zipPath
@@ -248,8 +269,9 @@ if ($standaloneRuntimeFiles.Count -ne 1 -or
     throw "Standalone publish requires runtime companion files: $($standaloneRuntimeFiles.Name -join ', ')"
 }
 Copy-Item -LiteralPath $standaloneExecutable -Destination $standaloneStaging
-& (Join-Path $PSScriptRoot "verify_archive_lite_standalone.ps1") -ExecutablePath $standaloneStaging
-Assert-LastExitCode "Archive Lite standalone artifact guard"
+Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot "verify_archive_lite_standalone.ps1") -Operation "Archive Lite standalone artifact guard" -ScriptArguments @{
+    ExecutablePath = $standaloneStaging
+}
 Move-Item -LiteralPath $standaloneStaging -Destination $standalonePath
 
 Remove-Item -LiteralPath $workerStage -Recurse -Force
