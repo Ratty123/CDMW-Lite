@@ -553,6 +553,40 @@ internal static class ArchiveLiteTestRunner
         Require(styleKeys.Contains("TopBarComboBoxStyle"), "custom chrome has no compact top-bar selector style");
         Require(styleKeys.Contains("WorkspaceNavigationButtonStyle"), "title row has no shared workspace navigation style");
         Require(styleKeys.Contains("WorkspaceContentTabControlStyle"), "workspace content has no headerless tab host style");
+        var globallySizedControlTypes = new[]
+        {
+            "Window",
+            "TextBlock",
+            "Label",
+            "Button",
+            "TextBox",
+            "ComboBox",
+            "ComboBoxItem",
+            "CheckBox",
+            "GroupBox",
+            "ListBox",
+            "ListBoxItem",
+            "DataGrid",
+            "DataGridColumnHeader",
+            "DataGridRow",
+            "DataGridCell",
+            "ToolTip",
+            "Menu",
+            "ContextMenu",
+            "MenuItem",
+        };
+        foreach (var controlType in globallySizedControlTypes)
+        {
+            var style = controls.Root!.Elements()
+                .SingleOrDefault(element => element.Name.LocalName == "Style"
+                    && string.Equals((string?)element.Attribute("TargetType"), controlType, StringComparison.Ordinal)
+                    && element.Attributes().All(attribute => attribute.Name.LocalName != "Key"));
+            Require(
+                style?.Elements().Any(element => element.Name.LocalName == "Setter"
+                    && string.Equals((string?)element.Attribute("Property"), "FontSize", StringComparison.Ordinal)
+                    && ((string?)element.Attribute("Value"))?.Contains("DynamicResource BaseFontSize", StringComparison.Ordinal) == true) == true,
+                $"{controlType} does not follow the global font-size resource");
+        }
         Require(
             window.Descendants().Any(element => ((string?)element.Attribute("ItemsSource"))?.Contains("FontSizes", StringComparison.Ordinal) == true)
             && window.Descendants().Any(element => ((string?)element.Attribute("ItemsSource"))?.Contains("LayoutDensities", StringComparison.Ordinal) == true),
@@ -574,6 +608,9 @@ internal static class ArchiveLiteTestRunner
             string.Equals((string?)topTabs.Attribute("SelectedIndex"), "0", StringComparison.Ordinal),
             "Archive Browser is not the explicit default startup workspace");
         var xamlText = File.ReadAllText(Path.Combine(appRoot, "MainWindow.xaml"));
+        Require(
+            xamlText.Split("TextElement.FontSize=\"{DynamicResource BaseFontSize}\"", StringSplitOptions.None).Length >= 3,
+            "custom Archive Browser menus do not follow the global font-size resource");
         Require(
             !xamlText.Contains("ProductSubtitle", StringComparison.Ordinal)
             && !xamlText.Contains("ReadOnlyWorkspace", StringComparison.Ordinal)
