@@ -498,7 +498,13 @@ public partial class MainWindow : Window
             if (double.IsFinite(setting.Width) && setting.Width > 0)
             {
                 var minimum = Math.Max(48, Math.Max(grid.MinColumnWidth, column.MinWidth));
-                column.Width = new DataGridLength(Math.Clamp(setting.Width, minimum, 1600), DataGridLengthUnitType.Pixel);
+                var configuredMaximum = Math.Min(grid.MaxColumnWidth, column.MaxWidth);
+                var maximum = double.IsFinite(configuredMaximum)
+                    ? Math.Max(minimum, configuredMaximum)
+                    : double.PositiveInfinity;
+                column.Width = new DataGridLength(
+                    Math.Clamp(setting.Width, minimum, maximum),
+                    DataGridLengthUnitType.Pixel);
             }
         }
     }

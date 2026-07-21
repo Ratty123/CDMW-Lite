@@ -916,6 +916,10 @@ internal static class ArchiveLiteTestRunner
             "extension filter is not a categorized picker");
         var controlsSource = File.ReadAllText(Path.Combine(appRoot, "Themes", "Controls.xaml"));
         Require(
+            controlsSource.Contains("x:Name=\"PART_LeftHeaderGripper\"", StringComparison.Ordinal)
+            && controlsSource.Contains("x:Name=\"PART_RightHeaderGripper\"", StringComparison.Ordinal),
+            "the shared column-header template removes WPF's functional resize handles");
+        Require(
             controlsSource.Contains("<ItemsPresenter KeyboardNavigation.DirectionalNavigation=\"Contained\"", StringComparison.Ordinal)
             && !controlsSource.Contains("<StackPanel IsItemsHost=\"True\"", StringComparison.Ordinal)
             && controlsSource.Contains("<ScrollViewer CanContentScroll=\"False\"", StringComparison.Ordinal),
@@ -948,6 +952,11 @@ internal static class ArchiveLiteTestRunner
             && windowSource.Contains("MigrateArchiveColumnKeys", StringComparison.Ordinal)
             && windowSource.Contains("MigrateArchiveColumnLayout", StringComparison.Ordinal),
             "legacy Role visibility, ordering, and width are not migrated to File type and Usage");
+        Require(
+            windowSource.Contains("grid.MaxColumnWidth", StringComparison.Ordinal)
+            && windowSource.Contains("column.MaxWidth", StringComparison.Ordinal)
+            && !windowSource.Contains("Math.Clamp(setting.Width, minimum, 1600)", StringComparison.Ordinal),
+            "saved catalog widths are still capped by an arbitrary restore limit");
         var migrateLayout = typeof(Cdmw.ArchiveLite.App.MainWindow).GetMethod(
             "MigrateArchiveColumnLayout",
             BindingFlags.NonPublic | BindingFlags.Static)
