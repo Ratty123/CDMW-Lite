@@ -14,7 +14,7 @@
     <ProjectReference Include="../../src/Cdmw.ArchiveLite.Standalone/Cdmw.ArchiveLite.Standalone.csproj" />
   </ItemGroup>
   <PropertyGroup>
-    <NativeArchiveCorePath>$(MSBuildThisFileDirectory)..\..\..\..\native\cdmw_archive_core\build\$(Configuration)\cdmw-archive-core.dll</NativeArchiveCorePath>
+    <NativeArchiveCorePath>$(MSBuildThisFileDirectory)..\..\native\cdmw_archive_core\build\$(Configuration)\cdmw-archive-core.dll</NativeArchiveCorePath>
   </PropertyGroup>
   <Target Name="CopyNativeArchiveCore" AfterTargets="Build" Condition="Exists('$(NativeArchiveCorePath)')">
     <Copy SourceFiles="$(NativeArchiveCorePath)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />

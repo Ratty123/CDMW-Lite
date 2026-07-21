@@ -1,11 +1,11 @@
 # Archive Lite validation matrix
 
-All commands are Python-free and use system temporary directories for synthetic archives and exports. They do not launch the visible application, licensed game content, or real PAMT/PAC data.
+All commands are Python-free and use system temporary directories for synthetic archives and exports. They do not launch the visible application, licensed game content, or real PAMT/PAC data. Every main gate first runs `scripts/verify_repository_independence.ps1`, which requires this Git root to own all managed, native, renderer, schema, and project-reference inputs.
 
 ## Focused validation
 
 ```powershell
-.\apps\Cdmw.ArchiveLite\scripts\test_archive_lite.ps1 -Configuration Debug
+.\scripts\test_archive_lite.ps1 -Configuration Debug
 ```
 
 This gate configures and builds `cdmw_archive_core`, `cdmw_preview_core`, `cdmw_archive_accelerator`, `cdmw_mesh_core`, and the DirectXTex-backed `cd-texture-dx`; runs the available native self-tests/version checks; builds the .NET 10 solution and .NET/Vortice renderer; and runs the managed console test runner. Covered behavior includes:
@@ -17,7 +17,7 @@ This gate configures and builds `cdmw_archive_core`, `cdmw_preview_core`, `cdmw_
 - game-folder recognition and Steam-library parsing, plus missing/current/stale archive-cache health transitions;
 - portable settings/cache/log/crash routing beside the distributable with isolated test overrides; round-trip persistence for archive/text-search filters, export options, theme, global font size, layout density, window placement, split panes, and grid columns; deterministic Archive Browser startup; startup auto-load of a current persistent cache without prompting; automatic cache-choice presentation when no index exists; full-fingerprint rejection without an automatic rebuild after same-size/same-timestamp source changes; and a manual Refresh recommendation for stale caches;
 - persistent path/basename index build and reuse, forced-rebuild routing, real native PAMT parse/sort/write/publish totals, compact indexed basename lookup without a full association scan, cooperative native cancellation, one-time two-index isolation and shutdown cleanup, source-byte immutability, and the shared themed cache-choice flow for manual Open and Refresh;
-- one shared 107-extension capability manifest, Full/Lite classifier parity, bounded normalized content documents, readable MeshInfo and PAE/PAEM/BNK/PATHC/PAB/HKX metadata, explicit unsupported capabilities, semantic-artifact publication, and native PAT LOD0 geometry parsing with bounds, quantized vertices, normals, UVs, indices, draw ranges, and material candidates;
+- one repository-owned 107-extension capability manifest, versioned classifier behavior, bounded normalized content documents, readable MeshInfo and PAE/PAEM/BNK/PATHC/PAB/HKX metadata, explicit unsupported capabilities, semantic-artifact publication, and native PAT LOD0 geometry parsing with bounds, quantized vertices, normals, UVs, indices, draw ranges, and material candidates;
 - canonical Item Finder catalog rows from the native indexer, cache-schema and search-index reconstruction, model-variant grouping, secondary-ID and localized-name search, immutable category/material facets, bounded 72-row paging, exact-versus-related Archive Browser entry scopes, scope-specific extension counts, a scope-only clear action, and deterministic active-scope top-ten extension shortcuts. Managed WPF coverage drives the real 220 ms view-model debounce and proves one search/page publication for a user category change, no feedback search from programmatic facet/localization refresh, one icon transition, rapid-input latest-wins behavior, and stale-result rejection after session change or dialog close. Persistent settings, automatic background preload wiring, foreground-work priority, 64-item worker batches, a 96-image UI LRU, and 120-pixel DirectXTex thumbnail cold/warm behavior still prove a warm hit needs neither its deleted DDS staging input nor another converter launch;
 - native mesh-only model-package adaptation, compact cross-PAMT dependency-index handoff with safe legacy fallback, immediate model-selection dispatch, delay-free warm-cache hits, a bounded 35 ms cancellable cold-request coalescer, compact non-durable private-staging paths with atomic publication, and dependency-scoped cache reuse across an unrelated session fingerprint; a valid synthetic PAC proves the native report records decoded entries and zero-result prefab queries, exact stored-range hashes reject a same-size/same-timestamp PAZ mutation, and adding a matching prefab in a separate PAMT invalidates the old package. Coverage also includes hidden grid/gizmo state, empty texture channels, exact geometry-length checks, path-containment rejection, and hidden synthetic package loads through one real .NET/Vortice renderer PID; the resident-switch proof checks multiple same-device scene replacements, production-backend retention, rejection of an incomplete package without replacing the current scene, and successful recovery on the following generation;
 - synthetic mesh-only GLB 2.0, OBJ, and binary FBX exports, source-geometry immutability, determinate conversion progress, and cancellation that preserves an existing destination;
@@ -32,14 +32,14 @@ This gate configures and builds `cdmw_archive_core`, `cdmw_preview_core`, `cdmw_
 ## Release/package gate
 
 ```powershell
-.\apps\Cdmw.ArchiveLite\scripts\build_archive_lite.ps1
+.\scripts\build_archive_lite.ps1
 ```
 
 In addition to rerunning the focused checks in Release, this gate publishes the app, worker, and .NET/Vortice renderer self-contained for `win-x64`, includes the native archive, model-preview, item-name-index, mesh-interchange, DirectXTex DDS, and pinned vgmstream media helpers, writes a SHA-256 package-content manifest, and calls:
 
 ```powershell
-.\apps\Cdmw.ArchiveLite\scripts\verify_archive_lite_artifact.ps1 -ArtifactDirectory <published-folder>
-.\apps\Cdmw.ArchiveLite\scripts\verify_archive_lite_standalone.ps1 -ExecutablePath <standalone-exe>
+.\scripts\verify_archive_lite_artifact.ps1 -ArtifactDirectory <published-folder>
+.\scripts\verify_archive_lite_standalone.ps1 -ExecutablePath <standalone-exe>
 ```
 
 The portable artifact guard rejects Python source/bytecode/extensions/runtimes, Python-named runtime folders, and PE files that reference a Python DLL. It also checks every packaged Archive Lite/native entry point is x64 and the separately hosted pinned vgmstream bundle is consistently x86; runs the native model-preview and DirectXTex self-tests; verifies every packaged vgmstream file against the pinned dependency manifest; verifies the packaged mesh core writes binary FBX 7400; loads and exports a synthetic native package through the packaged renderer without changing its source bytes; runs a hidden synthetic GPU smoke that requires `d3d11_vortice_shader` and measurable textureless contour separation on a faceted form from four angles; constructs and lays out the real WPF `MainWindow` across every theme/font-size/density combination without showing it; exercises the application-to-worker protocol; and rejects an orphaned packaged worker.

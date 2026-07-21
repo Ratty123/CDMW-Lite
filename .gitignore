@@ -1,0 +1,16 @@
+.vs/
+.tools/
+artifacts/
+cache/
+crash/
+logs/
+workspace/
+
+**/bin/
+**/build/
+**/obj/
+
+*.aic
+*.abi
+*.ali
+*.user

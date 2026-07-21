@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $liteRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $liteRoot "..\.."))
+$repositoryRoot = $liteRoot
 $nativeRoot = Join-Path $repositoryRoot "native\cdmw_archive_core"
 $previewRoot = Join-Path $repositoryRoot "native\cdmw_preview_core"
 $acceleratorRoot = Join-Path $repositoryRoot "native\cdmw_archive_accelerator"

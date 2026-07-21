@@ -8,7 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $liteRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $liteRoot "..\.."))
+$repositoryRoot = $liteRoot
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $liteRoot "artifacts"
 }
@@ -89,6 +89,7 @@ New-Item -ItemType Directory -Path $standaloneStage -Force | Out-Null
 
 Push-Location $repositoryRoot
 try {
+    & (Join-Path $PSScriptRoot "verify_repository_independence.ps1")
     & (Join-Path $PSScriptRoot "verify_archive_lite_source.ps1")
 
     & cmake -S $nativeRoot -B $nativeBuild
@@ -162,6 +163,8 @@ try {
 finally {
     Pop-Location
 }
+
+& (Join-Path $PSScriptRoot "ensure_vgmstream.ps1") -RuntimeDirectory $vgmstreamRoot
 
 $workerPayload = @(
     "CdmwArchiveLite.Worker.exe",

@@ -159,8 +159,6 @@ internal static class ArchiveLiteTestRunner
     {
         var resourceRoot = Path.Combine(
             FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App",
             "Resources");
@@ -228,8 +226,6 @@ internal static class ArchiveLiteTestRunner
 
             var locExtensionSource = File.ReadAllText(Path.Combine(
                 FindRepositoryRoot(),
-                "apps",
-                "Cdmw.ArchiveLite",
                 "src",
                 "Cdmw.ArchiveLite.App",
                 "Infrastructure",
@@ -256,8 +252,6 @@ internal static class ArchiveLiteTestRunner
     {
         var windowPath = Path.Combine(
             FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App",
             "MainWindow.xaml");
@@ -416,8 +410,6 @@ internal static class ArchiveLiteTestRunner
     {
         var appRoot = Path.Combine(
             FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App");
         var themeRoot = Path.Combine(appRoot, "Themes");
@@ -522,8 +514,6 @@ internal static class ArchiveLiteTestRunner
     {
         var appRoot = Path.Combine(
             FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App");
         var window = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "MainWindow.xaml"));
@@ -722,8 +712,6 @@ internal static class ArchiveLiteTestRunner
     {
         var appRoot = Path.Combine(
             FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App");
         var window = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "MainWindow.xaml"));
@@ -839,8 +827,6 @@ internal static class ArchiveLiteTestRunner
         var repositoryRoot = FindRepositoryRoot();
         var appRoot = Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App");
         var window = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "MainWindow.xaml"));
@@ -984,8 +970,6 @@ internal static class ArchiveLiteTestRunner
         Require(hostSource.Contains("--simple-preview", StringComparison.Ordinal), "Archive Lite does not request the simple renderer surface");
         var previewSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.Core",
             "NativeModelPreviewService.cs"));
@@ -1141,7 +1125,7 @@ internal static class ArchiveLiteTestRunner
         }
 
         var repositoryRoot = FindRepositoryRoot();
-        var appRoot = Path.Combine(repositoryRoot, "apps", "Cdmw.ArchiveLite", "src", "Cdmw.ArchiveLite.App");
+        var appRoot = Path.Combine(repositoryRoot, "src", "Cdmw.ArchiveLite.App");
         var windowSource = File.ReadAllText(Path.Combine(appRoot, "MainWindow.xaml"));
         Require(
             windowSource.Contains("AssociatedAssets.AssetsView", StringComparison.Ordinal)
@@ -1206,8 +1190,6 @@ internal static class ArchiveLiteTestRunner
         var repositoryRoot = FindRepositoryRoot();
         var launcherSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "BUILD-FRESH-EXE.bat"));
         Require(
             launcherSource.Contains(
@@ -1225,20 +1207,14 @@ internal static class ArchiveLiteTestRunner
             "the double-click launcher does not keep its result visible or identify the output folder");
         var buildSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "scripts",
             "build_archive_lite.ps1"));
         var artifactGuardSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "scripts",
             "verify_archive_lite_artifact.ps1"));
         var standaloneGuardSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "scripts",
             "verify_archive_lite_standalone.ps1"));
         Require(
@@ -1955,38 +1931,28 @@ internal static class ArchiveLiteTestRunner
         var repositoryRoot = FindRepositoryRoot();
         var viewModelSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App",
             "ViewModels",
             "ArchiveBrowserViewModel.cs"));
         var previewServiceSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.Core",
             "ArchivePreviewService.cs"));
         var modelPreviewSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.Core",
             "NativeModelPreviewService.cs"));
         var rendererHostSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App",
             "Controls",
             "DotNetModelPreviewHost.cs"));
         var buildSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "scripts",
             "build_archive_lite.ps1"));
         Require(
@@ -2164,8 +2130,6 @@ internal static class ArchiveLiteTestRunner
 
         var previewSource = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.Core",
             "ArchivePreviewService.cs"));
@@ -2176,8 +2140,6 @@ internal static class ArchiveLiteTestRunner
             "archive preview still contains an HKX visual-rendering route");
         var hostSource = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.App",
             "Controls",
@@ -2393,21 +2355,17 @@ internal static class ArchiveLiteTestRunner
 
         var repositoryRoot = FindRepositoryRoot();
         var acceleratorSource = File.ReadAllText(Path.Combine(repositoryRoot, "native", "cdmw_archive_accelerator", "src", "main.cpp"));
-        var fullCatalogSource = File.ReadAllText(Path.Combine(repositoryRoot, "cdmw", "core", "item_index.py"));
         var liteCatalogSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.Core",
             "ArchiveItemNameIndexService.cs"));
         Require(
             acceleratorSource.Contains("\\\"catalog_schema\\\":1", StringComparison.Ordinal)
-            && fullCatalogSource.Contains("catalog_schema = report.get(\"catalog_schema\")", StringComparison.Ordinal)
             && liteCatalogSource.Contains("item-index-job", StringComparison.Ordinal),
-            "Full and Lite do not consume the same versioned native item catalog");
+            "Lite does not consume its versioned native item catalog");
 
-        var appRoot = Path.Combine(repositoryRoot, "apps", "Cdmw.ArchiveLite", "src", "Cdmw.ArchiveLite.App");
+        var appRoot = Path.Combine(repositoryRoot, "src", "Cdmw.ArchiveLite.App");
         var mainWindow = File.ReadAllText(Path.Combine(appRoot, "MainWindow.xaml"));
         var mainWindowDocument = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "MainWindow.xaml"));
         var itemFinderDialog = File.ReadAllText(Path.Combine(appRoot, "Dialogs", "ItemFinderDialog.xaml"));
@@ -2417,8 +2375,6 @@ internal static class ArchiveLiteTestRunner
         var archiveBrowserViewModel = File.ReadAllText(Path.Combine(appRoot, "ViewModels", "ArchiveBrowserViewModel.cs"));
         var iconService = File.ReadAllText(Path.Combine(
             repositoryRoot,
-            "apps",
-            "Cdmw.ArchiveLite",
             "src",
             "Cdmw.ArchiveLite.Core",
             "ArchiveItemIconService.cs"));
@@ -3495,7 +3451,11 @@ internal static class ArchiveLiteTestRunner
             var current = new DirectoryInfo(start);
             while (current is not null)
             {
-                if (Directory.Exists(Path.Combine(current.FullName, "apps", "Cdmw.ArchiveLite"))) return current.FullName;
+                if (File.Exists(Path.Combine(current.FullName, "Cdmw.ArchiveLite.slnx"))
+                    && Directory.Exists(Path.Combine(current.FullName, "src", "Cdmw.ArchiveLite.App")))
+                {
+                    return current.FullName;
+                }
                 current = current.Parent;
             }
         }
@@ -3504,22 +3464,24 @@ internal static class ArchiveLiteTestRunner
 
     private static string FindWorkerOutputPath()
     {
-        var configuration = AppContext.BaseDirectory.Contains(
+        return Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Cdmw.ArchiveLite.Worker",
+            "bin",
+            FindBuildConfiguration(),
+            "net10.0-windows",
+            "win-x64",
+            "CdmwArchiveLite.Worker.exe");
+    }
+
+    private static string FindBuildConfiguration()
+    {
+        return AppContext.BaseDirectory.Contains(
             $"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}",
             StringComparison.OrdinalIgnoreCase)
             ? "Release"
             : "Debug";
-        return Path.Combine(
-            FindRepositoryRoot(),
-            "apps",
-            "Cdmw.ArchiveLite",
-            "src",
-            "Cdmw.ArchiveLite.Worker",
-            "bin",
-            configuration,
-            "net10.0-windows",
-            "win-x64",
-            "CdmwArchiveLite.Worker.exe");
     }
 
     private static Task RunOnWpfDispatcherAsync(Func<Task> action)
@@ -3598,9 +3560,9 @@ internal static class ArchiveLiteTestRunner
             "native",
             "cdmw_preview_core",
             "build",
-            "Release",
+            FindBuildConfiguration(),
             "cdmw-preview-core.exe");
-        Require(File.Exists(executable), "Release native preview core is not built");
+        Require(File.Exists(executable), $"{FindBuildConfiguration()} native preview core is not built");
         var testRoot = Path.Combine(ArchiveLiteDataPaths.Root, "native-pat");
         Directory.CreateDirectory(testRoot);
         var input = Path.Combine(testRoot, "tree.pat");

@@ -4,5 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="AvalonEdit" Version="6.3.1.120" />
+    <PackageVersion Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <PackageVersion Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageVersion Include="Vortice.DXGI" Version="3.8.3" />
   </ItemGroup>
 </Project>

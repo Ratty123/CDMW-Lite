@@ -7,7 +7,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $liteRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $liteRoot "..\.."))
+$repositoryRoot = $liteRoot
 $nativeRoot = Join-Path $repositoryRoot "native\cdmw_archive_core"
 $nativeBuild = Join-Path $nativeRoot "build"
 $previewRoot = Join-Path $repositoryRoot "native\cdmw_preview_core"
@@ -30,6 +30,7 @@ function Assert-LastExitCode([string]$Operation) {
 
 Push-Location $repositoryRoot
 try {
+    & (Join-Path $PSScriptRoot "verify_repository_independence.ps1")
     & (Join-Path $PSScriptRoot "verify_archive_lite_source.ps1")
 
     & cmake -S $nativeRoot -B $nativeBuild
