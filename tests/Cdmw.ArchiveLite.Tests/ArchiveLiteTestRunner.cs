@@ -424,13 +424,20 @@ internal static class ArchiveLiteTestRunner
         {
             "WindowBackgroundBrush",
             "SurfaceBrush",
+            "SurfaceRaisedBrush",
+            "SurfaceHoverBrush",
+            "SurfacePressedBrush",
             "InputBackgroundBrush",
             "TextBrush",
             "TextMutedBrush",
+            "TextDisabledBrush",
             "AccentBrush",
+            "AccentHoverBrush",
+            "AccentPressedBrush",
             "AccentTextBrush",
             "BorderBrush",
             "SelectionBrush",
+            "SelectionInactiveBrush",
             "AssociatedAssetModelBrush",
             "AssociatedAssetTextureBrush",
             "AssociatedAssetPhysicsBrush",
@@ -459,18 +466,38 @@ internal static class ArchiveLiteTestRunner
                 ThemeBrushColor(lightTheme, "SurfaceBrush"),
                 ThemeBrushColor(frostTheme, "SurfaceBrush")) >= 10d,
             "Frost is not visually distinct from the neutral Light theme");
-        foreach (var (name, theme) in new[] { ("Light", lightTheme), ("Frost", frostTheme) })
+        var activeButtonContrastPairs = new (string State, string Foreground, string Background)[]
         {
-            var accentText = ThemeBrushColor(theme, "AccentTextBrush");
-            Require(
-                string.Equals(accentText, "#FFFFFF", StringComparison.OrdinalIgnoreCase),
-                $"{name} accent buttons do not use a light foreground");
-            foreach (var accentKey in new[] { "AccentBrush", "AccentHoverBrush", "AccentPressedBrush" })
+            ("secondary", "TextBrush", "SurfaceRaisedBrush"),
+            ("secondary hover", "TextBrush", "SurfaceHoverBrush"),
+            ("secondary pressed", "TextBrush", "SurfacePressedBrush"),
+            ("secondary detail", "TextMutedBrush", "SurfaceRaisedBrush"),
+            ("secondary detail hover", "TextMutedBrush", "SurfaceHoverBrush"),
+            ("secondary detail pressed", "TextMutedBrush", "SurfacePressedBrush"),
+            ("selected secondary detail", "TextMutedBrush", "SelectionInactiveBrush"),
+            ("primary", "AccentTextBrush", "AccentBrush"),
+            ("primary hover", "AccentTextBrush", "AccentHoverBrush"),
+            ("primary pressed", "AccentTextBrush", "AccentPressedBrush"),
+            ("selected navigation", "TextBrush", "SelectionInactiveBrush"),
+        };
+        foreach (var (themeName, theme) in themeDocuments)
+        {
+            foreach (var (state, foregroundKey, backgroundKey) in activeButtonContrastPairs)
             {
+                var contrast = ContrastRatio(
+                    ThemeBrushColor(theme, foregroundKey),
+                    ThemeBrushColor(theme, backgroundKey));
                 Require(
-                    ContrastRatio(ThemeBrushColor(theme, accentKey), accentText) >= 4.5d,
-                    $"{name} {accentKey} does not retain readable accent-button text");
+                    contrast >= 4.5d,
+                    $"{themeName} {state} button contrast is only {contrast:F2}:1");
             }
+
+            var disabledContrast = ContrastRatio(
+                ThemeBrushColor(theme, "TextDisabledBrush"),
+                ThemeBrushColor(theme, "SurfaceRaisedBrush"));
+            Require(
+                disabledContrast >= 3d,
+                $"{themeName} disabled button contrast is only {disabledContrast:F2}:1");
         }
 
         var controls = System.Xml.Linq.XDocument.Load(Path.Combine(themeRoot, "Controls.xaml"));
@@ -495,6 +522,31 @@ internal static class ArchiveLiteTestRunner
                 attribute.Name.LocalName == "TextElement.Foreground"
                 && attribute.Value.Contains("TemplateBinding Foreground", StringComparison.Ordinal)),
             "button templates do not pass their foreground into generated label text");
+        foreach (var styleKey in new[] { "WorkspaceNavigationButtonStyle", "TopNavigationActionButtonStyle" })
+        {
+            var contentPresenter = controls.Root!.Elements()
+                .Single(element => element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Key" && attribute.Value == styleKey))
+                .Descendants()
+                .Single(element => element.Name.LocalName == "ContentPresenter");
+            Require(
+                contentPresenter.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "TextElement.Foreground"
+                    && attribute.Value.Contains("TemplateBinding Foreground", StringComparison.Ordinal)),
+                $"{styleKey} does not pass its readable foreground into label text");
+        }
+        var buttonStyles = controls.Root!.Elements().Where(element =>
+            element.Name.LocalName == "Style"
+            && (string.Equals((string?)element.Attribute("TargetType"), "Button", StringComparison.Ordinal)
+                || element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Key" && attribute.Value == "WorkspaceNavigationButtonStyle")));
+        Require(
+            !buttonStyles.SelectMany(static style => style.Descendants()).Any(element => element.Name.LocalName == "Setter"
+                && string.Equals((string?)element.Attribute("Property"), "Opacity", StringComparison.Ordinal)
+                && element.Ancestors().Any(ancestor => ancestor.Name.LocalName == "Trigger"
+                    && string.Equals((string?)ancestor.Attribute("Property"), "IsEnabled", StringComparison.Ordinal)
+                    && string.Equals((string?)ancestor.Attribute("Value"), "False", StringComparison.Ordinal))),
+            "disabled button labels are faded after selecting an accessible foreground");
 
         var window = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "MainWindow.xaml"));
         var progressBindings = window

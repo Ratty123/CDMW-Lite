@@ -103,7 +103,6 @@
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
-                            <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.58" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -465,6 +464,7 @@
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               ContentSource="Content"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
                                               RecognizesAccessKey="True" />
                         </Border>
                     </Grid>
@@ -508,6 +508,7 @@
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
                                               ContentSource="Content"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"
                                               RecognizesAccessKey="True" />
                         </Border>
                     </Grid>
@@ -522,7 +523,6 @@
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}" />
-                            <Setter TargetName="NavigationBorder" Property="Opacity" Value="0.6" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
