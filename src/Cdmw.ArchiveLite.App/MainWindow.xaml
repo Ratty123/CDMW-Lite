@@ -100,7 +100,7 @@
                     MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown" />
             <ComboBox Grid.Column="3"
                       Width="126"
-                      Margin="0,11,8,11"
+                      Margin="0,0,8,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=Theme}"
                       ItemsSource="{Binding Themes}"
@@ -108,7 +108,7 @@
                       shell:WindowChrome.IsHitTestVisibleInChrome="True" />
             <ComboBox Grid.Column="4"
                       Width="126"
-                      Margin="0,11,8,11"
+                      Margin="0,0,8,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=FontSize}"
                       ItemsSource="{Binding FontSizes}"
@@ -116,7 +116,7 @@
                       shell:WindowChrome.IsHitTestVisibleInChrome="True" />
             <ComboBox Grid.Column="5"
                       Width="140"
-                      Margin="0,11,8,11"
+                      Margin="0,0,8,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=LayoutDensity}"
                       ItemsSource="{Binding LayoutDensities}"
@@ -124,7 +124,7 @@
                       shell:WindowChrome.IsHitTestVisibleInChrome="True" />
             <ComboBox Grid.Column="6"
                       Width="110"
-                      Margin="0,11,10,11"
+                      Margin="0,0,10,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=Language}"
                       ItemsSource="{Binding Languages}"

@@ -698,6 +698,43 @@ internal static class ArchiveLiteTestRunner
         Require(styleKeys.Contains("TopBarComboBoxStyle"), "custom chrome has no compact top-bar selector style");
         Require(styleKeys.Contains("WorkspaceNavigationButtonStyle"), "title row has no shared workspace navigation style");
         Require(styleKeys.Contains("WorkspaceContentTabControlStyle"), "workspace content has no headerless tab host style");
+        var topBarComboBoxStyle = controls.Root!.Elements().Single(element =>
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Key" && attribute.Value == "TopBarComboBoxStyle"));
+        var topBarMinimumHeight = double.Parse(
+            topBarComboBoxStyle.Elements().Single(element =>
+                element.Name.LocalName == "Setter"
+                && string.Equals((string?)element.Attribute("Property"), "MinHeight", StringComparison.Ordinal))
+            .Attribute("Value")!.Value,
+            CultureInfo.InvariantCulture);
+        Require(
+            topBarComboBoxStyle.Elements().Any(element =>
+                element.Name.LocalName == "Setter"
+                && string.Equals((string?)element.Attribute("Property"), "VerticalAlignment", StringComparison.Ordinal)
+                && string.Equals((string?)element.Attribute("Value"), "Center", StringComparison.Ordinal)),
+            "top-bar selectors are not vertically centered in the fixed-height title row");
+        var shellGrid = window.Root!.Elements().Single(element => element.Name.LocalName == "Grid");
+        var titleRowHeight = double.Parse(
+            shellGrid.Elements().Single(element => element.Name.LocalName == "Grid.RowDefinitions")
+                .Elements().First().Attribute("Height")!.Value,
+            CultureInfo.InvariantCulture);
+        var titleBarGrid = shellGrid.Elements().Single(element =>
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Name" && attribute.Value == "TitleBarGrid"));
+        var topBarSelectors = titleBarGrid.Elements().Where(element =>
+            element.Name.LocalName == "ComboBox"
+            && ((string?)element.Attribute("Style"))?.Contains("TopBarComboBoxStyle", StringComparison.Ordinal) == true)
+            .ToArray();
+        Require(topBarSelectors.Length == 4, "title row does not expose all four appearance selectors");
+        foreach (var selector in topBarSelectors)
+        {
+            var margin = ((string?)selector.Attribute("Margin"))?.Split(',')
+                .Select(value => double.Parse(value, CultureInfo.InvariantCulture))
+                .ToArray();
+            Require(
+                margin?.Length == 4 && titleRowHeight - margin[1] - margin[3] >= topBarMinimumHeight + 1d,
+                "a top-bar selector's vertical margins clip its rounded border below the style's minimum height");
+        }
         var globallySizedControlTypes = new[]
         {
             "Window",
