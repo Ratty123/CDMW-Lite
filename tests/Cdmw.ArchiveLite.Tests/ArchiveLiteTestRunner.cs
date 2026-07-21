@@ -406,7 +406,7 @@ internal static class ArchiveLiteTestRunner
         }).ConfigureAwait(false);
     }
 
-    private static Task TestWpfThemesAsync()
+    private static async Task TestWpfThemesAsync()
     {
         var appRoot = Path.Combine(
             FindRepositoryRoot(),
@@ -482,6 +482,16 @@ internal static class ArchiveLiteTestRunner
         };
         foreach (var (themeName, theme) in themeDocuments)
         {
+            var accentBackgrounds = new[] { "AccentBrush", "AccentHoverBrush", "AccentPressedBrush" };
+            var blackWorstCase = accentBackgrounds.Min(backgroundKey =>
+                ContrastRatio("#000000", ThemeBrushColor(theme, backgroundKey)));
+            var whiteWorstCase = accentBackgrounds.Min(backgroundKey =>
+                ContrastRatio("#FFFFFF", ThemeBrushColor(theme, backgroundKey)));
+            var expectedAccentText = blackWorstCase >= whiteWorstCase ? "#000000" : "#FFFFFF";
+            Require(
+                string.Equals(ThemeBrushColor(theme, "AccentTextBrush"), expectedAccentText, StringComparison.OrdinalIgnoreCase),
+                $"{themeName} does not use its maximum-contrast black/white accent foreground");
+
             foreach (var (state, foregroundKey, backgroundKey) in activeButtonContrastPairs)
             {
                 var contrast = ContrastRatio(
@@ -500,7 +510,48 @@ internal static class ArchiveLiteTestRunner
                 $"{themeName} disabled button contrast is only {disabledContrast:F2}:1");
         }
 
+        await RunOnWpfDispatcherAsync(() =>
+        {
+            foreach (var themePath in themePaths)
+            {
+                var host = new System.Windows.Controls.Grid();
+                host.Resources.MergedDictionaries.Add(LoadWpfResourceDictionary(themePath));
+                host.Resources.MergedDictionaries.Add(LoadWpfResourceDictionary(Path.Combine(themeRoot, "Controls.xaml")));
+                var button = new System.Windows.Controls.Button
+                {
+                    Content = "Search",
+                    Style = (System.Windows.Style)host.Resources["PrimaryButtonStyle"],
+                };
+                host.Children.Add(button);
+                host.Measure(new System.Windows.Size(200d, 80d));
+                host.Arrange(new System.Windows.Rect(0d, 0d, 200d, 80d));
+                host.UpdateLayout();
+
+                var generatedLabel = FindVisualDescendant<System.Windows.Controls.TextBlock>(button)
+                    ?? throw new InvalidOperationException("Primary button label was not created.");
+                var actualForeground = generatedLabel.Foreground as System.Windows.Media.SolidColorBrush;
+                var expectedForeground = host.Resources["AccentTextBrush"]
+                    as System.Windows.Media.SolidColorBrush;
+                Require(
+                    actualForeground?.Color == expectedForeground?.Color,
+                    $"{Path.GetFileNameWithoutExtension(themePath)} primary button renders "
+                    + $"{actualForeground?.Color} instead of accent text {expectedForeground?.Color}");
+            }
+
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
+
         var controls = System.Xml.Linq.XDocument.Load(Path.Combine(themeRoot, "Controls.xaml"));
+        var defaultTextBlockStyle = controls.Root!.Elements().Single(element =>
+            element.Name.LocalName == "Style"
+            && string.Equals((string?)element.Attribute("TargetType"), "TextBlock", StringComparison.Ordinal)
+            && !element.Attributes().Any(attribute => attribute.Name.LocalName == "Key"));
+        Require(
+            defaultTextBlockStyle.Elements().Any(element =>
+                element.Name.LocalName == "Setter"
+                && string.Equals((string?)element.Attribute("Property"), "Foreground", StringComparison.Ordinal)
+                && ((string?)element.Attribute("Value"))?.Contains("TextBrush", StringComparison.Ordinal) == true),
+            "ordinary text blocks do not retain the theme's normal readable foreground");
         var primaryButtonStyle = controls.Root!.Elements().Single(element =>
             element.Attributes().Any(attribute =>
                 attribute.Name.LocalName == "Key" && attribute.Value == "PrimaryButtonStyle"));
@@ -520,8 +571,51 @@ internal static class ArchiveLiteTestRunner
         Require(
             buttonContentPresenter.Attributes().Any(attribute =>
                 attribute.Name.LocalName == "TextElement.Foreground"
-                && attribute.Value.Contains("TemplateBinding Foreground", StringComparison.Ordinal)),
-            "button templates do not pass their foreground into generated label text");
+                && attribute.Value.Contains("Binding Foreground", StringComparison.Ordinal)
+                && attribute.Value.Contains("RelativeSource TemplatedParent", StringComparison.Ordinal)),
+            "button templates do not bind their resolved foreground into generated label text");
+        Require(
+            buttonContentPresenter.Descendants().Any(element =>
+                element.Name.LocalName == "Setter"
+                && string.Equals((string?)element.Attribute("Property"), "Foreground", StringComparison.Ordinal)
+                && ((string?)element.Attribute("Value"))?.Contains("AncestorType=Button", StringComparison.Ordinal) == true),
+            "the global TextBlock style can override a button label's high-contrast foreground");
+        var columnResizeThumbStyle = controls.Root!.Elements().Single(element =>
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Key" && attribute.Value == "ColumnHeaderResizeThumbStyle"));
+        Require(
+            columnResizeThumbStyle.Elements().Any(element =>
+                element.Name.LocalName == "Setter"
+                && string.Equals((string?)element.Attribute("Property"), "Background", StringComparison.Ordinal)
+                && string.Equals((string?)element.Attribute("Value"), "Transparent", StringComparison.Ordinal))
+            && columnResizeThumbStyle.Descendants().Any(element => element.Name.LocalName == "ControlTemplate"),
+            "column resize handles can fall back to WPF's thick native Thumb chrome");
+        var columnHeaderStyle = controls.Root!.Elements().Single(element =>
+            element.Name.LocalName == "Style"
+            && string.Equals((string?)element.Attribute("TargetType"), "DataGridColumnHeader", StringComparison.Ordinal));
+        var columnHeaderGrippers = columnHeaderStyle.Descendants()
+            .Where(element => element.Name.LocalName == "Thumb"
+                && element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Name"
+                    && attribute.Value is "PART_LeftHeaderGripper" or "PART_RightHeaderGripper"))
+            .ToArray();
+        Require(
+            columnHeaderGrippers.Length == 2
+            && columnHeaderGrippers.All(element =>
+                ((string?)element.Attribute("Style"))?.Contains("ColumnHeaderResizeThumbStyle", StringComparison.Ordinal) == true),
+            "column headers do not keep invisible resize hit targets over their one-pixel dividers");
+        var gridSplitterStyle = controls.Root!.Elements().Single(element =>
+            element.Name.LocalName == "Style"
+            && string.Equals((string?)element.Attribute("TargetType"), "GridSplitter", StringComparison.Ordinal));
+        var splitterLine = gridSplitterStyle.Descendants().Single(element =>
+            element.Name.LocalName == "Border"
+            && element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Name" && attribute.Value == "SplitterLine"));
+        Require(
+            string.Equals((string?)splitterLine.Attribute("Width"), "1", StringComparison.Ordinal)
+            && gridSplitterStyle.Descendants().Where(element => element.Name.LocalName == "Setter")
+                .Any(element => string.Equals((string?)element.Attribute("TargetName"), "SplitterLine", StringComparison.Ordinal)),
+            "pane splitters do not remain a one-pixel line while hovered or dragged");
         foreach (var styleKey in new[] { "WorkspaceNavigationButtonStyle", "TopNavigationActionButtonStyle" })
         {
             var contentPresenter = controls.Root!.Elements()
@@ -559,7 +653,6 @@ internal static class ArchiveLiteTestRunner
         Require(
             progressBindings.All(static binding => binding!.Contains("Mode=OneWay", StringComparison.Ordinal)),
             "a read-only progress property uses WPF's default TwoWay binding");
-        return Task.CompletedTask;
     }
 
     private static Task TestModernShellAsync()
@@ -3760,6 +3853,33 @@ internal static class ArchiveLiteTestRunner
                 attribute.Name.LocalName == "Key" && attribute.Value == key))
             .Attribute("Color")?.Value
         ?? throw new InvalidDataException($"Theme brush {key} has no color.");
+
+    private static System.Windows.ResourceDictionary LoadWpfResourceDictionary(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return (System.Windows.ResourceDictionary)System.Windows.Markup.XamlReader.Load(stream);
+    }
+
+    private static T? FindVisualDescendant<T>(System.Windows.DependencyObject root)
+        where T : System.Windows.DependencyObject
+    {
+        for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var descendant = FindVisualDescendant<T>(child);
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
 
     private static double RgbDistance(string first, string second)
     {

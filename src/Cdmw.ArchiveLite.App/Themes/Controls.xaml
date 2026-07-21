@@ -91,8 +91,15 @@
                         <ContentPresenter Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                          TextElement.Foreground="{TemplateBinding Foreground}"
-                                          RecognizesAccessKey="True" />
+                                          TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}"
+                                          RecognizesAccessKey="True">
+                            <ContentPresenter.Resources>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground"
+                                            Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}, Mode=OneWay}" />
+                                </Style>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -582,6 +589,19 @@
         <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
     </Style>
 
+    <Style x:Key="ColumnHeaderResizeThumbStyle" TargetType="Thumb">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border Background="{TemplateBinding Background}"
+                            SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="DataGridColumnHeader">
         <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
@@ -619,12 +639,12 @@
                         <Thumb x:Name="PART_LeftHeaderGripper"
                                Width="8"
                                HorizontalAlignment="Left"
-                               Background="Transparent"
+                               Style="{StaticResource ColumnHeaderResizeThumbStyle}"
                                Cursor="SizeWE" />
                         <Thumb x:Name="PART_RightHeaderGripper"
                                Width="8"
                                HorizontalAlignment="Right"
-                               Background="Transparent"
+                               Style="{StaticResource ColumnHeaderResizeThumbStyle}"
                                Cursor="SizeWE" />
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -878,13 +898,17 @@
             <Setter.Value>
                 <ControlTemplate TargetType="GridSplitter">
                     <Border Background="{TemplateBinding Background}">
-                        <Border Width="1"
+                        <Border x:Name="SplitterLine"
+                                Width="1"
                                 HorizontalAlignment="Center"
                                 Background="{DynamicResource BorderBrush}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                            <Setter TargetName="SplitterLine" Property="Background" Value="{DynamicResource BorderStrongBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="SplitterLine" Property="Background" Value="{DynamicResource AccentBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
