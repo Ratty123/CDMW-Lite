@@ -141,6 +141,26 @@ void append_string(std::vector<std::uint8_t>& strings, const std::string& value,
     strings.insert(strings.end(), value.begin(), value.end());
 }
 
+struct SharedStringRange {
+    std::uint64_t offset = 0;
+    std::uint32_t length = 0;
+};
+
+void append_shared_string(
+    std::vector<std::uint8_t>& strings,
+    std::unordered_map<std::string, SharedStringRange>& shared,
+    const std::string& value,
+    std::uint64_t& offset,
+    std::uint32_t& length) {
+    if (const auto found = shared.find(value); found != shared.end()) {
+        offset = found->second.offset;
+        length = found->second.length;
+        return;
+    }
+    append_string(strings, value, offset, length);
+    shared.emplace(value, SharedStringRange{offset, length});
+}
+
 void publish_file(const fs::path& staging, const fs::path& destination) {
 #if defined(_WIN32)
     if (!MoveFileExW(
@@ -217,6 +237,15 @@ void write_index_atomic(
     if (!index_path.parent_path().empty()) fs::create_directories(index_path.parent_path());
     std::vector<std::uint8_t> records;
     std::vector<std::uint8_t> strings;
+    const auto path_bytes = std::accumulate(
+        entries.begin(),
+        entries.end(),
+        size_t{0},
+        [](size_t total, const Entry& entry) {
+            return total + entry.path.size();
+        });
+    strings.reserve(path_bytes);
+    std::unordered_map<std::string, SharedStringRange> shared_source_paths;
     records.reserve(entries.size() * kIndexRecordSize);
     for (size_t entry_index = 0; entry_index < entries.size(); ++entry_index) {
         const auto& entry = entries[entry_index];
@@ -226,8 +255,18 @@ void write_index_atomic(
         std::uint64_t path_offset = 0, pamt_offset = 0, paz_offset = 0;
         std::uint32_t path_length = 0, pamt_length = 0, paz_length = 0;
         append_string(strings, entry.path, path_offset, path_length);
-        append_string(strings, entry.pamt_path.u8string(), pamt_offset, pamt_length);
-        append_string(strings, entry.paz_path.u8string(), paz_offset, paz_length);
+        append_shared_string(
+            strings,
+            shared_source_paths,
+            entry.pamt_path.u8string(),
+            pamt_offset,
+            pamt_length);
+        append_shared_string(
+            strings,
+            shared_source_paths,
+            entry.paz_path.u8string(),
+            paz_offset,
+            paz_length);
         append_u64(records, path_offset);
         append_u64(records, pamt_offset);
         append_u64(records, paz_offset);

@@ -38,6 +38,15 @@ void write_u32_at(std::vector<std::uint8_t>& out, size_t offset, std::uint32_t v
     for (int shift = 0; shift < 32; shift += 8) out[offset + shift / 8] = static_cast<std::uint8_t>((value >> shift) & 0xFFu);
 }
 
+std::uint64_t read_u64_at(const std::vector<std::uint8_t>& data, size_t offset) {
+    require(offset <= data.size() && data.size() - offset >= 8, "test read is outside the buffer");
+    std::uint64_t value = 0;
+    for (int shift = 0; shift < 64; shift += 8) {
+        value |= static_cast<std::uint64_t>(data[offset + shift / 8]) << shift;
+    }
+    return value;
+}
+
 void write_bytes(const fs::path& path, const std::vector<std::uint8_t>& bytes) {
     fs::create_directories(path.parent_path());
     std::ofstream stream(path, std::ios::binary | std::ios::trunc);
@@ -65,6 +74,38 @@ std::vector<std::uint8_t> make_pamt(std::uint32_t stored_size, std::uint32_t ori
     cdmw::archive::append_u32(data, original_size);
     append_u16(data, 0);
     append_u16(data, flags);
+    return data;
+}
+
+std::vector<std::uint8_t> make_multi_entry_pamt(const std::vector<std::string>& filenames) {
+    std::vector<std::uint8_t> names;
+    std::vector<std::uint32_t> name_offsets;
+    for (const auto& filename : filenames) {
+        name_offsets.push_back(static_cast<std::uint32_t>(names.size()));
+        cdmw::archive::append_u32(names, 0xFFFFFFFFu);
+        require(filename.size() <= std::numeric_limits<std::uint8_t>::max(), "test filename is too long");
+        names.push_back(static_cast<std::uint8_t>(filename.size()));
+        names.insert(names.end(), filename.begin(), filename.end());
+    }
+
+    std::vector<std::uint8_t> data;
+    cdmw::archive::append_u32(data, 0);
+    cdmw::archive::append_u32(data, 1);
+    cdmw::archive::append_u32(data, 0);
+    for (int index = 0; index < 3; ++index) cdmw::archive::append_u32(data, 0);
+    cdmw::archive::append_u32(data, 0);
+    cdmw::archive::append_u32(data, static_cast<std::uint32_t>(names.size()));
+    data.insert(data.end(), names.begin(), names.end());
+    cdmw::archive::append_u32(data, 0);
+    cdmw::archive::append_u32(data, static_cast<std::uint32_t>(filenames.size()));
+    for (size_t index = 0; index < filenames.size(); ++index) {
+        cdmw::archive::append_u32(data, name_offsets[index]);
+        cdmw::archive::append_u32(data, static_cast<std::uint32_t>(index));
+        cdmw::archive::append_u32(data, 1);
+        cdmw::archive::append_u32(data, 1);
+        append_u16(data, 0);
+        append_u16(data, 0);
+    }
     return data;
 }
 
@@ -133,6 +174,36 @@ void test_index_and_raw_decode(const fs::path& root) {
         decoded.data(), decoded.size(), &required, note.data(), note.size(), error.data(), error.size()) == CDMW_ARCHIVE_OK,
         "raw decode failed");
     require(decoded == payload, "raw decode changed bytes");
+}
+
+void test_index_deduplicates_source_paths(const fs::path& root) {
+    write_bytes(root / "0009" / "0.paz", {'a', 'b'});
+    write_bytes(
+        root / "0009" / "0.pamt",
+        make_multi_entry_pamt({"character/model/first.pac", "character/model/second.pac"}));
+    const auto index = root / "deduplicated.ali";
+    std::uint64_t count = 0;
+    std::array<char, 512> error{};
+    require(cdmw_archive_build_index_utf8(
+        root.u8string().c_str(),
+        index.u8string().c_str(),
+        &count,
+        error.data(),
+        error.size()) == CDMW_ARCHIVE_OK,
+        std::string("deduplicated index build failed: ") + error.data());
+    require(count == 2, "deduplicated index count changed");
+    const auto bytes = cdmw::archive::read_binary(index, 1024 * 1024);
+    const auto records_offset = static_cast<size_t>(read_u64_at(bytes, 24));
+    const auto second_record = records_offset + cdmw::archive::kIndexRecordSize;
+    require(
+        read_u64_at(bytes, records_offset + 8) == read_u64_at(bytes, second_record + 8),
+        "repeated PAMT paths were duplicated in the index string table");
+    require(
+        read_u64_at(bytes, records_offset + 16) == read_u64_at(bytes, second_record + 16),
+        "repeated PAZ paths were duplicated in the index string table");
+    require(
+        read_u64_at(bytes, records_offset) != read_u64_at(bytes, second_record),
+        "distinct virtual paths unexpectedly shared one index string range");
 }
 
 void test_lz4_and_chacha(const fs::path& root) {
@@ -228,6 +299,7 @@ int main() {
         fs::create_directories(root);
         require(cdmw_archive_core_abi_version() == CDMW_ARCHIVE_CORE_ABI_VERSION, "ABI version is wrong");
         test_index_and_raw_decode(root / "raw");
+        test_index_deduplicates_source_paths(root / "deduplicated-source-paths");
         test_lz4_and_chacha(root / "codec");
         test_partial_dds_pathc(root / "partial-dds");
         fs::remove_all(root);
