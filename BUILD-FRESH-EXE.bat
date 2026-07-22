@@ -8,7 +8,7 @@ echo Building a fresh CDMW Archive Lite standalone executable...
 echo This can take a few minutes.
 echo.
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\build_archive_lite.ps1"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\build_archive_lite.ps1" -StandaloneOnly
 set "BUILD_EXIT_CODE=%ERRORLEVEL%"
 echo.
 

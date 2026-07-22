@@ -1,7 +1,8 @@
 param(
     [ValidateSet("Release")]
     [string]$Configuration = "Release",
-    [string]$OutputRoot = ""
+    [string]$OutputRoot = "",
+    [switch]$StandaloneOnly
 )
 
 Set-StrictMode -Version Latest
@@ -36,7 +37,8 @@ $rendererProject = Join-Path $repositoryRoot "tools\dotnet_mesh_editor_experimen
 $appProject = Join-Path $liteRoot "src\Cdmw.ArchiveLite.App\Cdmw.ArchiveLite.App.csproj"
 $workerProject = Join-Path $liteRoot "src\Cdmw.ArchiveLite.Worker\Cdmw.ArchiveLite.Worker.csproj"
 $standaloneProject = Join-Path $liteRoot "src\Cdmw.ArchiveLite.Standalone\Cdmw.ArchiveLite.Standalone.csproj"
-$stage = Join-Path $resolvedOutputRoot "CDMW-Archive-Lite-win-x64"
+$stageName = if ($StandaloneOnly) { ".CDMW-Archive-Lite-$version-payload.tmp" } else { "CDMW-Archive-Lite-win-x64" }
+$stage = Join-Path $resolvedOutputRoot $stageName
 $workerStage = Join-Path $resolvedOutputRoot ".worker-publish"
 $rendererStage = Join-Path $resolvedOutputRoot ".renderer-publish"
 $standaloneStage = Join-Path $resolvedOutputRoot ".standalone-publish"
@@ -86,16 +88,19 @@ Assert-ContainedOutput $zipPath
 Assert-ContainedOutput $standaloneStaging
 Assert-ContainedOutput $standalonePath
 New-Item -ItemType Directory -Path $resolvedOutputRoot -Force | Out-Null
-foreach ($target in @(
+$initialCleanupTargets = @(
     $stage,
     $workerStage,
     $rendererStage,
     $standaloneStage,
     $zipStaging,
-    $zipPath,
     $standaloneStaging,
     $standalonePath
-)) {
+)
+if (-not $StandaloneOnly) {
+    $initialCleanupTargets += $zipPath
+}
+foreach ($target in $initialCleanupTargets) {
     if (Test-Path -LiteralPath $target) {
         Remove-Item -LiteralPath $target -Recurse -Force
     }
@@ -254,10 +259,14 @@ Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot "verify_archive_li
 }
 
 Compress-Archive -LiteralPath $stage -DestinationPath $zipStaging -CompressionLevel Optimal
-Move-Item -LiteralPath $zipStaging -Destination $zipPath
+$payloadZipPath = $zipStaging
+if (-not $StandaloneOnly) {
+    Move-Item -LiteralPath $zipStaging -Destination $zipPath
+    $payloadZipPath = $zipPath
+}
 
 & dotnet publish $standaloneProject -c $Configuration -r win-x64 --self-contained true --nologo --output $standaloneStage `
-    -p:Version=$version -p:DebugType=None "-p:ArchiveLitePayloadPath=$zipPath"
+    -p:Version=$version -p:DebugType=None "-p:ArchiveLitePayloadPath=$payloadZipPath"
 Assert-LastExitCode "Archive Lite standalone launcher publish"
 $standaloneExecutable = Join-Path $standaloneStage "CdmwArchiveLite.Standalone.exe"
 if (-not (Test-Path -LiteralPath $standaloneExecutable -PathType Leaf)) {
@@ -274,9 +283,17 @@ Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot "verify_archive_li
 }
 Move-Item -LiteralPath $standaloneStaging -Destination $standalonePath
 
-Remove-Item -LiteralPath $workerStage -Recurse -Force
-Remove-Item -LiteralPath $rendererStage -Recurse -Force
-Remove-Item -LiteralPath $standaloneStage -Recurse -Force
+$finalCleanupTargets = @($workerStage, $rendererStage, $standaloneStage)
+if ($StandaloneOnly) {
+    $finalCleanupTargets += @($stage, $zipStaging)
+}
+foreach ($target in $finalCleanupTargets) {
+    if (Test-Path -LiteralPath $target) {
+        Remove-Item -LiteralPath $target -Recurse -Force
+    }
+}
 
-Write-Host "Portable Archive Lite package: $zipPath"
+if (-not $StandaloneOnly) {
+    Write-Host "Portable Archive Lite package: $zipPath"
+}
 Write-Host "Standalone Archive Lite executable: $standalonePath"

@@ -1554,6 +1554,9 @@ internal static class ArchiveLiteTestRunner
                 StringComparison.OrdinalIgnoreCase),
             "the double-click launcher bypasses the verified Archive Lite release builder");
         Require(
+            launcherSource.Contains("-StandaloneOnly", StringComparison.OrdinalIgnoreCase),
+            "the double-click launcher still requests the portable folder and ZIP outputs");
+        Require(
             launcherSource.Contains("set \"BUILD_EXIT_CODE=%ERRORLEVEL%\"", StringComparison.OrdinalIgnoreCase)
             && launcherSource.Contains("if not \"%BUILD_EXIT_CODE%\"==\"0\" goto build_failed", StringComparison.OrdinalIgnoreCase)
             && launcherSource.Contains("exit /b %BUILD_EXIT_CODE%", StringComparison.OrdinalIgnoreCase),
@@ -1580,6 +1583,8 @@ internal static class ArchiveLiteTestRunner
             "ensure_vgmstream.ps1"));
         Require(
             buildSource.Contains("function Invoke-CheckedPowerShellScript", StringComparison.Ordinal)
+            && buildSource.Contains("[switch]$StandaloneOnly", StringComparison.Ordinal)
+            && buildSource.Contains("if (-not $StandaloneOnly)", StringComparison.Ordinal)
             && buildSource.Contains(
                 "Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot \"ensure_vgmstream.ps1\")",
                 StringComparison.Ordinal)
