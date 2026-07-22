@@ -2280,15 +2280,22 @@ internal static class ArchiveLiteTestRunner
                 "specular_response is not routed from the packed material alpha channel");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
+                var initialCamera = scene.RootElement
+                    .GetProperty("archive_preview")
+                    .GetProperty("camera");
                 Require(
-                    scene.RootElement.GetProperty("archive_preview").GetProperty("textures_enabled").GetBoolean(),
-                    "textured native preview did not select the renderer's textured display mode");
+                    scene.RootElement.GetProperty("archive_preview").GetProperty("textures_enabled").GetBoolean()
+                    && Math.Abs(initialCamera.GetProperty("fit_relative_zoom").GetSingle() - 0.9f) < 0.0001f,
+                    "textured native preview did not select the renderer's textured display mode and relaxed initial fit");
             }
             Require(
                 ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/weapon/sword/example.pac")
                 && ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/01_sword/example.pac")
                 && !ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/body/example.pac")
-                && ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").PitchDegrees == 0.0f,
+                && ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").PitchDegrees == 0.0f
+                && Math.Abs(
+                    ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").FitRelativeZoom
+                    - 0.9f) < 0.0001f,
                 "archive model camera policy no longer matches Full's weapon-overhead and body-front classification");
 
             var rendererPath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DOTNET_PREVIEW_PATH");
@@ -3659,15 +3666,24 @@ internal static class ArchiveLiteTestRunner
                     .EnumerateArray()
                     .Single(view => view.GetProperty("id").GetString() == "editable")
                     .GetProperty("camera");
+                var boundsMinimum = camera.GetProperty("bounds_minimum");
+                var boundsMaximum = camera.GetProperty("bounds_maximum");
+                var sceneSize = Math.Max(
+                    boundsMaximum[0].GetDouble() - boundsMinimum[0].GetDouble(),
+                    Math.Max(
+                        boundsMaximum[1].GetDouble() - boundsMinimum[1].GetDouble(),
+                        boundsMaximum[2].GetDouble() - boundsMinimum[2].GetDouble()));
+                var fittedZoom = sceneSize > 0.0001 ? 380.0 / sceneSize : 220.0;
                 Require(
                     initialCameraApplied.RootElement.GetProperty("status").GetString() == "applied"
                     && Math.Abs(camera.GetProperty("yaw_degrees").GetDouble()) < 0.01
                     && Math.Abs(camera.GetProperty("pitch_degrees").GetDouble() + 89.0) < 0.01
+                    && Math.Abs(camera.GetProperty("zoom").GetDouble() - (fittedZoom * 0.9)) < 0.01
                     && Math.Abs(quality.GetProperty("orbit_sensitivity").GetDouble() - 0.35) < 0.001
                     && Math.Abs(quality.GetProperty("pan_sensitivity").GetDouble() - 1.15) < 0.001
                     && quality.GetProperty("invert_orbit_x").GetBoolean()
                     && quality.GetProperty("invert_pan_y").GetBoolean(),
-                    "resident renderer did not apply the classified weapon-overhead camera and live input settings");
+                    "resident renderer did not apply the relaxed weapon-overhead camera and live input settings");
             }
 
             await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new

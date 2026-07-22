@@ -84,7 +84,11 @@ internal sealed partial class MeshViewport
         _panY = 0.0f;
         if (_scene.ArchivePreviewFitToView)
         {
-            _zoom = FitZoomForBounds(SceneBoundsForContext(_activeCameraContextId));
+            var fitZoom = FitZoomForBounds(SceneBoundsForContext(_activeCameraContextId));
+            _zoom = CameraZoomPolicy.ApplyZoomFactor(
+                fitZoom,
+                fitZoom,
+                _scene.ArchivePreviewFitRelativeZoom);
         }
         UpdateGpuViewport();
     }

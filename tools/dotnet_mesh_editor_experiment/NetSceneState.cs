@@ -6,6 +6,8 @@ namespace Cdmw.MeshEditorExperiment;
 
 internal sealed class NetSceneState
 {
+    private const float DefaultArchivePreviewFitRelativeZoom = 0.9f;
+
     private sealed record PlacementSnapshot(
         Vector3 Translation,
         Vector3 RotationDegrees,
@@ -46,6 +48,7 @@ internal sealed class NetSceneState
     public float ArchivePreviewYawDegrees { get; private set; }
     public float ArchivePreviewPitchDegrees { get; private set; }
     public bool ArchivePreviewFitToView { get; private set; }
+    public float ArchivePreviewFitRelativeZoom { get; private set; } = DefaultArchivePreviewFitRelativeZoom;
     public long SceneGeneration { get; private set; }
     public long PresentationGeneration { get; private set; }
     public long LastRequestId { get; private set; }
@@ -95,6 +98,10 @@ internal sealed class NetSceneState
                     -89.0f,
                     89.0f);
                 ArchivePreviewFitToView = JsonBool(camera, "fit_to_view", true);
+                ArchivePreviewFitRelativeZoom = Math.Clamp(
+                    JsonFloat(camera, "fit_relative_zoom", ArchivePreviewFitRelativeZoom),
+                    0.1f,
+                    64.0f);
                 HasArchivePreviewCamera = true;
             }
         }
@@ -620,6 +627,7 @@ internal sealed class NetSceneState
         ArchivePreviewYawDegrees = other.ArchivePreviewYawDegrees;
         ArchivePreviewPitchDegrees = other.ArchivePreviewPitchDegrees;
         ArchivePreviewFitToView = other.ArchivePreviewFitToView;
+        ArchivePreviewFitRelativeZoom = other.ArchivePreviewFitRelativeZoom;
         SceneGeneration = other.SceneGeneration;
         PresentationGeneration = other.PresentationGeneration;
         LastRequestId = other.LastRequestId;

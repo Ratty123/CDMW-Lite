@@ -716,6 +716,7 @@ public static class NativePreviewPackageAdapter
                         ["yaw_degrees"] = initialView.YawDegrees,
                         ["pitch_degrees"] = initialView.PitchDegrees,
                         ["fit_to_view"] = initialView.FitToView,
+                        ["fit_relative_zoom"] = initialView.FitRelativeZoom,
                         ["reason"] = initialView.Reason,
                     },
                 },
