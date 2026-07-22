@@ -55,10 +55,15 @@ public sealed class ArchiveSessionManager : IDisposable
         string? stagingPath = null;
         ArchiveIndex? index = null;
         ArchiveBasenameIndex? basenameIndex = null;
+        ArchiveExtensionIndex? extensionIndex = null;
         var basenameIndexPath = persistent
             ? ResolvePersistentBasenameIndexPath(fingerprint.Value)
             : Path.ChangeExtension(indexPath, ".abi");
         var ownedBasenameIndexPath = persistent ? null : basenameIndexPath;
+        var extensionIndexPath = persistent
+            ? ResolvePersistentExtensionIndexPath(fingerprint.Value)
+            : Path.ChangeExtension(indexPath, ".aex");
+        var ownedExtensionIndexPath = persistent ? null : extensionIndexPath;
         try
         {
             await PublishProgressAsync(
@@ -122,7 +127,15 @@ public sealed class ArchiveSessionManager : IDisposable
                 basenameIndexPath,
                 progress,
                 cancellationToken).ConfigureAwait(false);
-            if (persistent)
+            await PublishProgressAsync(
+                progress,
+                new ProgressUpdate(0, index.EntryCount, "extension_index", Path.GetFileName(extensionIndexPath))).ConfigureAwait(false);
+            extensionIndex = await ArchiveExtensionIndex.OpenOrBuildAsync(
+                index,
+                extensionIndexPath,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+            if (persistent && !usedCache)
             {
                 try
                 {
@@ -146,13 +159,17 @@ public sealed class ArchiveSessionManager : IDisposable
                 fingerprint.Value,
                 index,
                 basenameIndex,
+                extensionIndex,
                 fingerprint.SourceFiles,
                 ownedIndexPath,
-                ownedBasenameIndexPath);
+                ownedBasenameIndexPath,
+                ownedExtensionIndexPath);
             index = null;
             basenameIndex = null;
+            extensionIndex = null;
             ownedIndexPath = null;
             ownedBasenameIndexPath = null;
+            ownedExtensionIndexPath = null;
             if (!_sessions.TryAdd(sessionId, session))
             {
                 session.Dispose();
@@ -170,9 +187,11 @@ public sealed class ArchiveSessionManager : IDisposable
         }
         finally
         {
+            extensionIndex?.Dispose();
             basenameIndex?.Dispose();
             index?.Dispose();
             TryDeleteFile(stagingPath);
+            TryDeleteFile(ownedExtensionIndexPath);
             TryDeleteFile(ownedBasenameIndexPath);
             TryDeleteFile(ownedIndexPath);
         }
@@ -188,6 +207,12 @@ public sealed class ArchiveSessionManager : IDisposable
     {
         ArchiveLiteDataPaths.EnsureCreated();
         return Path.Combine(ArchiveLiteDataPaths.IndexCache, $"{fingerprint}.abi");
+    }
+
+    private static string ResolvePersistentExtensionIndexPath(string fingerprint)
+    {
+        ArchiveLiteDataPaths.EnsureCreated();
+        return Path.Combine(ArchiveLiteDataPaths.IndexCache, $"{fingerprint}.aex");
     }
 
     private void ReleaseSessionsForIndexPath(string indexPath)

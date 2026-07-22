@@ -1648,8 +1648,10 @@ internal static class ArchiveLiteTestRunner
         var native = new NativeArchiveCore();
         string persistentPath;
         string persistentBasenamePath;
+        string persistentExtensionPath;
         string temporaryPath;
         string temporaryBasenamePath;
+        string temporaryExtensionPath;
         using (var sessions = new ArchiveSessionManager(native))
         {
             var built = await sessions.OpenAsync(
@@ -1660,15 +1662,25 @@ internal static class ArchiveLiteTestRunner
                 CancellationToken.None).ConfigureAwait(false);
             persistentPath = sessions.GetRequired(built.SessionId).Index.Path;
             persistentBasenamePath = Path.ChangeExtension(persistentPath, ".abi");
+            persistentExtensionPath = Path.ChangeExtension(persistentPath, ".aex");
             Require(built.CacheMode == ArchiveCacheMode.Persistent, "persistent cache mode was not returned");
             Require(!built.UsedCachedIndex, "a forced persistent build incorrectly reported a cache hit");
             Require(File.Exists(persistentPath), "persistent archive index was not retained");
             Require(File.Exists(persistentBasenamePath), "persistent basename lookup index was not retained");
+            Require(File.Exists(persistentExtensionPath), "persistent extension lookup index was not retained");
+
+            var manifestPath = Directory.EnumerateFiles(ArchiveLiteDataPaths.IndexRootManifests, "*.json")
+                .Single(path => File.ReadAllText(path).Contains(built.Fingerprint, StringComparison.OrdinalIgnoreCase));
+            var manifestBeforeReuse = await File.ReadAllBytesAsync(manifestPath).ConfigureAwait(false);
 
             var reused = await sessions.OpenAsync(
                 new OpenArchiveRequest(fixture.Root, CacheMode: ArchiveCacheMode.Persistent),
                 CancellationToken.None).ConfigureAwait(false);
             Require(reused.UsedCachedIndex, "a verified persistent index was not reused");
+            var manifestAfterReuse = await File.ReadAllBytesAsync(manifestPath).ConfigureAwait(false);
+            Require(
+                manifestBeforeReuse.AsSpan().SequenceEqual(manifestAfterReuse),
+                "reusing an unchanged persistent cache rewrote its freshness manifest");
 
             var priorSessionIds = new List<string> { built.SessionId, reused.SessionId };
             for (var refresh = 0; refresh < 3; refresh++)
@@ -1718,10 +1730,12 @@ internal static class ArchiveLiteTestRunner
                 CancellationToken.None).ConfigureAwait(false);
             temporaryPath = sessions.GetRequired(sessionOnly.SessionId).Index.Path;
             temporaryBasenamePath = Path.ChangeExtension(temporaryPath, ".abi");
+            temporaryExtensionPath = Path.ChangeExtension(temporaryPath, ".aex");
             Require(sessionOnly.CacheMode == ArchiveCacheMode.SessionOnly, "session-only cache mode was not returned");
             Require(!sessionOnly.UsedCachedIndex, "session-only loading reused a persistent index");
             Require(File.Exists(temporaryPath), "session-only index was not available for the live session");
             Require(File.Exists(temporaryBasenamePath), "session-only basename index was not available for the live session");
+            Require(File.Exists(temporaryExtensionPath), "session-only extension index was not available for the live session");
             Require(
                 !Path.GetFullPath(temporaryPath).Equals(Path.GetFullPath(persistentPath), StringComparison.OrdinalIgnoreCase),
                 "session-only loading wrote into the persistent index path");
@@ -1729,8 +1743,25 @@ internal static class ArchiveLiteTestRunner
 
         Require(File.Exists(persistentPath), "closing a session removed its persistent index");
         Require(File.Exists(persistentBasenamePath), "closing a session removed its persistent basename index");
+        Require(File.Exists(persistentExtensionPath), "closing a session removed its persistent extension index");
         Require(!File.Exists(temporaryPath), "closing the worker session retained a one-time index");
         Require(!File.Exists(temporaryBasenamePath), "closing the worker session retained a one-time basename index");
+        Require(!File.Exists(temporaryExtensionPath), "closing the worker session retained a one-time extension index");
+
+        await File.WriteAllBytesAsync(persistentExtensionPath, [0x01, 0x02, 0x03]).ConfigureAwait(false);
+        using (var repairedSessions = new ArchiveSessionManager(native))
+        {
+            var repaired = await repairedSessions.OpenAsync(
+                new OpenArchiveRequest(fixture.Root, CacheMode: ArchiveCacheMode.Persistent),
+                CancellationToken.None).ConfigureAwait(false);
+            Require(repaired.UsedCachedIndex, "repairing a derived extension lookup rebuilt the primary archive index");
+            var facets = await new ArchiveFacetsService(repairedSessions).LoadAsync(
+                new ArchiveFacetsRequest(repaired.SessionId),
+                null,
+                CancellationToken.None).ConfigureAwait(false);
+            Require(facets.Extensions.Count > 0, "the repaired extension lookup returned no facets");
+            Require(new FileInfo(persistentExtensionPath).Length > 64, "the damaged extension lookup was not rebuilt");
+        }
         foreach (var (sourcePath, expectedHash) in sourceHashes)
         {
             Require(

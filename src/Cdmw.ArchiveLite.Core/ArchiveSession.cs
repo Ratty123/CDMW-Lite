@@ -14,6 +14,7 @@ public sealed class ArchiveSession : IDisposable
     private IReadOnlyList<ArchiveExtensionFacet>? _extensionFacets;
     private readonly string? _ownedIndexPath;
     private readonly string? _ownedBasenameIndexPath;
+    private readonly string? _ownedExtensionIndexPath;
     private int _disposed;
 
     internal ArchiveSession(
@@ -22,18 +23,22 @@ public sealed class ArchiveSession : IDisposable
         string fingerprint,
         ArchiveIndex index,
         ArchiveBasenameIndex basenameIndex,
+        ArchiveExtensionIndex extensionIndex,
         IReadOnlyList<string> sourceFiles,
         string? ownedIndexPath = null,
-        string? ownedBasenameIndexPath = null)
+        string? ownedBasenameIndexPath = null,
+        string? ownedExtensionIndexPath = null)
     {
         Id = id;
         PackageRoot = packageRoot;
         Fingerprint = fingerprint;
         Index = index;
         BasenameIndex = basenameIndex;
+        ExtensionIndex = extensionIndex;
         SourceFiles = sourceFiles;
         _ownedIndexPath = ownedIndexPath;
         _ownedBasenameIndexPath = ownedBasenameIndexPath;
+        _ownedExtensionIndexPath = ownedExtensionIndexPath;
     }
 
     public string Id { get; }
@@ -41,6 +46,7 @@ public sealed class ArchiveSession : IDisposable
     public string Fingerprint { get; }
     public ArchiveIndex Index { get; }
     internal ArchiveBasenameIndex BasenameIndex { get; }
+    internal ArchiveExtensionIndex ExtensionIndex { get; }
     public IReadOnlyList<string> SourceFiles { get; }
     internal SemaphoreSlim NameIndexBuildGate { get; } = new(1, 1);
 
@@ -135,18 +141,26 @@ public sealed class ArchiveSession : IDisposable
             NameIndexBuildGate.Dispose();
             try
             {
-                BasenameIndex.Dispose();
+                ExtensionIndex.Dispose();
             }
             finally
             {
                 try
                 {
-                    Index.Dispose();
+                    BasenameIndex.Dispose();
                 }
                 finally
                 {
-                    DeleteOwnedIndex(_ownedBasenameIndexPath);
-                    DeleteOwnedIndex(_ownedIndexPath);
+                    try
+                    {
+                        Index.Dispose();
+                    }
+                    finally
+                    {
+                        DeleteOwnedIndex(_ownedExtensionIndexPath);
+                        DeleteOwnedIndex(_ownedBasenameIndexPath);
+                        DeleteOwnedIndex(_ownedIndexPath);
+                    }
                 }
             }
         }

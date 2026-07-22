@@ -43,6 +43,16 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
             }
             yield break;
         }
+        if (session.ExtensionIndex.TryGetEntryIds(query.Extensions, out var extensionEntryIds))
+        {
+            foreach (var entryId in extensionEntryIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var entry = session.Index.ReadEntry(entryId);
+                if (Matches(entry, query, entryIds: null)) yield return entry;
+            }
+            yield break;
+        }
         for (long entryId = 0; entryId < session.Index.EntryCount; entryId++)
         {
             if ((entryId & 0xFF) == 0) cancellationToken.ThrowIfCancellationRequested();
@@ -80,10 +90,13 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
         var categories = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         long total = 0;
         var descendingPath = query.SortField == ArchiveSortField.Path && query.SortDescending;
-        for (long position = 0; position < session.Index.EntryCount; position++)
+        var usesExtensionIndex = session.ExtensionIndex.TryGetEntryIds(query.Extensions, out var extensionEntryIds);
+        var candidateCount = usesExtensionIndex ? extensionEntryIds.Count : session.Index.EntryCount;
+        for (long position = 0; position < candidateCount; position++)
         {
             if ((position & 0xFF) == 0) cancellationToken.ThrowIfCancellationRequested();
-            var entryId = descendingPath ? session.Index.EntryCount - position - 1 : position;
+            var candidatePosition = descendingPath ? candidateCount - position - 1 : position;
+            var entryId = usesExtensionIndex ? extensionEntryIds[checked((int)candidatePosition)] : candidatePosition;
             var entry = session.Index.ReadEntry(entryId);
             if (needsNameDataDuringScan)
             {

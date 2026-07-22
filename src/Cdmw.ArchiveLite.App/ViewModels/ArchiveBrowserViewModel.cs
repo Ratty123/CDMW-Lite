@@ -1937,6 +1937,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             "index_sort" => LocalizationManager.Get("ProgressSortingIndex"),
             "index_write" => LocalizationManager.Get("ProgressWritingIndex"),
             "index_publish" => LocalizationManager.Get("ProgressPublishingIndex"),
+            "lookup_index" or "lookup_index_build" or "extension_index" or "extension_index_build" => LocalizationManager.Get("ProgressBuildingIndex"),
             "validate" => LocalizationManager.Get("ProgressValidating"),
             "export" => LocalizationManager.Get("ProgressExporting"),
             "mesh_export_prepare" => LocalizationManager.Get("ProgressPreparingMesh"),
