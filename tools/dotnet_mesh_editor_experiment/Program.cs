@@ -129,7 +129,9 @@ internal sealed partial class ExperimentForm : Form
             _overlaySettings = new MeshOverlaySettings(
                 new MeshOverlayColors(Color.FromArgb(48, 60, 74), MeshOverlayColors.Default.Vertex),
                 new MeshOverlaySizing(1.0f, MeshOverlaySizing.Default.VertexMarkerSizePixels));
-            _ = _viewport.TrySetSynchronizedDisplayMode("untextured_wire", out _);
+            _ = _viewport.TrySetSynchronizedDisplayMode(
+                _scene.ArchivePreviewTexturesEnabled ? "textured" : "untextured_wire",
+                out _);
         }
         _viewport.SetOverlaySettings(_overlaySettings);
         _viewport.ToolOptionsProvider = ToolOptionsPayload;
@@ -954,6 +956,7 @@ internal sealed partial class MeshViewport : Control
         _renderSurfaceResizeTimer.Tick += OnRenderSurfaceResizeTimerTick;
         InitializeGpuViewport();
         FrameMesh();
+        ApplyArchivePreviewInitialCamera();
         InitializePresentationContexts();
     }
 

@@ -27,6 +27,19 @@
   <data name="MaterialFinder" xml:space="preserve"><value>Buscador de materiales</value></data>
   <data name="AssetFamily" xml:space="preserve"><value>Familia de recursos</value></data>
   <data name="AssociatedAssets" xml:space="preserve"><value>Recursos asociados</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>Mostrar texturas</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>Resuelve y muestra las texturas del modelo bajo demanda. Déjelo desmarcado para seleccionar PAC con mayor rapidez.</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>Ajustes de vista previa</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>Control de cámara</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>Controles de cámara .NET/Vortice: arrastre izquierdo para orbitar; arrastre central, derecho o Mayús+izquierdo para desplazar; la rueda acerca o aleja.</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>Sensibilidad de órbita</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>Sensibilidad de desplazamiento</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>Invertir órbita X</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>Invertir órbita Y</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>Invertir desplazamiento X</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>Invertir desplazamiento Y</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>Estos ajustes solo cambian la navegación de la vista previa; nunca editan ni exportan el recurso.</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>Restablecer cámara</value></data>
   <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>Recursos asociados ({0:N0})</value></data>
   <data name="FindAssociatedAssets" xml:space="preserve"><value>Buscar recursos</value></data>
   <data name="ShowAssociatedAsset" xml:space="preserve"><value>Mostrar en el navegador</value></data>

@@ -17,7 +17,8 @@ public sealed record PreviewRequest(
     string SessionId,
     long EntryId,
     int TextCharacterLimit = 120_000,
-    int BinaryByteLimit = 256);
+    int BinaryByteLimit = 256,
+    bool IncludeModelTextures = false);
 
 public sealed record PreviewResult(
     string SessionId,

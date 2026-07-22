@@ -47,6 +47,13 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private BitmapSource? _previewImage;
     private Uri? _previewMediaSource;
     private string? _modelPreviewPackagePath;
+    private bool _showModelTextures;
+    private double _modelPreviewOrbitSensitivity;
+    private double _modelPreviewPanSensitivity;
+    private bool _modelPreviewInvertOrbitX;
+    private bool _modelPreviewInvertOrbitY;
+    private bool _modelPreviewInvertPanX;
+    private bool _modelPreviewInvertPanY;
     private PreviewKind _previewKind = PreviewKind.Metadata;
     private bool _isPreviewBusy;
     private bool _shouldPrewarmModelRenderer;
@@ -115,6 +122,13 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _manifestFormat = Enum.IsDefined(browserSettings.ManifestFormat)
             ? browserSettings.ManifestFormat
             : ExportManifestFormat.Json;
+        var cameraInput = browserSettings.ModelPreviewCameraInput ?? new ModelPreviewCameraInputSettings();
+        _modelPreviewOrbitSensitivity = Math.Clamp(cameraInput.OrbitSensitivity, 0.05, 1.0);
+        _modelPreviewPanSensitivity = Math.Clamp(cameraInput.PanSensitivity, 0.05, 3.0);
+        _modelPreviewInvertOrbitX = cameraInput.InvertOrbitX;
+        _modelPreviewInvertOrbitY = cameraInput.InvertOrbitY;
+        _modelPreviewInvertPanX = cameraInput.InvertPanX;
+        _modelPreviewInvertPanY = cameraInput.InvertPanY;
         AssociatedAssets = new AssociatedAssetsViewModel(
             worker,
             ShowAssociatedAssetInBrowserAsync,
@@ -136,6 +150,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         PreviousPageCommand = new AsyncCommand(token => QueryAsync(Math.Max(0, PageStart - PageSize), token), () => PageStart > 0 && !IsBusy);
         NextPageCommand = new AsyncCommand(token => QueryAsync(PageStart + PageSize, token), () => PageStart + Entries.Count < TotalMatches && !IsBusy);
         CancelCommand = new RelayCommand(CancelForeground, () => IsBusy);
+        ResetModelPreviewCameraInputCommand = new RelayCommand(ResetModelPreviewCameraInput);
         ExportSelectedCommand = new AsyncCommand(ExportSelectedAsync, () => CanExportSelectedEntries() && !IsBusy);
         ExportFamilyCommand = new AsyncCommand(
             token => AssociatedAssets.ExportCurrentFamilyAsync(token),
@@ -174,6 +189,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     public AsyncCommand PreviousPageCommand { get; }
     public AsyncCommand NextPageCommand { get; }
     public RelayCommand CancelCommand { get; }
+    public RelayCommand ResetModelPreviewCameraInputCommand { get; }
     public AsyncCommand ExportSelectedCommand { get; }
     public AsyncCommand ExportFamilyCommand { get; }
     public AsyncCommand ExportFolderCommand { get; }
@@ -476,6 +492,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                     _selectedEntryIds = [];
                 }
                 AssociatedAssets.SelectSource(SessionId, value);
+                OnPropertyChanged(nameof(IsModelSelection));
                 ExportSelectedCommand.RaiseCanExecuteChanged();
                 ExportFamilyCommand.RaiseCanExecuteChanged();
                 if (!_suppressPreviewSelection)
@@ -562,6 +579,57 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         private set => SetProperty(ref _isPreviewBusy, value);
     }
 
+    public bool ShowModelTextures
+    {
+        get => _showModelTextures;
+        set
+        {
+            if (!SetProperty(ref _showModelTextures, value)
+                || !IsModelSelection
+                || SelectedEntry is not { } entry)
+            {
+                return;
+            }
+            _ = LoadPreviewLatestAsync(entry);
+        }
+    }
+
+    public double ModelPreviewOrbitSensitivity
+    {
+        get => _modelPreviewOrbitSensitivity;
+        set => SetProperty(ref _modelPreviewOrbitSensitivity, Math.Clamp(value, 0.05, 1.0));
+    }
+
+    public double ModelPreviewPanSensitivity
+    {
+        get => _modelPreviewPanSensitivity;
+        set => SetProperty(ref _modelPreviewPanSensitivity, Math.Clamp(value, 0.05, 3.0));
+    }
+
+    public bool ModelPreviewInvertOrbitX
+    {
+        get => _modelPreviewInvertOrbitX;
+        set => SetProperty(ref _modelPreviewInvertOrbitX, value);
+    }
+
+    public bool ModelPreviewInvertOrbitY
+    {
+        get => _modelPreviewInvertOrbitY;
+        set => SetProperty(ref _modelPreviewInvertOrbitY, value);
+    }
+
+    public bool ModelPreviewInvertPanX
+    {
+        get => _modelPreviewInvertPanX;
+        set => SetProperty(ref _modelPreviewInvertPanX, value);
+    }
+
+    public bool ModelPreviewInvertPanY
+    {
+        get => _modelPreviewInvertPanY;
+        set => SetProperty(ref _modelPreviewInvertPanY, value);
+    }
+
     public bool ShouldPrewarmModelRenderer
     {
         get => _shouldPrewarmModelRenderer;
@@ -577,7 +645,17 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     public bool IsImagePreview => PreviewKind == PreviewKind.Image && PreviewImage is not null;
     public bool IsMediaPreview => PreviewKind is PreviewKind.Audio or PreviewKind.Video && PreviewMediaSource is not null;
     public bool IsModelPreview => PreviewKind == PreviewKind.Model && !string.IsNullOrWhiteSpace(ModelPreviewPackagePath);
+    public bool IsModelSelection => SelectedEntry is { Extension: var extension }
+        && NativeModelExtension(extension);
     public bool IsTextPreview => !IsImagePreview && !IsMediaPreview && !IsModelPreview;
+
+    public ModelPreviewCameraInputSettings CaptureModelPreviewCameraInputSettings() => new(
+        ModelPreviewOrbitSensitivity,
+        ModelPreviewPanSensitivity,
+        ModelPreviewInvertOrbitX,
+        ModelPreviewInvertOrbitY,
+        ModelPreviewInvertPanX,
+        ModelPreviewInvertPanY);
 
     public long TotalMatches
     {
@@ -1474,10 +1552,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
 
         try
         {
-            var isNativeModel = entry.Extension.Equals(".pac", StringComparison.OrdinalIgnoreCase)
-                || entry.Extension.Equals(".pam", StringComparison.OrdinalIgnoreCase)
-                || entry.Extension.Equals(".pamlod", StringComparison.OrdinalIgnoreCase)
-                || entry.Extension.Equals(".pat", StringComparison.OrdinalIgnoreCase);
+            var isNativeModel = NativeModelExtension(entry.Extension);
             if (!isNativeModel)
             {
                 await Task.Delay(90, operation.Token).ConfigureAwait(true);
@@ -1492,7 +1567,10 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             var result = await _worker.SendAsync<PreviewRequest, PreviewResult>(
                 WorkerProtocol.Preview,
                 generation,
-                new PreviewRequest(sessionId, entry.EntryId),
+                new PreviewRequest(
+                    sessionId,
+                    entry.EntryId,
+                    IncludeModelTextures: isNativeModel && ShowModelTextures),
                 operation.Token,
                 progress).ConfigureAwait(true);
             if (generation != Volatile.Read(ref _previewGeneration))
@@ -1623,6 +1701,18 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         CancelOperation(operation);
         ClearPreview();
     }
+
+    private void ResetModelPreviewCameraInput()
+    {
+        ModelPreviewOrbitSensitivity = 0.22;
+        ModelPreviewPanSensitivity = 0.60;
+    }
+
+    private static bool NativeModelExtension(string extension) =>
+        extension.Equals(".pac", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".pam", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".pamlod", StringComparison.OrdinalIgnoreCase)
+        || extension.Equals(".pat", StringComparison.OrdinalIgnoreCase);
 
     private async Task ExportSelectedAsync(CancellationToken cancellationToken)
     {

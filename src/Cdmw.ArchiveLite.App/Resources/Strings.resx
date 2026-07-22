@@ -27,6 +27,19 @@
   <data name="MaterialFinder" xml:space="preserve"><value>Material Finder</value></data>
   <data name="AssetFamily" xml:space="preserve"><value>Asset Family</value></data>
   <data name="AssociatedAssets" xml:space="preserve"><value>Associated assets</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>Display textures</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>Resolve and display model textures on demand. Leave unchecked for the fastest PAC selection.</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>Preview settings</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>Camera input</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>.NET/Vortice camera controls: left-drag orbits; middle-drag, right-drag, or Shift+left-drag pans; the mouse wheel zooms.</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>Orbit sensitivity</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>Pan sensitivity</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>Invert orbit X</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>Invert orbit Y</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>Invert pan X</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>Invert pan Y</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>These settings only change preview navigation; they never edit or export the asset.</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>Reset camera input</value></data>
   <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>Associated assets ({0:N0})</value></data>
   <data name="FindAssociatedAssets" xml:space="preserve"><value>Find assets</value></data>
   <data name="ShowAssociatedAsset" xml:space="preserve"><value>Show in browser</value></data>

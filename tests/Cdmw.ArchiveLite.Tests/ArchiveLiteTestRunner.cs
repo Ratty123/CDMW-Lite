@@ -101,6 +101,12 @@ internal static class ArchiveLiteTestRunner
         Require(
             WorkerProtocol.ReadPayload<OpenArchiveRequest>(openMessage)?.CacheMode == ArchiveCacheMode.SessionOnly,
             "archive cache mode did not round-trip");
+        var texturedPreview = new PreviewRequest("session", 17, IncludeModelTextures: true);
+        var texturedPreviewJson = JsonSerializer.Serialize(texturedPreview, WorkerProtocol.JsonOptions);
+        Require(
+            texturedPreviewJson.Contains("\"include_model_textures\":true", StringComparison.Ordinal)
+            && new PreviewRequest("session", 17).IncludeModelTextures == false,
+            "opt-in model texture intent is not snake case or no longer defaults off");
         var cachedOnlyMessage = WorkerProtocol.Request(
             Guid.Parse("23232323-2323-2323-2323-232323232323"),
             8,
@@ -317,7 +323,14 @@ internal static class ArchiveLiteTestRunner
                 ViewMode: ArchiveViewMode.CategoriesAndFolders,
                 FolderPath: "character/model/player",
                 CollisionPolicy: ExportCollisionPolicy.Overwrite,
-                ManifestFormat: ExportManifestFormat.Csv),
+                ManifestFormat: ExportManifestFormat.Csv,
+                ModelPreviewCameraInput: new ModelPreviewCameraInputSettings(
+                    OrbitSensitivity: 0.35,
+                    PanSensitivity: 1.15,
+                    InvertOrbitX: true,
+                    InvertOrbitY: false,
+                    InvertPanX: false,
+                    InvertPanY: true)),
             TextSearch: new TextSearchSettings(
                 TextSearchSourceKind.LooseFolder,
                 "C:\\loose",
@@ -396,6 +409,22 @@ internal static class ArchiveLiteTestRunner
             Require(browser.SelectedRole.Role is null, "removed role filter still affects archive queries");
             Require(browser.CollisionPolicy == ExportCollisionPolicy.Overwrite, "export collision policy was not restored");
             Require(browser.ManifestFormat == ExportManifestFormat.Csv, "export manifest format was not restored");
+            Require(
+                browser.ModelPreviewOrbitSensitivity == 0.35
+                && browser.ModelPreviewPanSensitivity == 1.15
+                && browser.ModelPreviewInvertOrbitX
+                && !browser.ModelPreviewInvertOrbitY
+                && !browser.ModelPreviewInvertPanX
+                && browser.ModelPreviewInvertPanY,
+                "model-preview camera input settings were not restored");
+            Require(!browser.ShowModelTextures, "model textures must stay session-only and opt-in after startup");
+            browser.ResetModelPreviewCameraInputCommand.Execute(null);
+            Require(
+                browser.ModelPreviewOrbitSensitivity == 0.22
+                && browser.ModelPreviewPanSensitivity == 0.60
+                && browser.ModelPreviewInvertOrbitX
+                && browser.ModelPreviewInvertPanY,
+                "camera-input reset did not restore Full's sensitivity defaults while preserving inversion choices");
             Require(search.SourceKind == TextSearchSourceKind.LooseFolder, "text-search source was not restored");
             Require(search.LooseFolder == "C:\\loose", "text-search loose folder was not restored");
             Require(search.Query == "material_name", "text-search query was not restored");
@@ -948,6 +977,50 @@ internal static class ArchiveLiteTestRunner
             && !associatedAssetsDrawer.Attributes().Any(attribute => attribute.Name.LocalName == "Panel.ZIndex"),
             "associated assets still overlap the native preview instead of occupying the adjacent layout column");
 
+        var textureToggle = window.Descendants().Single(element =>
+            ((string?)element.Attribute("IsChecked"))?.Contains(
+                "ArchiveBrowser.ShowModelTextures",
+                StringComparison.Ordinal) == true);
+        Require(
+            textureToggle.Name.LocalName == "CheckBox"
+            && ((string?)textureToggle.Attribute("Visibility"))?.Contains("IsModelSelection", StringComparison.Ordinal) == true,
+            "the on-demand texture option is not a model-only checkbox beside the preview actions");
+        Require(
+            window.Descendants().Any(element =>
+                string.Equals((string?)element.Attribute("Click"), "OnModelPreviewSettingsClick", StringComparison.Ordinal)
+                && ((string?)element.Attribute("Visibility"))?.Contains("IsModelSelection", StringComparison.Ordinal) == true),
+            "model previews do not expose the Preview Settings window");
+        var modelPreviewHost = window.Descendants().Single(element =>
+            element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Name" && attribute.Value == "ModelPreviewHost"));
+        foreach (var binding in new[]
+        {
+            "ModelPreviewOrbitSensitivity",
+            "ModelPreviewPanSensitivity",
+            "ModelPreviewInvertOrbitX",
+            "ModelPreviewInvertOrbitY",
+            "ModelPreviewInvertPanX",
+            "ModelPreviewInvertPanY",
+        })
+        {
+            Require(
+                modelPreviewHost.Attributes().Any(attribute => attribute.Value.Contains(binding, StringComparison.Ordinal)),
+                $"model preview host is missing the live {binding} binding");
+        }
+        var settingsDialog = System.Xml.Linq.XDocument.Load(Path.Combine(
+            appRoot,
+            "Dialogs",
+            "ModelPreviewSettingsDialog.xaml"));
+        Require(
+            settingsDialog.Descendants().Any(element =>
+                element.Name.LocalName == "TabItem"
+                && ((string?)element.Attribute("Header"))?.Contains("CameraInput", StringComparison.Ordinal) == true)
+            && settingsDialog.Descendants().Count(element => element.Name.LocalName == "Slider") == 2
+            && settingsDialog.Descendants().Count(element =>
+                element.Name.LocalName == "CheckBox"
+                && ((string?)element.Attribute("IsChecked"))?.Contains("ModelPreviewInvert", StringComparison.Ordinal) == true) == 4,
+            "Preview Settings does not provide the requested Orbit/Pan camera-input tab");
+
         var imagePreview = previewLayout.Descendants().Single(element =>
             element.Name.LocalName == "Image"
             && ((string?)element.Attribute("Source"))?.Contains(
@@ -1197,13 +1270,24 @@ internal static class ArchiveLiteTestRunner
             "legacy Role layout migration disturbed another saved column or lost the old width");
 
         var hostSource = File.ReadAllText(Path.Combine(appRoot, "Controls", "DotNetModelPreviewHost.cs"));
-        Require(hostSource.Contains("--simple-preview", StringComparison.Ordinal), "Archive Lite does not request the simple renderer surface");
+        Require(
+            hostSource.Contains("--simple-preview", StringComparison.Ordinal)
+            && hostSource.Contains("presentation_state_update", StringComparison.Ordinal)
+            && hostSource.Contains("resident_presentation_state_v1", StringComparison.Ordinal)
+            && hostSource.Contains("orbit_sensitivity = input.OrbitSensitivity", StringComparison.Ordinal)
+            && hostSource.Contains("pan_sensitivity = input.PanSensitivity", StringComparison.Ordinal),
+            "Archive Lite does not request the simple renderer surface with live Orbit/Pan input updates");
         var previewSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
             "Cdmw.ArchiveLite.Core",
             "NativeModelPreviewService.cs"));
-        Require(previewSource.Contains("[\"use_textures_by_default\"] = false", StringComparison.Ordinal), "native PAC preview still requests textures");
+        Require(
+            previewSource.Contains("[\"use_textures_by_default\"] = includeTextures", StringComparison.Ordinal)
+            && previewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
+            && previewSource.Contains("var channels = includeTextures", StringComparison.Ordinal)
+            && previewSource.Contains("? ResolveChannels(root, batch, out components)", StringComparison.Ordinal),
+            "native PAC texture discovery is not isolated behind the explicit opt-in route");
         var rendererProgram = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "tools",
@@ -1214,10 +1298,20 @@ internal static class ArchiveLiteTestRunner
             && rendererProgram.Contains("_presentationGizmoVisible = scene.GizmoVisible", StringComparison.Ordinal),
             "the renderer presentation contexts can restore the grid or gizmo over a hidden scene setting");
         Require(
-            rendererProgram.Contains("TrySetSynchronizedDisplayMode(\"untextured_wire\"", StringComparison.Ordinal)
+            rendererProgram.Contains("ArchivePreviewTexturesEnabled ? \"textured\" : \"untextured_wire\"", StringComparison.Ordinal)
             && rendererProgram.Contains("Color.FromArgb(48, 60, 74)", StringComparison.Ordinal)
             && rendererProgram.Contains("new MeshOverlaySizing(1.0f", StringComparison.Ordinal),
-            "the simple Archive Lite renderer does not use the restrained matte topology presentation");
+            "the simple Archive Lite renderer does not switch between opt-in textures and the restrained default presentation");
+        var residentPackageSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "tools",
+            "dotnet_mesh_editor_experiment",
+            "MeshViewport.ResidentPackage.cs"));
+        Require(
+            residentPackageSource.Contains("preserveArchiveCamera", StringComparison.Ordinal)
+            && residentPackageSource.Contains("ApplyArchivePreviewInitialCamera", StringComparison.Ordinal)
+            && residentPackageSource.Contains("(_yaw, _pitch, _zoom, _panX, _panY) = previousCamera", StringComparison.Ordinal),
+            "resident texture refreshes do not preserve the user's camera or apply the classified initial view");
         var displayModesSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "tools",
@@ -1919,6 +2013,10 @@ internal static class ArchiveLiteTestRunner
                     foreach (var value in vertex) writer.Write(value);
                 }
             }
+            var textureRoot = Path.Combine(root, "textures");
+            Directory.CreateDirectory(textureRoot);
+            var baseTexturePath = Path.Combine(textureRoot, "base.dds");
+            await File.WriteAllBytesAsync(baseTexturePath, "DDS synthetic texture reference"u8.ToArray()).ConfigureAwait(false);
             var manifestPath = Path.Combine(root, "manifest.json");
             await File.WriteAllTextAsync(
                 manifestPath,
@@ -1926,6 +2024,7 @@ internal static class ArchiveLiteTestRunner
                 {
                     schema_version = 8,
                     backend = "d3d11",
+                    source_path = "character/model/01_weapon/sword/synthetic.pac",
                     batches = new[]
                     {
                         new
@@ -1941,7 +2040,10 @@ internal static class ArchiveLiteTestRunner
                             material_category = "metal",
                             material_category_confidence = 0.9f,
                             material_response_promoted = true,
-                            dds_textures = new Dictionary<string, object>(),
+                            dds_textures = new Dictionary<string, object>
+                            {
+                                ["base"] = new { source_path = "textures/base.dds" },
+                            },
                         },
                     },
                 }),
@@ -1953,11 +2055,18 @@ internal static class ArchiveLiteTestRunner
             Require(File.Exists(Path.Combine(root, "net_materials.json")), "renderer materials sidecar was not created");
             Require(File.Exists(Path.Combine(root, "dotnet_scene.json")), "renderer scene sidecar was not created");
             Require(File.Exists(Path.Combine(root, "mesh.cdmeta.json")), "renderer metadata sidecar was not created");
+            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v2.json")), "renderer adapter version marker was not created");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
                 Require(!scene.RootElement.GetProperty("grid").GetProperty("visible").GetBoolean(), "read-only preview scene exposed the grid");
                 Require(!scene.RootElement.GetProperty("gizmo").GetProperty("visible").GetBoolean(), "read-only preview scene exposed the edit gizmo");
                 Require(scene.RootElement.GetProperty("interaction_mode").GetString() == "placement", "preview scene mode is wrong");
+                var archivePreview = scene.RootElement.GetProperty("archive_preview");
+                Require(!archivePreview.GetProperty("textures_enabled").GetBoolean(), "default native preview unexpectedly enables textures");
+                Require(
+                    archivePreview.GetProperty("camera").GetProperty("pitch_degrees").GetSingle() == -89.0f
+                    && archivePreview.GetProperty("camera").GetProperty("reason").GetString() == "archive_model_initial_overhead",
+                    "weapon preview did not inherit Full's overhead initial camera");
             }
             using (var materials = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "net_materials.json")).ConfigureAwait(false)))
             {
@@ -1966,6 +2075,38 @@ internal static class ArchiveLiteTestRunner
                 Require(submesh.GetProperty("resolved_channels").GetRawText() == "{}", "mesh-only preview retained resolved textures");
                 Require(string.IsNullOrEmpty(submesh.GetProperty("texture").GetString()), "mesh-only preview retained a base texture");
             }
+
+            await NativePreviewPackageAdapter.PrepareAsync(
+                root,
+                "synthetic:test:textured",
+                CancellationToken.None,
+                includeTextures: true).ConfigureAwait(false);
+            using (var materials = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "net_materials.json")).ConfigureAwait(false)))
+            {
+                var submesh = materials.RootElement.GetProperty("submeshes")[0];
+                Require(
+                    string.Equals(
+                        submesh.GetProperty("resolved_channels").GetProperty("base").GetString(),
+                        Path.GetFullPath(baseTexturePath),
+                        StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(submesh.GetProperty("texture").GetString(), Path.GetFullPath(baseTexturePath), StringComparison.OrdinalIgnoreCase),
+                    "opt-in native preview did not carry the Full material graph's resolved base texture");
+            }
+            using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
+            {
+                Require(
+                    scene.RootElement.GetProperty("archive_preview").GetProperty("textures_enabled").GetBoolean(),
+                    "textured native preview did not select the renderer's textured display mode");
+            }
+            Require(
+                ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/weapon/sword/example.pac")
+                && ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/01_sword/example.pac")
+                && !ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/body/example.pac")
+                && ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").PitchDegrees == 0.0f,
+                "archive model camera policy no longer matches Full's weapon-overhead and body-front classification");
+
+            // Restore the default texture-free package before export and optional renderer smoke coverage.
+            await NativePreviewPackageAdapter.PrepareAsync(root, "synthetic:test", CancellationToken.None).ConfigureAwait(false);
 
             var exportRoot = Path.Combine(root, "exports");
             Directory.CreateDirectory(exportRoot);
@@ -2168,6 +2309,9 @@ internal static class ArchiveLiteTestRunner
         using (var cacheManifest = JsonDocument.Parse(cacheManifestText))
         {
             var root = cacheManifest.RootElement;
+            Require(
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v3_pat",
+                "the default texture-free preview changed its established cache version");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
                 root.GetProperty("dependencies").EnumerateArray().Any(dependency =>
@@ -2226,6 +2370,25 @@ internal static class ArchiveLiteTestRunner
             $"dependency-validated cache reuse ({warmTimer.Elapsed.TotalMilliseconds:N1} ms) was not faster than the cold native build ({coldTimer.Elapsed.TotalMilliseconds:N1} ms)");
         Console.WriteLine(
             $"INFO: native model cache cold={coldTimer.Elapsed.TotalMilliseconds:N1}ms cross-session-warm={warmTimer.Elapsed.TotalMilliseconds:N1}ms");
+
+        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v2.json");
+        File.Delete(adapterMarker);
+        var migrationProgress = new List<ProgressUpdate>();
+        var migrated = await previews.BuildAsync(
+            session,
+            entry,
+            update =>
+            {
+                migrationProgress.Add(update);
+                return Task.CompletedTask;
+            },
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            migrated == destination
+            && File.Exists(adapterMarker)
+            && migrationProgress.Any(update => update.Phase == "model_preview_adapt")
+            && migrationProgress.All(update => update.Phase != "model_preview_native"),
+            "legacy texture-free cache metadata did not upgrade in place without rerunning native PAC preparation");
 
         var unknownValidationManifest = crossSessionManifest.Replace(
             "dependency_v1",
@@ -2326,14 +2489,19 @@ internal static class ArchiveLiteTestRunner
             && modelPreviewSource.Contains("[\"archive_basename_index_path\"] = session.BasenameIndex.Path", StringComparison.Ordinal),
             "native model jobs do not carry the compact cross-package lookup indexes");
         Require(
-            modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(PackageVersion, session, entry, companion)", StringComparison.Ordinal)
+            modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v3_pat\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v4_textured\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
-            "native model packages are still keyed by the whole archive-session fingerprint");
+            "native model packages do not preserve the fast default cache while isolating textured packages");
         Require(
             rendererHostSource.Contains("resident.LoadPackageAsync(packagePath, generation", StringComparison.Ordinal)
             && rendererHostSource.Contains("The old scene remains live while a fresh-process fallback starts", StringComparison.Ordinal)
-            && rendererHostSource.Contains("prior is { IsAlive: true }", StringComparison.Ordinal),
+            && rendererHostSource.Contains("prior is { IsAlive: true }", StringComparison.Ordinal)
+            && rendererHostSource.Contains("BeginCameraInputUpdate();", StringComparison.Ordinal)
+            && !rendererHostSource.Contains("await resident.ApplyCameraInputAsync", StringComparison.Ordinal),
             "Archive Lite does not reuse the resident renderer with generation and rollback guards");
         Require(
             rendererHostSource.Contains("PreviewRendererWarmupPackage.GetOrCreateAsync", StringComparison.Ordinal)
@@ -2342,7 +2510,7 @@ internal static class ArchiveLiteTestRunner
             && rendererHostSource.Contains("AttachToHostAsync(visibleHost", StringComparison.Ordinal)
             && rendererHostSource.Contains("WsPopup | WsVisible | WsClipChildren", StringComparison.Ordinal)
             && viewModelSource.Contains("ShouldPrewarmModelRenderer = true", StringComparison.Ordinal)
-            && viewModelSource.Contains("entry.Extension.Equals(\".pat\"", StringComparison.Ordinal),
+            && viewModelSource.Contains("NativeModelExtension(entry.Extension)", StringComparison.Ordinal),
             "Archive Lite does not safely prewarm and attach the resident renderer after first-page readiness");
         Require(
             buildSource.Contains("-p:PublishSingleFile=false", StringComparison.Ordinal)
@@ -3170,6 +3338,7 @@ internal static class ArchiveLiteTestRunner
                 Require(GetParent(new IntPtr(rendererWindowHandle)) == parentHandle, "renderer did not return to its original host");
             }
 
+            var residentSessionId = string.Empty;
             for (var generation = 2; generation <= 3; generation++)
             {
                 await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
@@ -3186,6 +3355,8 @@ internal static class ArchiveLiteTestRunner
                     timeout.Token).ConfigureAwait(false);
                 Require(applied.RootElement.GetProperty("request_id").GetInt64() == generation, "resident renderer acknowledged the wrong request");
                 Require(applied.RootElement.GetProperty("process_id").GetInt32() == process.Id, "resident package load changed renderer process");
+                residentSessionId = applied.RootElement.GetProperty("session_id").GetString() ?? string.Empty;
+                Require(residentSessionId.Length > 0, "resident package load did not publish its presentation session identity");
                 Require(
                     applied.RootElement.GetProperty("resident_scene_load_count").GetInt64() == generation,
                     "resident renderer did not replace the D3D11 scene in place");
@@ -3196,9 +3367,169 @@ internal static class ArchiveLiteTestRunner
 
             await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
             {
+                @event = "presentation_state_update",
+                session_id = residentSessionId,
+                request_id = 39,
+                base_revision = 0,
+                process_generation = 1,
+                protocol_version = 2,
+                presentation_generation = 1,
+                display = new
+                {
+                    quality = new
+                    {
+                        orbit_sensitivity = 0.35,
+                        pan_sensitivity = 1.15,
+                        invert_orbit_x = true,
+                        invert_orbit_y = false,
+                        invert_pan_x = false,
+                        invert_pan_y = true,
+                    },
+                },
+            })).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            using (var initialCameraApplied = await ReadRendererEventAsync(
+                       process.StandardOutput,
+                       "presentation_state_update_ack",
+                       timeout.Token).ConfigureAwait(false))
+            {
+                var presentation = initialCameraApplied.RootElement.GetProperty("presentation");
+                var quality = presentation.GetProperty("quality_state");
+                var camera = presentation
+                    .GetProperty("view_contexts")
+                    .EnumerateArray()
+                    .Single(view => view.GetProperty("id").GetString() == "editable")
+                    .GetProperty("camera");
+                Require(
+                    initialCameraApplied.RootElement.GetProperty("status").GetString() == "applied"
+                    && Math.Abs(camera.GetProperty("yaw_degrees").GetDouble()) < 0.01
+                    && Math.Abs(camera.GetProperty("pitch_degrees").GetDouble() + 89.0) < 0.01
+                    && Math.Abs(quality.GetProperty("orbit_sensitivity").GetDouble() - 0.35) < 0.001
+                    && Math.Abs(quality.GetProperty("pan_sensitivity").GetDouble() - 1.15) < 0.001
+                    && quality.GetProperty("invert_orbit_x").GetBoolean()
+                    && quality.GetProperty("invert_pan_y").GetBoolean(),
+                    "resident renderer did not apply the classified weapon-overhead camera and live input settings");
+            }
+
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
+            {
+                @event = "presentation_state_update",
+                session_id = residentSessionId,
+                request_id = 40,
+                base_revision = 0,
+                process_generation = 1,
+                protocol_version = 2,
+                presentation_generation = 2,
+                camera = new
+                {
+                    role = "editable",
+                    yaw = 23.0,
+                    pitch = -40.0,
+                    zoom_factor = 1.25,
+                    pan = new[] { 0.20, -0.10 },
+                    command_generation = 1,
+                },
+                display = new
+                {
+                    quality = new
+                    {
+                        orbit_sensitivity = 0.35,
+                        pan_sensitivity = 1.15,
+                        invert_orbit_x = true,
+                        invert_orbit_y = false,
+                        invert_pan_x = false,
+                        invert_pan_y = true,
+                    },
+                },
+            })).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            var cameraZoomBeforeRefresh = 0.0;
+            using (var cameraInputApplied = await ReadRendererEventAsync(
+                       process.StandardOutput,
+                       "presentation_state_update_ack",
+                       timeout.Token).ConfigureAwait(false))
+            {
+                var quality = cameraInputApplied.RootElement
+                    .GetProperty("presentation")
+                    .GetProperty("quality_state");
+                var camera = cameraInputApplied.RootElement
+                    .GetProperty("presentation")
+                    .GetProperty("view_contexts")
+                    .EnumerateArray()
+                    .Single(view => view.GetProperty("id").GetString() == "editable")
+                    .GetProperty("camera");
+                cameraZoomBeforeRefresh = camera.GetProperty("zoom").GetDouble();
+                var pan = camera.GetProperty("pan");
+                Require(
+                    cameraInputApplied.RootElement.GetProperty("status").GetString() == "applied"
+                    && Math.Abs(quality.GetProperty("orbit_sensitivity").GetDouble() - 0.35) < 0.001
+                    && Math.Abs(quality.GetProperty("pan_sensitivity").GetDouble() - 1.15) < 0.001
+                    && quality.GetProperty("invert_orbit_x").GetBoolean()
+                    && quality.GetProperty("invert_pan_y").GetBoolean()
+                    && Math.Abs(camera.GetProperty("yaw_degrees").GetDouble() - 23.0) < 0.01
+                    && Math.Abs(camera.GetProperty("pitch_degrees").GetDouble() + 40.0) < 0.01
+                    && Math.Abs(pan[0].GetDouble() - 0.20) < 0.001
+                    && Math.Abs(pan[1].GetDouble() + 0.10) < 0.001,
+                    "resident renderer did not apply the live Orbit/Pan camera settings");
+            }
+
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
+            {
                 @event = "package_load_request",
                 request_id = 4,
                 generation = 4,
+                package_path = replacementPackageRoot,
+            })).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            using (var refreshed = await ReadRendererEventAsync(
+                       process.StandardOutput,
+                       "package_load_applied",
+                       timeout.Token).ConfigureAwait(false))
+            {
+                residentSessionId = refreshed.RootElement.GetProperty("session_id").GetString() ?? string.Empty;
+                Require(
+                    refreshed.RootElement.GetProperty("resident_scene_load_count").GetInt64() == 4
+                    && residentSessionId.Length > 0,
+                    "same-model resident refresh did not complete in place");
+            }
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
+            {
+                @event = "presentation_state_update",
+                session_id = residentSessionId,
+                request_id = 41,
+                base_revision = 0,
+                process_generation = 1,
+                protocol_version = 2,
+                presentation_generation = 3,
+            })).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            using (var refreshedCamera = await ReadRendererEventAsync(
+                       process.StandardOutput,
+                       "presentation_state_update_ack",
+                       timeout.Token).ConfigureAwait(false))
+            {
+                var camera = refreshedCamera.RootElement
+                    .GetProperty("presentation")
+                    .GetProperty("view_contexts")
+                    .EnumerateArray()
+                    .Single(view => view.GetProperty("id").GetString() == "editable")
+                    .GetProperty("camera");
+                var pan = camera.GetProperty("pan");
+                Require(
+                    refreshedCamera.RootElement.GetProperty("status").GetString() == "applied"
+                    && Math.Abs(camera.GetProperty("yaw_degrees").GetDouble() - 23.0) < 0.01
+                    && Math.Abs(camera.GetProperty("pitch_degrees").GetDouble() + 40.0) < 0.01
+                    && Math.Abs(camera.GetProperty("zoom").GetDouble() - cameraZoomBeforeRefresh) < 0.001
+                    && Math.Abs(pan[0].GetDouble() - 0.20) < 0.001
+                    && Math.Abs(pan[1].GetDouble() + 0.10) < 0.001,
+                    "same-model resident refresh reset the user's orbit, pan, or zoom");
+            }
+
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
+            {
+                @event = "package_load_request",
+                request_id = 5,
+                generation = 5,
                 package_path = runtimeRoot,
             })).ConfigureAwait(false);
             await process.StandardInput.FlushAsync().ConfigureAwait(false);
@@ -3207,15 +3538,15 @@ internal static class ArchiveLiteTestRunner
                        "package_load_failed",
                        timeout.Token).ConfigureAwait(false))
             {
-                Require(failed.RootElement.GetProperty("request_id").GetInt64() == 4, "resident renderer rejected the wrong package request");
+                Require(failed.RootElement.GetProperty("request_id").GetInt64() == 5, "resident renderer rejected the wrong package request");
                 Require(failed.RootElement.GetProperty("process_id").GetInt32() == process.Id, "failed package load changed renderer process");
             }
 
             await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
             {
                 @event = "package_load_request",
-                request_id = 5,
-                generation = 5,
+                request_id = 6,
+                generation = 6,
                 package_path = replacementPackageRoot,
             })).ConfigureAwait(false);
             await process.StandardInput.FlushAsync().ConfigureAwait(false);
@@ -3226,7 +3557,7 @@ internal static class ArchiveLiteTestRunner
             {
                 Require(recovered.RootElement.GetProperty("process_id").GetInt32() == process.Id, "resident renderer restarted after a rejected package");
                 Require(
-                    recovered.RootElement.GetProperty("resident_scene_load_count").GetInt64() == 4,
+                    recovered.RootElement.GetProperty("resident_scene_load_count").GetInt64() == 5,
                     "failed resident package load changed or lost the prior D3D11 scene");
             }
 

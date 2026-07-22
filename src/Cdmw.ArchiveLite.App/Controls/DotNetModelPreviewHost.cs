@@ -14,6 +14,7 @@ namespace Cdmw.ArchiveLite.App.Controls;
 public sealed class DotNetModelPreviewHost : HwndHost
 {
     private const string RequiredRendererBackend = "d3d11_vortice_shader";
+    private const long ArchivePreviewProcessGeneration = 1;
     private const int WsChild = 0x40000000;
     private const int WsVisible = 0x10000000;
     private const int WsClipChildren = 0x02000000;
@@ -29,11 +30,13 @@ public sealed class DotNetModelPreviewHost : HwndHost
     private readonly object _sessionGate = new();
     private readonly CancellationTokenSource _warmupCancellation = new();
     private CancellationTokenSource? _switchCancellation;
+    private CancellationTokenSource? _cameraInputCancellation;
     private ModelRendererSession? _currentSession;
     private ModelRendererSession? _startingSession;
     private IntPtr _hostHandle;
     private IntPtr _warmupHostHandle;
     private long _generation;
+    private long _cameraInputGeneration;
     private int _prewarmStarted;
     private int _shutdown;
     private bool _hasPresentedPackage;
@@ -74,6 +77,42 @@ public sealed class DotNetModelPreviewHost : HwndHost
         typeof(DotNetModelPreviewHost),
         new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.None, OnPrewarmChanged));
 
+    public static readonly DependencyProperty OrbitSensitivityProperty = DependencyProperty.Register(
+        nameof(OrbitSensitivity),
+        typeof(double),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(0.22, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
+
+    public static readonly DependencyProperty PanSensitivityProperty = DependencyProperty.Register(
+        nameof(PanSensitivity),
+        typeof(double),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(0.60, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
+
+    public static readonly DependencyProperty InvertOrbitXProperty = DependencyProperty.Register(
+        nameof(InvertOrbitX),
+        typeof(bool),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
+
+    public static readonly DependencyProperty InvertOrbitYProperty = DependencyProperty.Register(
+        nameof(InvertOrbitY),
+        typeof(bool),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
+
+    public static readonly DependencyProperty InvertPanXProperty = DependencyProperty.Register(
+        nameof(InvertPanX),
+        typeof(bool),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
+
+    public static readonly DependencyProperty InvertPanYProperty = DependencyProperty.Register(
+        nameof(InvertPanY),
+        typeof(bool),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
+
     public string? PackagePath
     {
         get => (string?)GetValue(PackagePathProperty);
@@ -88,6 +127,42 @@ public sealed class DotNetModelPreviewHost : HwndHost
         get => (bool)GetValue(PrewarmProperty);
         set => SetValue(PrewarmProperty, value);
     }
+
+    public double OrbitSensitivity
+    {
+        get => (double)GetValue(OrbitSensitivityProperty);
+        set => SetValue(OrbitSensitivityProperty, value);
+    }
+
+    public double PanSensitivity
+    {
+        get => (double)GetValue(PanSensitivityProperty);
+        set => SetValue(PanSensitivityProperty, value);
+    }
+
+    public bool InvertOrbitX
+    {
+        get => (bool)GetValue(InvertOrbitXProperty);
+        set => SetValue(InvertOrbitXProperty, value);
+    }
+
+    public bool InvertOrbitY
+    {
+        get => (bool)GetValue(InvertOrbitYProperty);
+        set => SetValue(InvertOrbitYProperty, value);
+    }
+
+    public bool InvertPanX
+    {
+        get => (bool)GetValue(InvertPanXProperty);
+        set => SetValue(InvertPanXProperty, value);
+    }
+
+    public bool InvertPanY
+    {
+        get => (bool)GetValue(InvertPanYProperty);
+        set => SetValue(InvertPanYProperty, value);
+    }
     public async Task ShutdownAsync()
     {
         if (Interlocked.Exchange(ref _shutdown, 1) != 0)
@@ -95,8 +170,10 @@ public sealed class DotNetModelPreviewHost : HwndHost
             return;
         }
         Interlocked.Increment(ref _generation);
+        Interlocked.Increment(ref _cameraInputGeneration);
         _warmupCancellation.Cancel();
         Interlocked.Exchange(ref _switchCancellation, null)?.Cancel();
+        Interlocked.Exchange(ref _cameraInputCancellation, null)?.Cancel();
         await _switchGate.WaitAsync().ConfigureAwait(true);
         try
         {
@@ -188,6 +265,71 @@ public sealed class DotNetModelPreviewHost : HwndHost
         }
     }
 
+    private static void OnCameraInputChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args) =>
+        ((DotNetModelPreviewHost)dependencyObject).BeginCameraInputUpdate();
+
+    private void BeginCameraInputUpdate()
+    {
+        if (Volatile.Read(ref _shutdown) != 0)
+        {
+            return;
+        }
+        var generation = Interlocked.Increment(ref _cameraInputGeneration);
+        var operation = new CancellationTokenSource();
+        operation.CancelAfter(TimeSpan.FromSeconds(5));
+        Interlocked.Exchange(ref _cameraInputCancellation, operation)?.Cancel();
+        _ = UpdateCameraInputAsync(generation, operation);
+    }
+
+    private async Task UpdateCameraInputAsync(long generation, CancellationTokenSource operation)
+    {
+        try
+        {
+            await Task.Delay(40, operation.Token).ConfigureAwait(true);
+            await _switchGate.WaitAsync(operation.Token).ConfigureAwait(true);
+            try
+            {
+                if (generation != Volatile.Read(ref _cameraInputGeneration))
+                {
+                    return;
+                }
+                var session = GetCurrentSession();
+                if (session is { IsAlive: true, SupportsPreviewCameraInput: true })
+                {
+                    await session.ApplyCameraInputAsync(CaptureCameraInput(), operation.Token).ConfigureAwait(true);
+                }
+            }
+            finally
+            {
+                _switchGate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer slider/check-box change, package switch, or shutdown owns the camera input state.
+        }
+        catch (Exception exception)
+        {
+            await DiagnosticLog.WriteAsync(
+                "renderer-camera-input-update",
+                exception.ToString(),
+                CancellationToken.None).ConfigureAwait(true);
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _cameraInputCancellation, null, operation);
+            operation.Dispose();
+        }
+    }
+
+    private PreviewCameraInput CaptureCameraInput() => new(
+        Math.Clamp(OrbitSensitivity, 0.05, 1.0),
+        Math.Clamp(PanSensitivity, 0.05, 3.0),
+        InvertOrbitX,
+        InvertOrbitY,
+        InvertPanX,
+        InvertPanY);
+
     private void BeginPrewarm()
     {
         if (Volatile.Read(ref _shutdown) != 0
@@ -273,6 +415,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
         {
             return;
         }
+        Interlocked.Increment(ref _cameraInputGeneration);
+        Interlocked.Exchange(ref _cameraInputCancellation, null)?.Cancel();
         var generation = Interlocked.Increment(ref _generation);
         var operation = new CancellationTokenSource();
         Interlocked.Exchange(ref _switchCancellation, operation)?.Cancel();
@@ -327,6 +471,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                         SetValue(IsLoadingPropertyKey, false);
                         SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
                         _hasPresentedPackage = true;
+                        BeginCameraInputUpdate();
                         return;
                     }
                     catch (OperationCanceledException)
@@ -366,7 +511,6 @@ public sealed class DotNetModelPreviewHost : HwndHost
                     {
                         throw new OperationCanceledException(operation.Token);
                     }
-
                     ModelRendererSession? prior;
                     lock (_sessionGate)
                     {
@@ -378,6 +522,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                     SetValue(IsLoadingPropertyKey, false);
                     SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
                     _hasPresentedPackage = true;
+                    BeginCameraInputUpdate();
                     if (prior is not null)
                     {
                         await prior.ShutdownAsync().ConfigureAwait(true);
@@ -612,6 +757,14 @@ public sealed class DotNetModelPreviewHost : HwndHost
         public int Bottom;
     }
 
+    private sealed record PreviewCameraInput(
+        double OrbitSensitivity,
+        double PanSensitivity,
+        bool InvertOrbitX,
+        bool InvertOrbitY,
+        bool InvertPanX,
+        bool InvertPanY);
+
     private sealed class ModelRendererSession : IDisposable
     {
         private readonly Process _process;
@@ -626,13 +779,17 @@ public sealed class DotNetModelPreviewHost : HwndHost
         private readonly TaskCompletionSource<string> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ConcurrentDictionary<long, TaskCompletionSource<ResidentPackageLoadResult>> _packageLoads = new();
         private readonly ConcurrentDictionary<long, TaskCompletionSource<long>> _hostAttachments = new();
+        private readonly ConcurrentDictionary<long, TaskCompletionSource<bool>> _cameraInputUpdates = new();
         private readonly SemaphoreSlim _writeGate = new(1, 1);
         private long _packageLoadRequestId;
         private long _hostAttachRequestId;
+        private long _cameraInputRequestId;
         private long _rendererWindowHandle;
         private long _attachedHostHandle;
+        private string _residentSessionId;
         private volatile bool _supportsResidentPackageLoad;
         private volatile bool _supportsResidentHostAttach;
+        private volatile bool _supportsPreviewCameraInput;
         private int _disposed;
 
         private ModelRendererSession(
@@ -640,12 +797,14 @@ public sealed class DotNetModelPreviewHost : HwndHost
             WorkerJob job,
             string runtimeRoot,
             IntPtr parentHandle,
+            string residentSessionId,
             Action<string> status)
         {
             _process = process;
             _job = job;
             _runtimeRoot = runtimeRoot;
             _attachedHostHandle = parentHandle.ToInt64();
+            _residentSessionId = residentSessionId;
             _stdoutTask = ReadProtocolAsync(process.StandardOutput, status, _lifetime.Token);
             _stderrTask = DrainAsync(process.StandardError, _stderr, _lifetime.Token);
             _exitTask = ObserveExitAsync();
@@ -655,6 +814,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
         public bool IsAlive => Volatile.Read(ref _disposed) == 0 && !_process.HasExited;
         public bool SupportsResidentPackageLoad => _supportsResidentPackageLoad;
         public bool SupportsResidentHostAttach => _supportsResidentHostAttach;
+        public bool SupportsPreviewCameraInput => _supportsPreviewCameraInput;
 
         public bool IsAttachedTo(IntPtr hostHandle) =>
             hostHandle != IntPtr.Zero
@@ -783,11 +943,80 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 {
                     _writeGate.Release();
                 }
-                return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                var result = await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(result.SessionId))
+                {
+                    throw new InvalidDataException("The resident preview package acknowledgement has no session identity.");
+                }
+                _residentSessionId = result.SessionId;
+                return result;
             }
             finally
             {
                 _packageLoads.TryRemove(requestId, out _);
+            }
+        }
+
+        public async Task ApplyCameraInputAsync(
+            PreviewCameraInput input,
+            CancellationToken cancellationToken)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            if (!_supportsPreviewCameraInput)
+            {
+                throw new NotSupportedException("The active renderer does not support live preview camera input settings.");
+            }
+            var sessionId = _residentSessionId;
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                throw new InvalidDataException("The active preview package has no resident session identity.");
+            }
+
+            var requestId = Interlocked.Increment(ref _cameraInputRequestId);
+            var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_cameraInputUpdates.TryAdd(requestId, completion))
+            {
+                throw new InvalidOperationException("Could not register the preview camera input request.");
+            }
+            try
+            {
+                var message = JsonSerializer.Serialize(new
+                {
+                    @event = "presentation_state_update",
+                    session_id = sessionId,
+                    request_id = requestId,
+                    base_revision = 0,
+                    process_generation = ArchivePreviewProcessGeneration,
+                    protocol_version = 2,
+                    presentation_generation = requestId,
+                    display = new
+                    {
+                        quality = new
+                        {
+                            orbit_sensitivity = input.OrbitSensitivity,
+                            pan_sensitivity = input.PanSensitivity,
+                            invert_orbit_x = input.InvertOrbitX,
+                            invert_orbit_y = input.InvertOrbitY,
+                            invert_pan_x = input.InvertPanX,
+                            invert_pan_y = input.InvertPanY,
+                        },
+                    },
+                });
+                await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+                    await _process.StandardInput.WriteLineAsync(message).WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _writeGate.Release();
+                }
+                await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                _cameraInputUpdates.TryRemove(requestId, out _);
             }
         }
 
@@ -799,6 +1028,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
         {
             cancellationToken.ThrowIfCancellationRequested();
             var package = ValidatePackage(packagePath);
+            var residentSessionId = ReadPreviewSessionId(package);
             var manifest = Path.Combine(package, "manifest.json");
             var metadata = Path.Combine(package, "mesh.cdmeta.json");
             var renderer = ResolveRendererPath();
@@ -844,7 +1074,13 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 process.StandardInput.AutoFlush = true;
                 job = WorkerJob.Create();
                 job.Add(process);
-                return Task.FromResult(new ModelRendererSession(process, job, runtimeRoot, parentHandle, status));
+                return Task.FromResult(new ModelRendererSession(
+                    process,
+                    job,
+                    runtimeRoot,
+                    parentHandle,
+                    residentSessionId,
+                    status));
             }
             catch
             {
@@ -942,6 +1178,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                                 status(LocalizationManager.Get("RendererLoading"));
                                 break;
                             case "ready":
+                                _supportsPreviewCameraInput = HasCapability(root, "resident_presentation_state_v1");
                                 var backend = root.TryGetProperty("renderer", out var renderer)
                                     ? JsonString(renderer, "backend")
                                     : string.Empty;
@@ -963,6 +1200,9 @@ public sealed class DotNetModelPreviewHost : HwndHost
                             case "host_attach_failed":
                                 CompleteHostAttachment(root, failed: true);
                                 break;
+                            case "presentation_state_update_ack":
+                                CompleteCameraInputUpdate(root);
+                                break;
                         }
                     }
                     catch (JsonException)
@@ -980,6 +1220,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 _ready.TrySetException(exception);
                 FailPendingPackageLoads(exception);
                 FailPendingHostAttachments(exception);
+                FailPendingCameraInputUpdates(exception);
             }
         }
 
@@ -999,6 +1240,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
                     $"The .NET previewer exited during resident package loading (code {_process.ExitCode})."));
                 FailPendingHostAttachments(new InvalidOperationException(
                     $"The .NET previewer exited during host attachment (code {_process.ExitCode})."));
+                FailPendingCameraInputUpdates(new InvalidOperationException(
+                    $"The .NET previewer exited during a camera input update (code {_process.ExitCode})."));
             }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
             {
@@ -1011,6 +1254,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
             _lifetime.Cancel();
             FailPendingPackageLoads(new OperationCanceledException("The resident preview renderer is shutting down."));
             FailPendingHostAttachments(new OperationCanceledException("The resident preview renderer is shutting down."));
+            FailPendingCameraInputUpdates(new OperationCanceledException("The resident preview renderer is shutting down."));
             _job.Dispose();
             try
             {
@@ -1161,7 +1405,10 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 && count.TryGetInt64(out var parsedCount)
                 ? parsedCount
                 : 0;
-            completion.TrySetResult(new ResidentPackageLoadResult(backend, sceneLoadCount));
+            completion.TrySetResult(new ResidentPackageLoadResult(
+                backend,
+                sceneLoadCount,
+                JsonString(root, "session_id").Trim()));
         }
 
         private void FailPendingPackageLoads(Exception exception)
@@ -1203,6 +1450,33 @@ public sealed class DotNetModelPreviewHost : HwndHost
             }
         }
 
+        private void CompleteCameraInputUpdate(JsonElement root)
+        {
+            var requestId = root.TryGetProperty("request_id", out var request)
+                && request.TryGetInt64(out var parsed)
+                ? parsed
+                : 0;
+            if (requestId <= 0 || !_cameraInputUpdates.TryGetValue(requestId, out var completion))
+            {
+                return;
+            }
+            if (!string.Equals(JsonString(root, "status"), "applied", StringComparison.OrdinalIgnoreCase))
+            {
+                completion.TrySetException(new InvalidDataException(
+                    $"The renderer rejected the camera input update: {JsonString(root, "reason", "unknown reason")}."));
+                return;
+            }
+            completion.TrySetResult(true);
+        }
+
+        private void FailPendingCameraInputUpdates(Exception exception)
+        {
+            foreach (var pending in _cameraInputUpdates.Values)
+            {
+                pending.TrySetException(exception);
+            }
+        }
+
         private static bool HasCapability(JsonElement root, string capability)
         {
             return root.TryGetProperty("capabilities", out var capabilities)
@@ -1210,6 +1484,17 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 && capabilities.EnumerateArray().Any(value =>
                     value.ValueKind == JsonValueKind.String
                     && string.Equals(value.GetString(), capability, StringComparison.Ordinal));
+        }
+
+        private static string ReadPreviewSessionId(string packagePath)
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(packagePath, "dotnet_scene.json")));
+            var sessionId = JsonString(document.RootElement, "session_id").Trim();
+            if (sessionId.Length == 0)
+            {
+                throw new InvalidDataException("The read-only .NET preview scene has no session identity.");
+            }
+            return sessionId;
         }
 
         private static string ValidatePackage(string packagePath)
@@ -1226,6 +1511,9 @@ public sealed class DotNetModelPreviewHost : HwndHost
             return package;
         }
 
-        public sealed record ResidentPackageLoadResult(string Backend, long ResidentSceneLoadCount);
+        public sealed record ResidentPackageLoadResult(
+            string Backend,
+            long ResidentSceneLoadCount,
+            string SessionId);
     }
 }

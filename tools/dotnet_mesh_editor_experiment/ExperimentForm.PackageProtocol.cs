@@ -48,6 +48,17 @@ internal sealed partial class ExperimentForm
     {
         _residentPackageUiContext = SynchronizationContext.Current
             ?? new WindowsFormsSynchronizationContext();
+        EstablishSimplePreviewSession(_scene.SessionId);
+    }
+
+    private void EstablishSimplePreviewSession(string sessionId)
+    {
+        if (!_options.SimplePreview || string.IsNullOrWhiteSpace(sessionId))
+        {
+            return;
+        }
+        _residentMaterialSessionId = sessionId.Trim();
+        _residentProcessGeneration = 1;
     }
 
     private void HandleResidentPackageLoadRequest(JsonElement root)
@@ -222,6 +233,7 @@ internal sealed partial class ExperimentForm
         _materials = prepared.Materials;
         _textureSet = prepared.DetachTextureSet();
         _scene = prepared.Scene;
+        EstablishSimplePreviewSession(_scene.SessionId);
         _editedSubmeshes.Clear();
         _externalTopologyDirty = false;
         _saved = false;
@@ -235,6 +247,7 @@ internal sealed partial class ExperimentForm
             ["request_id"] = requestId,
             ["generation"] = generation,
             ["package_path"] = prepared.PackagePath,
+            ["session_id"] = _scene.SessionId,
             ["process_id"] = Environment.ProcessId,
             ["parse_ms"] = prepared.ParseMilliseconds,
             ["texture_ms"] = prepared.TextureMilliseconds,

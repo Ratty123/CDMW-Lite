@@ -71,6 +71,7 @@ public sealed class ArchivePreviewService
                 var package = await _modelPreviews.BuildAsync(
                     session,
                     entry,
+                    request.IncludeModelTextures,
                     publishProgress,
                     cancellationToken).ConfigureAwait(false);
                 return new PreviewResult(

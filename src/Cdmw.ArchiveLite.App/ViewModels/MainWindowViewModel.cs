@@ -231,7 +231,8 @@ public sealed class MainWindowViewModel : ObservableObject
                 ViewMode: ArchiveBrowser.ViewMode,
                 FolderPath: ArchiveBrowser.SelectedFolder?.Path,
                 CollisionPolicy: ArchiveBrowser.CollisionPolicy,
-                ManifestFormat: ArchiveBrowser.ManifestFormat),
+                ManifestFormat: ArchiveBrowser.ManifestFormat,
+                ModelPreviewCameraInput: ArchiveBrowser.CaptureModelPreviewCameraInputSettings()),
             TextSearch = new TextSearchSettings(
                 TextSearch.SourceKind,
                 TextSearch.LooseFolder,

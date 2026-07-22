@@ -10,6 +10,7 @@ namespace Cdmw.ArchiveLite.Core;
 public sealed class NativeModelPreviewService
 {
     private const string PackageVersion = "archive_lite_native_model_v3_pat";
+    private const string TexturedPackageVersion = "archive_lite_native_model_v4_textured";
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan ColdBuildCoalesceDelay = TimeSpan.FromMilliseconds(35);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _buildGates = new(StringComparer.Ordinal);
@@ -19,6 +20,19 @@ public sealed class NativeModelPreviewService
     public async Task<string> BuildAsync(
         ArchiveSession session,
         ArchiveEntryDto entry,
+        Func<ProgressUpdate, Task>? publishProgress,
+        CancellationToken cancellationToken) =>
+        await BuildAsync(
+            session,
+            entry,
+            includeTextures: false,
+            publishProgress,
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task<string> BuildAsync(
+        ArchiveSession session,
+        ArchiveEntryDto entry,
+        bool includeTextures,
         Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
@@ -31,30 +45,34 @@ public sealed class NativeModelPreviewService
 
         var companion = FindCompanion(session.Index, entry);
         ArchiveLiteDataPaths.EnsureCreated();
-        var key = NativeModelPreviewCache.ComputeKey(PackageVersion, session, entry, companion);
+        var packageVersion = includeTextures ? TexturedPackageVersion : PackageVersion;
+        var key = NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion);
         var modelRoot = Path.Combine(ArchiveLiteDataPaths.PreviewCache, "models");
         var nativeCacheRoot = Path.Combine(ArchiveLiteDataPaths.PreviewCache, "native");
         Directory.CreateDirectory(modelRoot);
         Directory.CreateDirectory(nativeCacheRoot);
         var destination = Path.Combine(modelRoot, key);
+        var sourceIdentity = $"{packageVersion}:{key}:{entry.Path}";
         if (await NativeModelPreviewCache.IsReusableAsync(
                 destination,
-                PackageVersion,
+                packageVersion,
                 key,
                 session,
                 entry,
-                cancellationToken).ConfigureAwait(false))
+                cancellationToken).ConfigureAwait(false)
+            && NativePreviewPackageAdapter.HasCurrentAdapterMetadata(destination))
         {
             return destination;
         }
         await Task.Delay(ColdBuildCoalesceDelay, cancellationToken).ConfigureAwait(false);
         if (await NativeModelPreviewCache.IsReusableAsync(
                 destination,
-                PackageVersion,
+                packageVersion,
                 key,
                 session,
                 entry,
-                cancellationToken).ConfigureAwait(false))
+                cancellationToken).ConfigureAwait(false)
+            && NativePreviewPackageAdapter.HasCurrentAdapterMetadata(destination))
         {
             return destination;
         }
@@ -65,12 +83,21 @@ public sealed class NativeModelPreviewService
         {
             if (await NativeModelPreviewCache.IsReusableAsync(
                     destination,
-                    PackageVersion,
+                    packageVersion,
                     key,
                     session,
                     entry,
                     cancellationToken).ConfigureAwait(false))
             {
+                if (!NativePreviewPackageAdapter.HasCurrentAdapterMetadata(destination))
+                {
+                    await PublishAsync(publishProgress, "model_preview_adapt", cancellationToken).ConfigureAwait(false);
+                    await NativePreviewPackageAdapter.PrepareAsync(
+                        destination,
+                        sourceIdentity,
+                        cancellationToken,
+                        includeTextures).ConfigureAwait(false);
+                }
                 return destination;
             }
             if (Directory.Exists(destination))
@@ -88,13 +115,21 @@ public sealed class NativeModelPreviewService
                 var jobPath = Path.Combine(protocolRoot, "job.json");
                 var reportPath = Path.Combine(protocolRoot, "report.json");
                 await PublishAsync(publishProgress, "model_preview_native", cancellationToken).ConfigureAwait(false);
-                await WriteJobAsync(jobPath, packageRoot, nativeCacheRoot, session, entry, companion, cancellationToken).ConfigureAwait(false);
+                await WriteJobAsync(
+                    jobPath,
+                    packageRoot,
+                    nativeCacheRoot,
+                    session,
+                    entry,
+                    companion,
+                    includeTextures,
+                    cancellationToken).ConfigureAwait(false);
                 await RunPreviewCoreAsync(jobPath, reportPath, cancellationToken).ConfigureAwait(false);
                 var dependencyTrace = ValidateReport(reportPath, staging, packageRoot);
 
                 await PublishAsync(publishProgress, "model_preview_adapt", cancellationToken).ConfigureAwait(false);
                 var cacheManifest = await NativeModelPreviewCache.CaptureAsync(
-                    PackageVersion,
+                    packageVersion,
                     key,
                     session,
                     entry,
@@ -103,7 +138,8 @@ public sealed class NativeModelPreviewService
                 await NativePreviewPackageAdapter.PrepareAsync(
                     packageRoot,
                     cacheManifest.SourceIdentity,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    includeTextures).ConfigureAwait(false);
                 await AtomicFile.WriteAsync(
                     Path.Combine(packageRoot, "archive_lite_preview.json"),
                     async (stream, token) => await JsonSerializer.SerializeAsync(
@@ -122,7 +158,7 @@ public sealed class NativeModelPreviewService
                 {
                     if (!await NativeModelPreviewCache.IsReusableAsync(
                             destination,
-                            PackageVersion,
+                            packageVersion,
                             key,
                             session,
                             entry,
@@ -167,6 +203,7 @@ public sealed class NativeModelPreviewService
         ArchiveSession session,
         ArchiveEntryDto entry,
         ArchiveEntryDto? companion,
+        bool includeTextures,
         CancellationToken cancellationToken)
     {
         var payload = new Dictionary<string, object?>
@@ -187,7 +224,7 @@ public sealed class NativeModelPreviewService
             {
                 ["visible_texture_mode"] = "mesh_base_first",
                 ["d3d11_view_mode"] = "lit",
-                ["use_textures_by_default"] = false,
+                ["use_textures_by_default"] = includeTextures,
                 ["high_quality_by_default"] = true,
             },
             ["capabilities"] = new Dictionary<string, object?>
@@ -448,15 +485,21 @@ public sealed class NativeModelPreviewService
 
 public static class NativePreviewPackageAdapter
 {
+    private const string AdapterMetadataName = "archive_lite_adapter_v2.json";
+    private const int AdapterSchemaVersion = 2;
     private const int SupportedSchemaVersion = 8;
     private const int BytesPerVertex = 23 * sizeof(float);
     private const int MaximumVertices = 8_000_000;
     internal static JsonSerializerOptions JsonOptions { get; } = new() { WriteIndented = true };
 
+    public static bool HasCurrentAdapterMetadata(string packageRoot) =>
+        File.Exists(Path.Combine(Path.GetFullPath(packageRoot), AdapterMetadataName));
+
     public static async Task<NativePreviewPackageInfo> PrepareAsync(
         string packageRoot,
         string sourceIdentity,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeTextures = false)
     {
         var root = Path.GetFullPath(packageRoot);
         var manifestPath = Path.Combine(root, "manifest.json");
@@ -475,6 +518,8 @@ public static class NativePreviewPackageAdapter
         {
             throw new InvalidDataException("Native preview manifest has no batches array.");
         }
+        var sourcePath = ReadString(manifest.RootElement, "source_path");
+        var initialView = ArchiveModelPreviewPolicy.InitialView(sourcePath);
 
         var slots = new List<Dictionary<string, object?>>();
         var submeshes = new List<Dictionary<string, object?>>();
@@ -504,8 +549,10 @@ public static class NativePreviewPackageAdapter
             }
 
             var material = ReadString(batch, "material_name", $"material_{index:000}");
-            var channels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var components = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var channels = includeTextures
+                ? ResolveChannels(root, batch, out components)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             slots.Add(new Dictionary<string, object?>
             {
                 ["index"] = index,
@@ -592,6 +639,18 @@ public static class NativePreviewPackageAdapter
                 ["comparison_mode"] = "replacement_only",
                 ["grid"] = new Dictionary<string, object?> { ["visible"] = false, ["origin"] = new[] { 0.0f, -1.0f, 0.0f }, ["spacing"] = 0.25f },
                 ["gizmo"] = new Dictionary<string, object?> { ["visible"] = false, ["tool"] = "move" },
+                ["archive_preview"] = new Dictionary<string, object?>
+                {
+                    ["source_path"] = sourcePath,
+                    ["textures_enabled"] = includeTextures,
+                    ["camera"] = new Dictionary<string, object?>
+                    {
+                        ["yaw_degrees"] = initialView.YawDegrees,
+                        ["pitch_degrees"] = initialView.PitchDegrees,
+                        ["fit_to_view"] = initialView.FitToView,
+                        ["reason"] = initialView.Reason,
+                    },
+                },
             },
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
@@ -602,6 +661,15 @@ public static class NativePreviewPackageAdapter
                 ["source_identity"] = sourceIdentity,
                 ["native_manifest"] = "manifest.json",
                 ["read_only"] = true,
+            },
+            cancellationToken).ConfigureAwait(false);
+        await WriteJsonAsync(
+            Path.Combine(root, AdapterMetadataName),
+            new Dictionary<string, object?>
+            {
+                ["schema"] = AdapterSchemaVersion,
+                ["source_path"] = sourcePath,
+                ["textures_enabled"] = includeTextures,
             },
             cancellationToken).ConfigureAwait(false);
         return new NativePreviewPackageInfo(submeshes.Count, totalVertices, manifestPath);

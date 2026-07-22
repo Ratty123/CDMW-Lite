@@ -40,6 +40,12 @@ internal sealed class NetSceneState
     public float SceneExtent { get; private set; } = 2.0f;
     public string SessionId { get; private set; } = string.Empty;
     public string SourceIdentity { get; private set; } = string.Empty;
+    public string ArchivePreviewSourcePath { get; private set; } = string.Empty;
+    public bool ArchivePreviewTexturesEnabled { get; private set; }
+    public bool HasArchivePreviewCamera { get; private set; }
+    public float ArchivePreviewYawDegrees { get; private set; }
+    public float ArchivePreviewPitchDegrees { get; private set; }
+    public bool ArchivePreviewFitToView { get; private set; }
     public long SceneGeneration { get; private set; }
     public long PresentationGeneration { get; private set; }
     public long LastRequestId { get; private set; }
@@ -69,6 +75,29 @@ internal sealed class NetSceneState
     {
         SessionId = JsonText(root, "session_id", SessionId).Trim();
         SourceIdentity = JsonText(root, "source_identity", SourceIdentity).Trim();
+        if (root.TryGetProperty("archive_preview", out var archivePreview)
+            && archivePreview.ValueKind == JsonValueKind.Object)
+        {
+            ArchivePreviewSourcePath = JsonText(archivePreview, "source_path", ArchivePreviewSourcePath).Trim();
+            ArchivePreviewTexturesEnabled = JsonBool(
+                archivePreview,
+                "textures_enabled",
+                ArchivePreviewTexturesEnabled);
+            if (archivePreview.TryGetProperty("camera", out var camera)
+                && camera.ValueKind == JsonValueKind.Object)
+            {
+                ArchivePreviewYawDegrees = Math.Clamp(
+                    JsonFloat(camera, "yaw_degrees", ArchivePreviewYawDegrees),
+                    -360.0f,
+                    360.0f);
+                ArchivePreviewPitchDegrees = Math.Clamp(
+                    JsonFloat(camera, "pitch_degrees", ArchivePreviewPitchDegrees),
+                    -89.0f,
+                    89.0f);
+                ArchivePreviewFitToView = JsonBool(camera, "fit_to_view", true);
+                HasArchivePreviewCamera = true;
+            }
+        }
         SceneGeneration = Math.Max(SceneGeneration, JsonLong(root, "scene_generation", SceneGeneration));
         EditableSubmeshCount = Math.Clamp(JsonInt(root, "editable_submesh_count", EditableSubmeshCount), 0, documentSubmeshCount);
         ReferenceSubmeshCount = Math.Clamp(JsonInt(root, "reference_submesh_count", documentSubmeshCount - EditableSubmeshCount), 0, documentSubmeshCount - EditableSubmeshCount);
@@ -585,6 +614,12 @@ internal sealed class NetSceneState
         SceneExtent = other.SceneExtent;
         SessionId = other.SessionId;
         SourceIdentity = other.SourceIdentity;
+        ArchivePreviewSourcePath = other.ArchivePreviewSourcePath;
+        ArchivePreviewTexturesEnabled = other.ArchivePreviewTexturesEnabled;
+        HasArchivePreviewCamera = other.HasArchivePreviewCamera;
+        ArchivePreviewYawDegrees = other.ArchivePreviewYawDegrees;
+        ArchivePreviewPitchDegrees = other.ArchivePreviewPitchDegrees;
+        ArchivePreviewFitToView = other.ArchivePreviewFitToView;
         SceneGeneration = other.SceneGeneration;
         PresentationGeneration = other.PresentationGeneration;
         LastRequestId = other.LastRequestId;

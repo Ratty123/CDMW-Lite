@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private bool _shutdownStarted;
     private bool _shutdownComplete;
     private bool _applyingArchiveColumnLayout;
+    private ModelPreviewSettingsDialog? _modelPreviewSettingsDialog;
     private WindowState _lastNonMinimizedWindowState = WindowState.Normal;
 
     private static readonly HashSet<string> DefaultArchiveColumns = new(StringComparer.Ordinal)
@@ -176,6 +177,28 @@ public partial class MainWindow : Window
     private void OnAssociatedAssetsSelectionChanged(object sender, SelectionChangedEventArgs eventArgs) =>
         _viewModel.ArchiveBrowser.AssociatedAssets.SetSelectedAssets(
             AssociatedAssetsList.SelectedItems.OfType<AssociatedAssetRow>());
+
+    private void OnModelPreviewSettingsClick(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_modelPreviewSettingsDialog is null)
+        {
+            var dialog = new ModelPreviewSettingsDialog(_viewModel.ArchiveBrowser)
+            {
+                Owner = this,
+            };
+            dialog.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_modelPreviewSettingsDialog, dialog))
+                {
+                    _modelPreviewSettingsDialog = null;
+                }
+            };
+            _modelPreviewSettingsDialog = dialog;
+            dialog.Show();
+        }
+
+        _modelPreviewSettingsDialog.ShowCameraInputTab();
+    }
 
     private void OnItemFinderClick(object sender, RoutedEventArgs eventArgs)
     {
@@ -389,6 +412,7 @@ public partial class MainWindow : Window
 
         _shutdownStarted = true;
         CaptureUiState();
+        _modelPreviewSettingsDialog?.Close();
         IsEnabled = false;
         try
         {

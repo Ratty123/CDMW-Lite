@@ -20,6 +20,12 @@ internal sealed partial class MeshViewport
         }
         var renderer = _d3d11Viewport
             ?? throw new InvalidOperationException("The production D3D11 renderer is not available for resident package replacement.");
+        var preserveArchiveCamera = !string.IsNullOrWhiteSpace(_scene.ArchivePreviewSourcePath)
+            && string.Equals(
+                _scene.ArchivePreviewSourcePath,
+                scene.ArchivePreviewSourcePath,
+                StringComparison.OrdinalIgnoreCase);
+        var previousCamera = (_yaw, _pitch, _zoom, _panX, _panY);
 
         renderer.ReplaceResidentScene(document, materials, textureSet, scene);
         _document = document;
@@ -48,11 +54,38 @@ internal sealed partial class MeshViewport
         _presentationGizmoVisible = scene.GizmoVisible;
         _presentationStateFingerprint = string.Empty;
         FrameMesh();
+        if (preserveArchiveCamera)
+        {
+            (_yaw, _pitch, _zoom, _panX, _panY) = previousCamera;
+        }
+        else
+        {
+            ApplyArchivePreviewInitialCamera();
+        }
         InitializePresentationContexts();
         if (_options.SimplePreview)
         {
-            _ = TrySetSynchronizedDisplayMode("untextured_wire", out _);
+            _ = TrySetSynchronizedDisplayMode(
+                scene.ArchivePreviewTexturesEnabled ? "textured" : "untextured_wire",
+                out _);
         }
         ApplySceneState();
+    }
+
+    private void ApplyArchivePreviewInitialCamera()
+    {
+        if (!_scene.HasArchivePreviewCamera)
+        {
+            return;
+        }
+        _yaw = _scene.ArchivePreviewYawDegrees * MathF.PI / 180.0f;
+        _pitch = Math.Clamp(_scene.ArchivePreviewPitchDegrees, -89.0f, 89.0f) * MathF.PI / 180.0f;
+        _panX = 0.0f;
+        _panY = 0.0f;
+        if (_scene.ArchivePreviewFitToView)
+        {
+            _zoom = FitZoomForBounds(SceneBoundsForContext(_activeCameraContextId));
+        }
+        UpdateGpuViewport();
     }
 }

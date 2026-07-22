@@ -683,6 +683,8 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
                                                Style="{StaticResource SectionTitleStyle}"
@@ -692,7 +694,20 @@
                                             Style="{StaticResource CompactButtonStyle}"
                                             Content="{Binding ArchiveBrowser.AssociatedAssets.Header}"
                                             Command="{Binding ArchiveBrowser.AssociatedAssets.ToggleDrawerCommand}" />
-                                    <Border Grid.Column="2" Style="{StaticResource BadgeBorderStyle}" Margin="8,0,0,0">
+                                    <CheckBox Grid.Column="2"
+                                              Margin="10,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Content="{infra:Loc Key=DisplayModelTextures}"
+                                              ToolTip="{infra:Loc Key=DisplayModelTexturesHint}"
+                                              IsChecked="{Binding ArchiveBrowser.ShowModelTextures, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Visibility="{Binding ArchiveBrowser.IsModelSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <Button Grid.Column="3"
+                                            Margin="8,0,0,0"
+                                            Style="{StaticResource CompactButtonStyle}"
+                                            Content="{infra:Loc Key=PreviewSettings}"
+                                            Click="OnModelPreviewSettingsClick"
+                                            Visibility="{Binding ArchiveBrowser.IsModelSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    <Border Grid.Column="4" Style="{StaticResource BadgeBorderStyle}" Margin="8,0,0,0">
                                          <TextBlock FontSize="{DynamicResource BadgeFontSize}"
                                                    FontWeight="Bold"
                                                    Foreground="{DynamicResource TextMutedBrush}"
@@ -779,6 +794,12 @@
                                                                           Grid.RowSpan="3"
                                                                           PackagePath="{Binding ArchiveBrowser.ModelPreviewPackagePath, Mode=OneWay}"
                                                                           Prewarm="{Binding ArchiveBrowser.ShouldPrewarmModelRenderer, Mode=OneWay}"
+                                                                          OrbitSensitivity="{Binding ArchiveBrowser.ModelPreviewOrbitSensitivity, Mode=OneWay}"
+                                                                          PanSensitivity="{Binding ArchiveBrowser.ModelPreviewPanSensitivity, Mode=OneWay}"
+                                                                          InvertOrbitX="{Binding ArchiveBrowser.ModelPreviewInvertOrbitX, Mode=OneWay}"
+                                                                          InvertOrbitY="{Binding ArchiveBrowser.ModelPreviewInvertOrbitY, Mode=OneWay}"
+                                                                          InvertPanX="{Binding ArchiveBrowser.ModelPreviewInvertPanX, Mode=OneWay}"
+                                                                          InvertPanY="{Binding ArchiveBrowser.ModelPreviewInvertPanY, Mode=OneWay}"
                                                                           Visibility="{Binding ArchiveBrowser.IsModelPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         <Grid Grid.Row="0"
                                               Grid.RowSpan="3"

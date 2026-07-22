@@ -26,7 +26,16 @@ public sealed record ArchiveBrowserSettings(
     ArchiveViewMode ViewMode = ArchiveViewMode.Flat,
     string? FolderPath = null,
     ExportCollisionPolicy CollisionPolicy = ExportCollisionPolicy.Skip,
-    ExportManifestFormat ManifestFormat = ExportManifestFormat.Json);
+    ExportManifestFormat ManifestFormat = ExportManifestFormat.Json,
+    ModelPreviewCameraInputSettings? ModelPreviewCameraInput = null);
+
+public sealed record ModelPreviewCameraInputSettings(
+    double OrbitSensitivity = 0.22,
+    double PanSensitivity = 0.60,
+    bool InvertOrbitX = false,
+    bool InvertOrbitY = false,
+    bool InvertPanX = false,
+    bool InvertPanY = false);
 
 public sealed record TextSearchSettings(
     TextSearchSourceKind SourceKind = TextSearchSourceKind.Archive,

@@ -27,6 +27,19 @@
   <data name="MaterialFinder" xml:space="preserve"><value>Material-Finder</value></data>
   <data name="AssetFamily" xml:space="preserve"><value>Asset-Familie</value></data>
   <data name="AssociatedAssets" xml:space="preserve"><value>Zugehörige Dateien</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>Texturen anzeigen</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>Modelltexturen bei Bedarf auflösen und anzeigen. Für die schnellste PAC-Auswahl deaktiviert lassen.</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>Vorschaueinstellungen</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>Kamerasteuerung</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>.NET/Vortice-Kamerasteuerung: Ziehen mit links kreist; Ziehen mit Mitte, rechts oder Umschalt+links verschiebt; das Mausrad zoomt.</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>Orbit-Empfindlichkeit</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>Verschiebeempfindlichkeit</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>Orbit X umkehren</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>Orbit Y umkehren</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>Verschieben X umkehren</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>Verschieben Y umkehren</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>Diese Einstellungen ändern nur die Vorschaunavigation; das Asset wird nie bearbeitet oder exportiert.</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>Kamerasteuerung zurücksetzen</value></data>
   <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>Zugehörige Dateien ({0:N0})</value></data>
   <data name="FindAssociatedAssets" xml:space="preserve"><value>Dateien suchen</value></data>
   <data name="ShowAssociatedAsset" xml:space="preserve"><value>Im Browser anzeigen</value></data>
