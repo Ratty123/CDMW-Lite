@@ -485,8 +485,8 @@ public sealed class NativeModelPreviewService
 
 public static class NativePreviewPackageAdapter
 {
-    private const string AdapterMetadataName = "archive_lite_adapter_v3.json";
-    private const int AdapterSchemaVersion = 3;
+    private const string AdapterMetadataName = "archive_lite_adapter_v4.json";
+    private const int AdapterSchemaVersion = 4;
     private const int SupportedSchemaVersion = 8;
     private const int BytesPerVertex = 23 * sizeof(float);
     private const int MaximumVertices = 8_000_000;
@@ -573,6 +573,15 @@ public static class NativePreviewPackageAdapter
                     resourceFingerprints,
                     cancellationToken).ConfigureAwait(false)
                 : new Dictionary<string, string>();
+            var materialLayers = includeTextures
+                ? await BuildMaterialLayerBindingsAsync(
+                    root,
+                    index,
+                    batch,
+                    resources,
+                    resourceFingerprints,
+                    cancellationToken).ConfigureAwait(false)
+                : Array.Empty<Dictionary<string, object?>>();
             slots.Add(new Dictionary<string, object?>
             {
                 ["index"] = index,
@@ -628,6 +637,14 @@ public static class NativePreviewPackageAdapter
                 ["double_sided_reason"] = "Native material graph sidedness contract.",
                 ["unsupported_features"] = unsupportedFeatures,
                 ["layer_bindings"] = layerBindings,
+                ["material_layers"] = materialLayers,
+                ["material_layer_compiler"] = materialLayers.Any(layer =>
+                    !string.Equals(
+                        layer.GetValueOrDefault("layer_role") as string,
+                        "base",
+                        StringComparison.OrdinalIgnoreCase))
+                    ? "archive_lite_managed_albedo_layer_compiler_v1"
+                    : "none",
                 ["parameters"] = BuildInitialParameters(batch, channels, color, category),
             });
         }
@@ -647,7 +664,7 @@ public static class NativePreviewPackageAdapter
                 ["format"] = "cdmw_mesh_dotnet_materials_v1",
                 ["renderer_authority"] = "dotnet_mesh_editor",
                 ["source"] = "manifest.json",
-                ["adapter"] = "archive_lite_native_material_bridge_v3",
+                ["adapter"] = "archive_lite_native_material_bridge_v4",
                 ["texture_channels"] = new[]
                 {
                     "base",
@@ -766,6 +783,139 @@ public static class NativePreviewPackageAdapter
         }
         return resourceChannels;
     }
+
+    private static async Task<Dictionary<string, object?>[]> BuildMaterialLayerBindingsAsync(
+        string packageRoot,
+        int submeshIndex,
+        JsonElement batch,
+        IDictionary<string, Dictionary<string, object?>> resources,
+        IDictionary<string, string> fingerprints,
+        CancellationToken cancellationToken)
+    {
+        if (!batch.TryGetProperty("material_layers", out var layers) || layers.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<Dictionary<string, object?>>();
+        }
+
+        var result = new List<Dictionary<string, object?>>();
+        foreach (var layer in layers.EnumerateArray())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (layer.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var diffusePath = ResolveTextureSource(packageRoot, ReadString(layer, "diffuse_source"));
+            if (string.IsNullOrWhiteSpace(diffusePath))
+            {
+                continue;
+            }
+            var layerRole = ReadString(layer, "layer_role", "layer");
+            var rawMaskPath = ReadString(layer, "mask_source");
+            var maskPath = ResolveTextureSource(packageRoot, rawMaskPath);
+            if (!string.Equals(layerRole, "base", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(rawMaskPath)
+                && string.IsNullOrWhiteSpace(maskPath))
+            {
+                // A missing authored mask must never turn a local layer into a
+                // full-surface replacement. Full skips unreadable masked layers.
+                continue;
+            }
+            var diffuseResourceId = await RegisterResourceAsync(
+                submeshIndex,
+                diffusePath,
+                "layer_diffuse",
+                "srgb",
+                resources,
+                fingerprints,
+                cancellationToken).ConfigureAwait(false);
+            var maskResourceId = string.IsNullOrWhiteSpace(maskPath)
+                ? string.Empty
+                : await RegisterResourceAsync(
+                    submeshIndex,
+                    maskPath,
+                    "layer_mask",
+                    "linear",
+                    resources,
+                    fingerprints,
+                    cancellationToken).ConfigureAwait(false);
+            result.Add(new Dictionary<string, object?>
+            {
+                ["layer_role"] = layerRole,
+                ["mask_channel"] = NormalizeLayerChannel(ReadString(layer, "mask_channel")),
+                ["blend_order"] = ReadString(layer, "blend_order", "base_then_layer"),
+                ["source_parameter"] = ReadString(layer, "source_parameter"),
+                ["mask_parameter"] = ReadString(layer, "mask_parameter"),
+                ["weight"] = Math.Clamp(ReadFloat(layer, "weight", 1.0f), 0.0f, 1.0f),
+                ["tint"] = ReadFloatArray(layer, "tint", [1.0f, 1.0f, 1.0f]),
+                ["diffuse_resource_id"] = diffuseResourceId,
+                ["mask_resource_id"] = maskResourceId,
+            });
+        }
+        return result.ToArray();
+    }
+
+    private static async Task<string> RegisterResourceAsync(
+        int submeshIndex,
+        string path,
+        string semantic,
+        string colorSpace,
+        IDictionary<string, Dictionary<string, object?>> resources,
+        IDictionary<string, string> fingerprints,
+        CancellationToken cancellationToken)
+    {
+        if (!fingerprints.TryGetValue(path, out var fingerprint))
+        {
+            fingerprint = await FileSha256Async(path, cancellationToken).ConfigureAwait(false);
+            fingerprints[path] = fingerprint;
+        }
+        var resourceId = $"texture:{fingerprint}";
+        if (!resources.ContainsKey(resourceId))
+        {
+            var resolution = new MaterialChannelResolution();
+            resolution.ColorSpaces[semantic] = colorSpace;
+            resolution.Authorities[semantic] = "native_preview_core_material_layer";
+            resources[resourceId] = BuildResourcePayload(
+                resourceId,
+                path,
+                fingerprint,
+                submeshIndex,
+                semantic,
+                resolution);
+        }
+        return resourceId;
+    }
+
+    private static string ResolveTextureSource(string packageRoot, string rawPath)
+    {
+        if (string.IsNullOrWhiteSpace(rawPath))
+        {
+            return string.Empty;
+        }
+        try
+        {
+            var path = Path.IsPathRooted(rawPath)
+                ? Path.GetFullPath(rawPath)
+                : ResolveContainedFile(packageRoot, rawPath);
+            return File.Exists(path) ? path : string.Empty;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or NotSupportedException
+            or PathTooLongException
+            or InvalidDataException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string NormalizeLayerChannel(string value) => CanonicalComponent(value) switch
+    {
+        "g" => "g",
+        "b" => "b",
+        "a" => "a",
+        _ => "r",
+    };
 
     private static Dictionary<string, object?> BuildResourcePayload(
         string resourceId,

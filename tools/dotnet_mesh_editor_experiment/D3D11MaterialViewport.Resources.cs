@@ -121,7 +121,12 @@ internal sealed partial class D3D11MaterialViewport
 
     private D3D11MaterialResources CreateMaterialResources(int submeshIndex)
     {
-        var baseTexture = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "base", "albedo", "diffuse"));
+        var baseReference = _textureSet.SynthesizedBaseReferenceForSubmesh(_materials, submeshIndex);
+        if (baseReference.IsEmpty)
+        {
+            baseReference = _materials.TextureReferenceForSubmesh(submeshIndex, "base", "albedo", "diffuse");
+        }
+        var baseTexture = CreateTextureSrv(baseReference);
         var normal = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "normal"));
         var specular = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "specular"));
         var roughness = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "roughness"));

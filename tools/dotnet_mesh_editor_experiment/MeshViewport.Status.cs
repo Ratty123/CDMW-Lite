@@ -59,7 +59,7 @@ internal sealed partial class MeshViewport
             ["material_parity_contract"] = "source_semantics_v2_native_dds_mips_srgb_linear_ggx_alpha_state_diagnostics",
             ["material_contract_gap"] = new[]
             {
-                "profile-specific multi-layer graphs without capture evidence",
+                "profile-specific multi-layer support-map synthesis",
                 "hair/fur anisotropy and flow response",
                 "skin subsurface and wrinkle response",
                 "order-dependent alpha blending",
@@ -88,6 +88,7 @@ internal sealed partial class MeshViewport
             ["incremental_texture_decodes"] = _textureSet.IncrementalDecodeCount,
             ["texture_decode_singleflight_joins"] = _textureSet.DecodeSingleflightJoinCount,
             ["decoded_bitmap_prunes"] = _textureSet.DecodedBitmapPruneCount,
+            ["managed_material_layer_composites"] = _textureSet.MaterialLayerCompositeCount,
             ["dds_upload_mode"] = _d3d11Viewport?.NativeDdsTextureCount > 0
                 ? (_d3d11Viewport.BitmapFallbackTextureCount > 0 ? "native_dds_mip_chain_with_bitmap_generated_mips" : "native_dds_mip_chain")
                 : "bitmap_bgra32_generated_mip_chain_or_unavailable",
@@ -130,6 +131,7 @@ internal sealed partial class MeshViewport
             ["dds_resources"] = _textureSet.DdsResourceCount,
             ["native_dds_resources"] = _textureSet.NativeDdsResourceCount,
             ["texture_load_failures"] = _textureSet.TextureLoadFailureCount,
+            ["managed_material_layer_composites"] = _textureSet.MaterialLayerCompositeCount,
             ["geometry_resources"] = geometryResources,
             ["live_metrics"] = geometryResources,
         };

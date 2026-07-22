@@ -2061,6 +2061,16 @@ internal static class ArchiveLiteTestRunner
             await File.WriteAllBytesAsync(specularTexturePath, BuildRgba8Dds(4, 4, 192, 192, 192)).ConfigureAwait(false);
             var damageTexturePath = Path.Combine(textureRoot, "damage.dds");
             await File.WriteAllBytesAsync(damageTexturePath, BuildRgba8Dds(4, 4, 255, 0, 255)).ConfigureAwait(false);
+            var layerTexturePath = Path.Combine(textureRoot, "detail-layer.dds");
+            await File.WriteAllBytesAsync(layerTexturePath, BuildRgba8Dds(4, 4, 32, 208, 96)).ConfigureAwait(false);
+            var layerMaskPath = Path.Combine(textureRoot, "detail-mask.dds");
+            await File.WriteAllBytesAsync(
+                layerMaskPath,
+                BuildRgba8DdsRows(
+                    4,
+                    4,
+                    top: (255, 255, 255, 255),
+                    bottom: (0, 0, 0, 255))).ConfigureAwait(false);
             var manifestPath = Path.Combine(root, "manifest.json");
             await File.WriteAllTextAsync(
                 manifestPath,
@@ -2127,6 +2137,29 @@ internal static class ArchiveLiteTestRunner
                                     },
                                 },
                             },
+                            material_layers = new object[]
+                            {
+                                new
+                                {
+                                    layer_role = "base",
+                                    mask_channel = "r",
+                                    blend_order = "base_then_layer",
+                                    diffuse_source = "textures/base.dds",
+                                    mask_source = "",
+                                    weight = 1.0f,
+                                    tint = new[] { 1.0f, 1.0f, 1.0f, 1.0f },
+                                },
+                                new
+                                {
+                                    layer_role = "detail",
+                                    mask_channel = "r",
+                                    blend_order = "base_then_detail",
+                                    diffuse_source = "textures/detail-layer.dds",
+                                    mask_source = "textures/detail-mask.dds",
+                                    weight = 0.65f,
+                                    tint = new[] { 1.0f, 0.8f, 0.6f, 1.0f },
+                                },
+                            },
                         },
                     },
                 }),
@@ -2138,7 +2171,7 @@ internal static class ArchiveLiteTestRunner
             Require(File.Exists(Path.Combine(root, "net_materials.json")), "renderer materials sidecar was not created");
             Require(File.Exists(Path.Combine(root, "dotnet_scene.json")), "renderer scene sidecar was not created");
             Require(File.Exists(Path.Combine(root, "mesh.cdmeta.json")), "renderer metadata sidecar was not created");
-            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v3.json")), "renderer adapter version marker was not created");
+            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v4.json")), "renderer adapter version marker was not created");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
                 Require(!scene.RootElement.GetProperty("grid").GetProperty("visible").GetBoolean(), "read-only preview scene exposed the grid");
@@ -2190,12 +2223,24 @@ internal static class ArchiveLiteTestRunner
                     "the Full-compatible bridge lost packed material channels, primary specular input, or layer-only filtering");
                 var resourceChannels = submesh.GetProperty("resource_channels");
                 Require(
-                    materials.RootElement.GetProperty("resources").GetArrayLength() == 3
+                    materials.RootElement.GetProperty("resources").GetArrayLength() == 5
                     && resourceChannels.EnumerateObject().Count() == 6
                     && resourceChannels.GetProperty("material").GetString() == resourceChannels.GetProperty("roughness").GetString()
                     && resourceChannels.GetProperty("material").GetString() == resourceChannels.GetProperty("metallic").GetString()
                     && resourceChannels.GetProperty("material").GetString() == resourceChannels.GetProperty("occlusion").GetString(),
                     "the Full-compatible bridge did not emit deduplicated resident texture resources");
+                var materialLayers = submesh.GetProperty("material_layers");
+                Require(
+                    materialLayers.GetArrayLength() == 2
+                    && materialLayers[0].GetProperty("layer_role").GetString() == "base"
+                    && materialLayers[1].GetProperty("layer_role").GetString() == "detail"
+                    && materialLayers[1].GetProperty("mask_channel").GetString() == "r"
+                    && materialLayers[1].GetProperty("weight").GetSingle() == 0.65f
+                    && !string.IsNullOrWhiteSpace(materialLayers[1].GetProperty("diffuse_resource_id").GetString())
+                    && !string.IsNullOrWhiteSpace(materialLayers[1].GetProperty("mask_resource_id").GetString())
+                    && submesh.GetProperty("material_layer_compiler").GetString()
+                        == "archive_lite_managed_albedo_layer_compiler_v1",
+                    "the adapter did not preserve Full's ordered masked material-layer contract");
                 var components = submesh.GetProperty("channel_components");
                 Require(
                     components.GetProperty("occlusion").GetString() == "r"
@@ -2442,6 +2487,28 @@ internal static class ArchiveLiteTestRunner
         return dds;
     }
 
+    private static byte[] BuildRgba8DdsRows(
+        int width,
+        int height,
+        (byte R, byte G, byte B, byte A) top,
+        (byte R, byte G, byte B, byte A) bottom)
+    {
+        var dds = BuildRgba8Dds(width, height, 0, 0, 0);
+        for (var y = 0; y < height; y++)
+        {
+            var color = y < height / 2 ? top : bottom;
+            for (var x = 0; x < width; x++)
+            {
+                var offset = 128 + (((y * width) + x) * 4);
+                dds[offset] = color.R;
+                dds[offset + 1] = color.G;
+                dds[offset + 2] = color.B;
+                dds[offset + 3] = color.A;
+            }
+        }
+        return dds;
+    }
+
     private static async Task<string> GetRendererWarmupPackageAsync()
     {
         var warmupType = typeof(ArchiveBrowserViewModel).Assembly.GetType(
@@ -2547,7 +2614,7 @@ internal static class ArchiveLiteTestRunner
         Console.WriteLine(
             $"INFO: native model cache cold={coldTimer.Elapsed.TotalMilliseconds:N1}ms cross-session-warm={warmTimer.Elapsed.TotalMilliseconds:N1}ms");
 
-        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v3.json");
+        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v4.json");
         File.Delete(adapterMarker);
         var migrationProgress = new List<ProgressUpdate>();
         var migrated = await previews.BuildAsync(
@@ -3549,8 +3616,9 @@ internal static class ArchiveLiteTestRunner
                         && renderer.GetProperty("material_parameter_state_count").GetInt32() == 1
                         && renderer.GetProperty("resolved_texture_references").GetInt32() == 3
                         && renderer.GetProperty("existing_texture_files").GetInt32() == 3
-                        && renderer.GetProperty("dds_resources").GetInt32() == 3
-                        && renderer.GetProperty("native_dds_resources").GetInt32() == 3
+                        && renderer.GetProperty("dds_resources").GetInt32() == 5
+                        && renderer.GetProperty("native_dds_resources").GetInt32() == 5
+                        && renderer.GetProperty("managed_material_layer_composites").GetInt64() == 1
                         && renderer.GetProperty("texture_load_failures").GetInt32() == 0,
                         $"resident Vortice renderer did not load the synthetic Full-compatible DDS material graph: {renderer.GetRawText()}");
                 }
