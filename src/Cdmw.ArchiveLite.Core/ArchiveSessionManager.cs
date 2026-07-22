@@ -106,6 +106,7 @@ public sealed class ArchiveSessionManager : IDisposable
                         // Validate the complete native index before replacing a reusable cache.
                     }
                     cancellationToken.ThrowIfCancellationRequested();
+                    ReleaseSessionsForIndexPath(indexPath);
                     File.Move(buildPath, indexPath, overwrite: true);
                     stagingPath = null;
                 }
@@ -187,6 +188,22 @@ public sealed class ArchiveSessionManager : IDisposable
     {
         ArchiveLiteDataPaths.EnsureCreated();
         return Path.Combine(ArchiveLiteDataPaths.IndexCache, $"{fingerprint}.abi");
+    }
+
+    private void ReleaseSessionsForIndexPath(string indexPath)
+    {
+        var target = Path.GetFullPath(indexPath);
+        foreach (var pair in _sessions.ToArray())
+        {
+            if (!string.Equals(Path.GetFullPath(pair.Value.Index.Path), target, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (_sessions.TryRemove(pair.Key, out var removed))
+            {
+                removed.Dispose();
+            }
+        }
     }
 
     private static void TryDeleteFile(string? path)

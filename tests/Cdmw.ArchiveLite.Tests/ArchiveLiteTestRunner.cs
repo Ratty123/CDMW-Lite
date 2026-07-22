@@ -1670,6 +1670,28 @@ internal static class ArchiveLiteTestRunner
                 CancellationToken.None).ConfigureAwait(false);
             Require(reused.UsedCachedIndex, "a verified persistent index was not reused");
 
+            var priorSessionIds = new List<string> { built.SessionId, reused.SessionId };
+            for (var refresh = 0; refresh < 3; refresh++)
+            {
+                var refreshed = await sessions.OpenAsync(
+                    new OpenArchiveRequest(
+                        fixture.Root,
+                        ForceRefresh: true,
+                        CacheMode: ArchiveCacheMode.Persistent),
+                    CancellationToken.None).ConfigureAwait(false);
+                Require(!refreshed.UsedCachedIndex, "a forced refresh incorrectly reported a cache hit");
+                Require(
+                    Path.GetFullPath(sessions.GetRequired(refreshed.SessionId).Index.Path)
+                        .Equals(Path.GetFullPath(persistentPath), StringComparison.OrdinalIgnoreCase),
+                    "a forced refresh published to a different persistent cache path");
+                foreach (var releasedSessionId in priorSessionIds)
+                {
+                    await RequireThrowsAsync<KeyNotFoundException>(() => Task.FromResult(sessions.GetRequired(releasedSessionId)))
+                        .ConfigureAwait(false);
+                }
+                priorSessionIds = [refreshed.SessionId];
+            }
+
             var originalPamt = await File.ReadAllBytesAsync(fixture.Pamt).ConfigureAwait(false);
             var originalTimestamp = File.GetLastWriteTimeUtc(fixture.Pamt);
             var changedPamt = originalPamt.ToArray();
