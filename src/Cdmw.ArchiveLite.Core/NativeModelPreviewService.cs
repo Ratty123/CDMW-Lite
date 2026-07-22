@@ -485,11 +485,21 @@ public sealed class NativeModelPreviewService
 
 public static class NativePreviewPackageAdapter
 {
-    private const string AdapterMetadataName = "archive_lite_adapter_v2.json";
-    private const int AdapterSchemaVersion = 2;
+    private const string AdapterMetadataName = "archive_lite_adapter_v3.json";
+    private const int AdapterSchemaVersion = 3;
     private const int SupportedSchemaVersion = 8;
     private const int BytesPerVertex = 23 * sizeof(float);
     private const int MaximumVertices = 8_000_000;
+    private static readonly HashSet<string> LayerOnlyRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "damage",
+        "decal",
+        "detail",
+        "dye",
+        "grime",
+        "layer",
+        "overlay",
+    };
     internal static JsonSerializerOptions JsonOptions { get; } = new() { WriteIndented = true };
 
     public static bool HasCurrentAdapterMetadata(string packageRoot) =>
@@ -523,6 +533,8 @@ public static class NativePreviewPackageAdapter
 
         var slots = new List<Dictionary<string, object?>>();
         var submeshes = new List<Dictionary<string, object?>>();
+        var resources = new Dictionary<string, Dictionary<string, object?>>(StringComparer.Ordinal);
+        var resourceFingerprints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         long totalVertices = 0;
         foreach (var batch in batches.EnumerateArray())
         {
@@ -549,10 +561,18 @@ public static class NativePreviewPackageAdapter
             }
 
             var material = ReadString(batch, "material_name", $"material_{index:000}");
-            var components = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var channels = includeTextures
-                ? ResolveChannels(root, batch, out components)
-                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var channelResolution = includeTextures
+                ? ResolveChannels(root, batch)
+                : new MaterialChannelResolution();
+            var channels = channelResolution.Channels;
+            var resourceChannels = includeTextures
+                ? await BuildResourceBindingsAsync(
+                    index,
+                    channelResolution,
+                    resources,
+                    resourceFingerprints,
+                    cancellationToken).ConfigureAwait(false)
+                : new Dictionary<string, string>();
             slots.Add(new Dictionary<string, object?>
             {
                 ["index"] = index,
@@ -563,6 +583,14 @@ public static class NativePreviewPackageAdapter
 
             var color = ReadFloatArray(batch, "base_color", [0.65f, 0.65f, 0.65f]);
             var category = ReadString(batch, "material_category", "unknown");
+            var rawShaderFamily = ReadString(batch, "shader_family", "generic");
+            var shaderFamily = NormalizeShaderFamily(rawShaderFamily);
+            var alphaMode = NormalizeAlphaMode(ReadString(batch, "alpha_mode", "opaque"));
+            var layerBindings = ReadMaterialInputs(batch);
+            var unsupportedFeatures = UnsupportedFeatures(
+                shaderFamily,
+                alphaMode,
+                layerBindings.Length > 0 && !ReadBool(batch, "material_combiner_active"));
             submeshes.Add(new Dictionary<string, object?>
             {
                 ["submesh_index"] = index,
@@ -571,42 +599,36 @@ public static class NativePreviewPackageAdapter
                 ["texture"] = channels.GetValueOrDefault("base", ""),
                 ["resolved_channels"] = channels,
                 ["packaged_channels"] = new Dictionary<string, string>(),
-                ["resource_channels"] = new Dictionary<string, string>(),
-                ["channel_components"] = components,
-                ["channel_color_spaces"] = channels.Keys.ToDictionary(
-                    static channel => channel,
-                    static channel => channel == "base" ? "srgb" : "linear",
-                    StringComparer.OrdinalIgnoreCase),
-                ["channel_authorities"] = channels.Keys.ToDictionary(
-                    static channel => channel,
-                    static _ => "native_preview_core",
-                    StringComparer.OrdinalIgnoreCase),
-                ["normal_y_policy"] = "shader_invert_legacy_compat",
-                ["texture_flip_vertical"] = false,
-                ["shader_family"] = ReadString(batch, "shader_family", "generic"),
-                ["shader_technique"] = ReadString(batch, "shader_rule", "generic"),
-                ["shader_authority"] = "native_preview_core",
-                ["shader_family_source"] = "native_preview_core",
-                ["shader_family_reason"] = "Native material graph preview package.",
+                ["resource_channels"] = resourceChannels,
+                ["channel_components"] = channelResolution.Components,
+                ["channel_color_spaces"] = channelResolution.ColorSpaces,
+                ["channel_authorities"] = channelResolution.Authorities,
+                ["normal_y_policy"] = ReadString(batch, "normal_y_policy", "shader_invert_legacy_compat"),
+                ["texture_flip_vertical"] = ReadBool(batch, "texture_flip_vertical"),
+                ["shader_family"] = shaderFamily,
+                ["shader_technique"] = rawShaderFamily,
+                ["shader_authority"] = string.Equals(shaderFamily, "generic", StringComparison.OrdinalIgnoreCase)
+                    ? "guess"
+                    : "sidecar",
+                ["shader_family_source"] = "declared_shader_family",
+                ["shader_family_reason"] = string.Equals(shaderFamily, "generic", StringComparison.OrdinalIgnoreCase)
+                    ? "No supported source shader family was declared."
+                    : $"Native material graph declared shader family {rawShaderFamily}.",
                 ["material_category"] = category,
                 ["material_category_confidence"] = ReadFloat(batch, "material_category_confidence", 0.35f),
                 ["material_category_reason"] = ReadString(batch, "material_category_reason"),
                 ["material_response_promoted"] = ReadBool(batch, "material_response_promoted"),
-                ["alpha_mode"] = "opaque",
-                ["alpha_cutoff"] = 0.5f,
+                ["alpha_mode"] = alphaMode,
+                ["alpha_cutoff"] = ReadFloat(batch, "alpha_threshold", 0.5f),
                 ["opacity_factor"] = 1.0f,
-                ["double_sided"] = false,
-                ["unsupported_features"] = Array.Empty<string>(),
-                ["parameters"] = new Dictionary<string, object?>
-                {
-                    ["base_color"] = color,
-                    ["base_tint_strength"] = 1.0f,
-                    ["roughness"] = ReadFloat(batch, "roughness", 0.62f),
-                    ["metalness"] = ReadFloat(batch, "metalness", 0.0f),
-                    ["specular"] = ReadFloat(batch, "specular", 0.25f),
-                    ["height_scale"] = ReadFloat(batch, "height_scale", 0.0f),
-                    ["material_role"] = category,
-                },
+                ["alpha_authority"] = "native_preview_core",
+                ["alpha_reason"] = "Native material graph alpha contract.",
+                ["double_sided"] = ReadBool(batch, "two_sided"),
+                ["double_sided_authority"] = "native_preview_core",
+                ["double_sided_reason"] = "Native material graph sidedness contract.",
+                ["unsupported_features"] = unsupportedFeatures,
+                ["layer_bindings"] = layerBindings,
+                ["parameters"] = BuildInitialParameters(batch, channels, color, category),
             });
         }
         if (submeshes.Count == 0)
@@ -615,15 +637,44 @@ public static class NativePreviewPackageAdapter
         }
 
         var manifestBytes = await File.ReadAllBytesAsync(manifestPath, cancellationToken).ConfigureAwait(false);
-        var signature = Convert.ToHexString(SHA256.HashData(manifestBytes)).ToLowerInvariant();
+        var manifestSignature = Convert.ToHexString(SHA256.HashData(manifestBytes)).ToLowerInvariant();
+        var signature = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            $"{manifestSignature}:archive_lite_adapter:{AdapterSchemaVersion}"))).ToLowerInvariant();
         await WriteJsonAsync(
             Path.Combine(root, "net_materials.json"),
             new Dictionary<string, object?>
             {
-                ["schema"] = "cdmw_archive_lite_native_materials_v1",
+                ["format"] = "cdmw_mesh_dotnet_materials_v1",
+                ["renderer_authority"] = "dotnet_mesh_editor",
+                ["source"] = "manifest.json",
+                ["adapter"] = "archive_lite_native_material_bridge_v3",
+                ["texture_channels"] = new[]
+                {
+                    "base",
+                    "normal",
+                    "specular",
+                    "roughness",
+                    "metallic",
+                    "emissive",
+                    "height",
+                    "material",
+                    "occlusion",
+                    "opacity",
+                },
                 ["material_signature"] = signature,
                 ["material_slots"] = slots,
+                ["resources"] = resources
+                    .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                    .Select(static pair => pair.Value)
+                    .ToArray(),
                 ["submeshes"] = submeshes,
+                ["fallbacks"] = new Dictionary<string, string>
+                {
+                    ["base"] = "neutral_checker",
+                    ["normal"] = "flat_normal",
+                    ["emissive"] = "black",
+                },
+                ["source_mesh"] = sourcePath,
             },
             cancellationToken).ConfigureAwait(false);
         await WriteJsonAsync(
@@ -675,13 +726,113 @@ public static class NativePreviewPackageAdapter
         return new NativePreviewPackageInfo(submeshes.Count, totalVertices, manifestPath);
     }
 
-    private static Dictionary<string, string> ResolveChannels(
-        string packageRoot,
-        JsonElement batch,
-        out Dictionary<string, string> components)
+    private static async Task<Dictionary<string, string>> BuildResourceBindingsAsync(
+        int submeshIndex,
+        MaterialChannelResolution resolution,
+        IDictionary<string, Dictionary<string, object?>> resources,
+        IDictionary<string, string> fingerprints,
+        CancellationToken cancellationToken)
     {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        components = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var resourceChannels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (semantic, path) in resolution.Channels.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!fingerprints.TryGetValue(path, out var fingerprint))
+            {
+                fingerprint = await FileSha256Async(path, cancellationToken).ConfigureAwait(false);
+                fingerprints[path] = fingerprint;
+            }
+            var resourceId = $"texture:{fingerprint}";
+            resourceChannels[semantic] = resourceId;
+            if (!resources.TryGetValue(resourceId, out var resource))
+            {
+                resource = BuildResourcePayload(
+                    resourceId,
+                    path,
+                    fingerprint,
+                    submeshIndex,
+                    semantic,
+                    resolution);
+                resources[resourceId] = resource;
+            }
+            else if (ResourceChannelRank(semantic) < ResourceChannelRank(resource.GetValueOrDefault("material_channel") as string ?? ""))
+            {
+                resource["material_channel"] = semantic;
+                resource["semantic"] = semantic;
+                resource["color_space"] = resolution.ColorSpaces.GetValueOrDefault(semantic, "linear");
+                resource["semantic_authority"] = resolution.Authorities.GetValueOrDefault(semantic, "native_preview_core");
+                resource["fallback_policy"] = ResourceFallbackPolicy(semantic);
+            }
+        }
+        return resourceChannels;
+    }
+
+    private static Dictionary<string, object?> BuildResourcePayload(
+        string resourceId,
+        string path,
+        string fingerprint,
+        int submeshIndex,
+        string semantic,
+        MaterialChannelResolution resolution) => new()
+    {
+        ["resource_id"] = resourceId,
+        ["path"] = path,
+        ["source_reference"] = path,
+        ["fingerprint"] = fingerprint,
+        ["role"] = "replacement",
+        ["submesh_index"] = submeshIndex,
+        ["material_channel"] = semantic,
+        ["semantic"] = semantic,
+        ["color_space"] = resolution.ColorSpaces.GetValueOrDefault(semantic, "linear"),
+        ["semantic_authority"] = resolution.Authorities.GetValueOrDefault(semantic, "native_preview_core"),
+        ["profile"] = "legacy_unknown",
+        ["required"] = false,
+        ["criticality"] = "optional",
+        ["fallback_policy"] = ResourceFallbackPolicy(semantic),
+    };
+
+    private static int ResourceChannelRank(string channel) => channel switch
+    {
+        "base" => 0,
+        "normal" => 1,
+        "material" => 2,
+        "roughness" => 3,
+        "metallic" => 4,
+        "specular" => 5,
+        "emissive" => 6,
+        "height" => 7,
+        _ => 99,
+    };
+
+    private static string ResourceFallbackPolicy(string channel) => channel switch
+    {
+        "base" => "neutral_checker",
+        "normal" => "flat_normal",
+        "roughness" => "neutral_roughness",
+        "metallic" => "nonmetal",
+        "material" => "neutral_material",
+        "specular" => "neutral_specular",
+        "emissive" => "black",
+        "height" => "neutral_height",
+        _ => "diagnostic_only",
+    };
+
+    private static async Task<string> FileSha256Async(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            1024 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken).ConfigureAwait(false);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static MaterialChannelResolution ResolveChannels(string packageRoot, JsonElement batch)
+    {
+        var result = new MaterialChannelResolution();
         if (!batch.TryGetProperty("dds_textures", out var textures) || textures.ValueKind != JsonValueKind.Object)
         {
             return result;
@@ -692,48 +843,297 @@ public static class NativePreviewPackageAdapter
             {
                 continue;
             }
-            var path = ReadString(texture.Value, "source_path");
-            if (string.IsNullOrWhiteSpace(path))
+            AddTextureDescriptor(result, packageRoot, texture.Name, texture.Value, overwrite: true);
+        }
+        if (textures.TryGetProperty("material_inputs", out var inputs) && inputs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var input in inputs.EnumerateArray())
             {
-                continue;
-            }
-            path = Path.IsPathRooted(path)
-                ? Path.GetFullPath(path)
-                : ResolveContainedFile(packageRoot, path);
-            if (!File.Exists(path))
-            {
-                continue;
-            }
-            var slot = texture.Name.ToLowerInvariant();
-            result[slot] = path;
-            if (slot == "material")
-            {
-                result["specular"] = path;
-                result["roughness"] = path;
-                result["metallic"] = path;
-                var packed = ReadString(texture.Value, "packed_channels");
-                components["specular"] = FindComponent(packed, "specular", "r");
-                components["roughness"] = FindComponent(packed, "roughness", "g");
-                components["metallic"] = FindComponent(packed, "metalness", "b");
+                if (input.ValueKind != JsonValueKind.Object
+                    || LayerOnlyRoles.Contains(ReadString(input, "layer_role")))
+                {
+                    continue;
+                }
+                var slot = ReadString(input, "slot", ReadString(input, "semantic_type"));
+                AddTextureDescriptor(result, packageRoot, slot, input, overwrite: false);
             }
         }
         return result;
     }
 
-    private static string FindComponent(string packed, string semantic, string fallback)
+    private static void AddTextureDescriptor(
+        MaterialChannelResolution result,
+        string packageRoot,
+        string rawSlot,
+        JsonElement descriptor,
+        bool overwrite)
     {
-        var normalized = packed.ToLowerInvariant().Replace("metallic", "metalness", StringComparison.Ordinal);
-        foreach (var channel in new[] { "r", "g", "b", "a" })
+        if (!ReadBool(descriptor, "available", fallback: true)
+            || !ReadBool(descriptor, "direct_upload_candidate", fallback: true))
         {
-            if (normalized.Contains($"{semantic}={channel}", StringComparison.Ordinal)
-                || normalized.Contains($"{semantic}:{channel}", StringComparison.Ordinal)
-                || normalized.Contains($"{channel}={semantic}", StringComparison.Ordinal)
-                || normalized.Contains($"{channel}:{semantic}", StringComparison.Ordinal))
+            return;
+        }
+        var slot = CanonicalChannel(rawSlot);
+        var rawPath = ReadString(descriptor, "source_path");
+        if (string.IsNullOrWhiteSpace(slot) || string.IsNullOrWhiteSpace(rawPath))
+        {
+            return;
+        }
+        var path = Path.IsPathRooted(rawPath)
+            ? Path.GetFullPath(rawPath)
+            : ResolveContainedFile(packageRoot, rawPath);
+        if (!File.Exists(path))
+        {
+            return;
+        }
+        var colorSpace = NormalizeColorSpace(ReadString(descriptor, "srgb_mode"), slot);
+        var authority = ReadString(
+            descriptor,
+            "source_authority",
+            ReadString(descriptor, "binding_authority", "native_preview_core"));
+        SetChannel(result, slot, path, colorSpace, authority, overwrite);
+
+        var packedComponents = ParsePackedComponents(ReadString(descriptor, "packed_channels"));
+        foreach (var (semantic, component) in packedComponents)
+        {
+            result.Components[semantic] = component;
+        }
+        if (slot == "material")
+        {
+            foreach (var semantic in new[] { "specular", "roughness", "metallic", "occlusion" })
             {
-                return channel;
+                if (packedComponents.ContainsKey(semantic))
+                {
+                    SetChannel(result, semantic, path, "linear", authority, overwrite);
+                }
             }
         }
-        return fallback;
+    }
+
+    private static void SetChannel(
+        MaterialChannelResolution result,
+        string channel,
+        string path,
+        string colorSpace,
+        string authority,
+        bool overwrite)
+    {
+        if (!overwrite && result.Channels.ContainsKey(channel))
+        {
+            return;
+        }
+        result.Channels[channel] = path;
+        result.ColorSpaces[channel] = colorSpace;
+        result.Authorities[channel] = authority;
+    }
+
+    private static Dictionary<string, string> ParsePackedComponents(string packed)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var token in packed.Split([',', ';', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = token.IndexOfAny(['=', ':']);
+            if (separator <= 0 || separator >= token.Length - 1)
+            {
+                continue;
+            }
+            var left = token[..separator];
+            var right = token[(separator + 1)..];
+            var leftComponent = CanonicalComponent(left);
+            var rightComponent = CanonicalComponent(right);
+            var semantic = leftComponent.Length > 0 ? CanonicalChannel(right) : CanonicalChannel(left);
+            var component = leftComponent.Length > 0 ? leftComponent : rightComponent;
+            if (semantic.Length > 0 && component.Length > 0)
+            {
+                result[semantic] = component;
+            }
+        }
+        return result;
+    }
+
+    private static Dictionary<string, object?> BuildInitialParameters(
+        JsonElement batch,
+        IReadOnlyDictionary<string, string> channels,
+        float[] color,
+        string category)
+    {
+        var result = new Dictionary<string, object?>
+        {
+            ["base_tint_color"] = color,
+            ["base_tint_strength"] = Math.Clamp(ReadFloat(batch, "base_tint_strength", 0.0f), 0.0f, 1.0f),
+            ["base_tint_metallic"] = string.Equals(category, "metal", StringComparison.OrdinalIgnoreCase),
+            ["material_role"] = category,
+        };
+        if (batch.TryGetProperty("native_material_hints", out var hints) && hints.ValueKind == JsonValueKind.Object)
+        {
+            CopyHint(hints, "roughness", result, "roughness_hint");
+            CopyHint(hints, "metalness", result, "metalness_hint");
+            CopyHint(hints, "specular", result, "specular_hint");
+        }
+        else
+        {
+            CopyScalar(batch, "roughness", result, channels.ContainsKey("roughness") ? "roughness_scale" : "roughness");
+            CopyScalar(batch, "metalness", result, channels.ContainsKey("metallic") ? "metalness_scale" : "metalness");
+            var specular = ReadOptionalFloat(batch, "specular", 0.0f, 1.0f);
+            if (specular is not null && Math.Abs(specular.Value - 1.0f) > 0.000001f)
+            {
+                result["specular"] = specular.Value;
+            }
+        }
+        var emissiveIntensity = ReadOptionalFloat(batch, "emissive_intensity", 0.0f, 32.0f);
+        if (emissiveIntensity is > 0.0f || channels.ContainsKey("emissive"))
+        {
+            result["emissive_intensity"] = emissiveIntensity ?? 1.0f;
+            result["emissive_color"] = ReadFloatArray(batch, "emissive_color", [1.0f, 1.0f, 1.0f]);
+            result["emissive_color_authoritative"] = true;
+        }
+        return result;
+    }
+
+    private static void CopyHint(
+        JsonElement source,
+        string sourceName,
+        IDictionary<string, object?> destination,
+        string destinationName)
+    {
+        var value = ReadOptionalFloat(source, sourceName, 0.0f, 1.0f);
+        if (value is not null)
+        {
+            destination[destinationName] = value.Value;
+        }
+    }
+
+    private static void CopyScalar(
+        JsonElement source,
+        string sourceName,
+        IDictionary<string, object?> destination,
+        string destinationName)
+    {
+        var value = ReadOptionalFloat(source, sourceName, 0.0f, 1.0f);
+        if (value is not null)
+        {
+            destination[destinationName] = value.Value;
+        }
+    }
+
+    private static JsonElement[] ReadMaterialInputs(JsonElement batch)
+    {
+        if (!batch.TryGetProperty("dds_textures", out var textures)
+            || textures.ValueKind != JsonValueKind.Object
+            || !textures.TryGetProperty("material_inputs", out var inputs)
+            || inputs.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<JsonElement>();
+        }
+        return inputs.EnumerateArray()
+            .Where(static input => input.ValueKind == JsonValueKind.Object)
+            .Select(static input => input.Clone())
+            .ToArray();
+    }
+
+    private static string[] UnsupportedFeatures(string shaderFamily, string alphaMode, bool hasLayerGraph)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        if (alphaMode == "blend") result.Add("per_triangle_alpha_blend_sorting");
+        if (hasLayerGraph) result.Add("shader_family_layer_graph");
+        if (shaderFamily is "hair" or "fur") result.Add("hair_fur_anisotropy_and_flow");
+        if (shaderFamily is "skin" or "skin_wrinkle") result.Add("skin_subsurface_and_wrinkle_response");
+        return result.OrderBy(static value => value, StringComparer.Ordinal).ToArray();
+    }
+
+    private static string NormalizeShaderFamily(string value)
+    {
+        var text = value.Trim().ToLowerInvariant();
+        var compact = CompactIdentifier(text);
+        if (compact.Length == 0) return "generic";
+        if ((compact.Contains("skin", StringComparison.Ordinal) && !compact.Contains("skinnedmesh", StringComparison.Ordinal))
+            || compact.Contains("skinnedmeshskin", StringComparison.Ordinal)) return "skin";
+        if (compact.Contains("skinnedmeshanimalhair", StringComparison.Ordinal)
+            || compact.Contains("skinnedmeshhairstandard", StringComparison.Ordinal)
+            || compact.Contains("skinnedmeshhair", StringComparison.Ordinal)
+            || compact.Contains("skinnedmeshfur", StringComparison.Ordinal)
+            || compact.Contains("hair", StringComparison.Ordinal)
+            || compact.Contains("fur", StringComparison.Ordinal)) return "hair";
+        if (compact.Contains("cloth", StringComparison.Ordinal))
+            return compact.Contains("v2", StringComparison.Ordinal) || compact.Contains("ver2", StringComparison.Ordinal)
+                ? "cloth_v2"
+                : "cloth";
+        if (compact.Contains("emissive", StringComparison.Ordinal))
+            return compact.Contains("v2", StringComparison.Ordinal) || compact.Contains("ver2", StringComparison.Ordinal)
+                ? "emissive_v2"
+                : "emissive";
+        if (compact.Contains("water", StringComparison.Ordinal)
+            || compact.Contains("shallowwater", StringComparison.Ordinal)
+            || compact.Contains("sea", StringComparison.Ordinal)) return "environment_water";
+        if ((compact.Contains("static", StringComparison.Ordinal) && compact.Contains("multi", StringComparison.Ordinal))
+            || compact.Contains("rgbtexture", StringComparison.Ordinal)
+            || compact.Contains("multitextured", StringComparison.Ordinal)) return "static_multitextured";
+        if (compact.Contains("static", StringComparison.Ordinal)) return "static_standard";
+        if (compact.Contains("standard", StringComparison.Ordinal))
+            return compact.Contains("v2", StringComparison.Ordinal) || compact.Contains("ver2", StringComparison.Ordinal)
+                ? "standard_v2"
+                : "standard";
+        return text.Replace(' ', '_');
+    }
+
+    private static string NormalizeAlphaMode(string value)
+    {
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "mask" or "alpha_cutout" or "coverage" or "cutout" => "cutout",
+            "transparent" or "alpha" or "blend" => "blend",
+            _ => "opaque",
+        };
+    }
+
+    private static string NormalizeColorSpace(string value, string channel)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        if (normalized.Contains("srgb", StringComparison.Ordinal)) return "srgb";
+        if (normalized.Contains("linear", StringComparison.Ordinal)) return "linear";
+        return channel is "base" or "emissive" ? "srgb" : "linear";
+    }
+
+    private static string CanonicalComponent(string value)
+    {
+        return CompactIdentifier(value) switch
+        {
+            "r" or "red" => "r",
+            "g" or "green" => "g",
+            "b" or "blue" => "b",
+            "a" or "alpha" => "a",
+            _ => string.Empty,
+        };
+    }
+
+    private static string CanonicalChannel(string value)
+    {
+        return CompactIdentifier(value) switch
+        {
+            "base" or "basecolor" or "albedo" or "color" or "diffuse" => "base",
+            "normal" or "normalmap" => "normal",
+            "material" or "materialmask" or "packedmaterial" or "packedmaterialmask" => "material",
+            "specular" or "specularresponse" => "specular",
+            "roughness" or "glossiness" => "roughness",
+            "metallic" or "metalness" => "metallic",
+            "occlusion" or "ambientocclusion" or "ao" => "occlusion",
+            "height" or "displacement" => "height",
+            "emissive" or "emission" => "emissive",
+            "opacity" or "alpha" => "opacity",
+            "layermask" or "mask" => "layer_mask",
+            _ => string.Empty,
+        };
+    }
+
+    private static string CompactIdentifier(string value) => new(
+        value.Where(char.IsLetterOrDigit).ToArray());
+
+    private sealed class MaterialChannelResolution
+    {
+        public Dictionary<string, string> Channels { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Components { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> ColorSpaces { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Authorities { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
     private static async Task WriteJsonAsync(string path, object payload, CancellationToken cancellationToken)
@@ -775,9 +1175,24 @@ public static class NativePreviewPackageAdapter
                 : fallback;
     }
 
-    private static bool ReadBool(JsonElement element, string name)
+    private static float? ReadOptionalFloat(JsonElement element, string name, float minimum, float maximum)
     {
-        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
+        return element.TryGetProperty(name, out var value)
+            && value.TryGetSingle(out var result)
+            && float.IsFinite(result)
+                ? Math.Clamp(result, minimum, maximum)
+                : null;
+    }
+
+    private static bool ReadBool(JsonElement element, string name, bool fallback = false)
+    {
+        if (!element.TryGetProperty(name, out var value)) return fallback;
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => fallback,
+        };
     }
 
     private static float[] ReadFloatArray(JsonElement element, string name, float[] fallback)

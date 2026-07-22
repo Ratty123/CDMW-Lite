@@ -916,8 +916,13 @@ internal static class ArchiveLiteTestRunner
             && exportDialog.Descendants().Any(element => element.Name.LocalName == "ComboBox"),
             "Export selected does not offer file-only, folder-structure, family, and model-format choices");
         var controlsSource = File.ReadAllText(Path.Combine(appRoot, "Themes", "Controls.xaml"));
+        var controlsDocument = System.Xml.Linq.XDocument.Parse(controlsSource);
+        var workspaceTabStyle = controlsDocument.Descendants().Single(element =>
+            element.Name.LocalName == "Style"
+            && element.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "Key" && attribute.Value == "WorkspaceContentTabControlStyle"));
         Require(
-            !controlsSource.Contains("<TabPanel", StringComparison.Ordinal)
+            !workspaceTabStyle.Descendants().Any(element => element.Name.LocalName == "TabPanel")
             && controlsSource.Contains("CornerRadius=\"9\"", StringComparison.Ordinal)
             && controlsSource.Contains("BorderThickness=\"{TemplateBinding BorderThickness}\"", StringComparison.Ordinal),
             "title-row navigation still uses the clipped secondary tab panel");
@@ -1011,15 +1016,43 @@ internal static class ArchiveLiteTestRunner
             appRoot,
             "Dialogs",
             "ModelPreviewSettingsDialog.xaml"));
+        var settingsTab = settingsDialog.Descendants().Single(element =>
+            element.Name.LocalName == "TabControl"
+            && ((string?)element.Attribute("Name") ?? element.Attributes().FirstOrDefault(attribute =>
+                attribute.Name.LocalName == "Name")?.Value) == "SettingsTabs");
+        var settingsSliders = settingsDialog.Descendants()
+            .Where(element => element.Name.LocalName == "Slider")
+            .ToArray();
         Require(
             settingsDialog.Descendants().Any(element =>
                 element.Name.LocalName == "TabItem"
                 && ((string?)element.Attribute("Header"))?.Contains("CameraInput", StringComparison.Ordinal) == true)
-            && settingsDialog.Descendants().Count(element => element.Name.LocalName == "Slider") == 2
+            && settingsSliders.Length == 2
             && settingsDialog.Descendants().Count(element =>
                 element.Name.LocalName == "CheckBox"
                 && ((string?)element.Attribute("IsChecked"))?.Contains("ModelPreviewInvert", StringComparison.Ordinal) == true) == 4,
             "Preview Settings does not provide the requested Orbit/Pan camera-input tab");
+        Require(
+            ((string?)settingsTab.Attribute("Style"))?.Contains("SettingsTabControlStyle", StringComparison.Ordinal) == true
+            && settingsSliders.All(element =>
+                ((string?)element.Attribute("Style"))?.Contains("SettingsSliderStyle", StringComparison.Ordinal) == true),
+            "Preview Settings still falls back to the platform's white TabControl or Slider surfaces");
+        var settingsControls = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "Themes", "Controls.xaml"));
+        foreach (var styleKey in new[]
+        {
+            "SettingsTabItemStyle",
+            "SettingsTabControlStyle",
+            "SettingsSliderTrackButtonStyle",
+            "SettingsSliderThumbStyle",
+            "SettingsSliderStyle",
+        })
+        {
+            Require(
+                settingsControls.Descendants().Any(element => element.Name.LocalName == "Style"
+                    && element.Attributes().Any(attribute =>
+                        attribute.Name.LocalName == "Key" && attribute.Value == styleKey)),
+                $"the dark Preview Settings control theme is missing {styleKey}");
+        }
 
         var imagePreview = previewLayout.Descendants().Single(element =>
             element.Name.LocalName == "Image"
@@ -1285,8 +1318,8 @@ internal static class ArchiveLiteTestRunner
         Require(
             previewSource.Contains("[\"use_textures_by_default\"] = includeTextures", StringComparison.Ordinal)
             && previewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && previewSource.Contains("var channels = includeTextures", StringComparison.Ordinal)
-            && previewSource.Contains("? ResolveChannels(root, batch, out components)", StringComparison.Ordinal),
+            && previewSource.Contains("var channelResolution = includeTextures", StringComparison.Ordinal)
+            && previewSource.Contains("? ResolveChannels(root, batch)", StringComparison.Ordinal),
             "native PAC texture discovery is not isolated behind the explicit opt-in route");
         var rendererProgram = File.ReadAllText(Path.Combine(
             repositoryRoot,
@@ -2016,7 +2049,13 @@ internal static class ArchiveLiteTestRunner
             var textureRoot = Path.Combine(root, "textures");
             Directory.CreateDirectory(textureRoot);
             var baseTexturePath = Path.Combine(textureRoot, "base.dds");
-            await File.WriteAllBytesAsync(baseTexturePath, "DDS synthetic texture reference"u8.ToArray()).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(baseTexturePath, BuildRgba8Dds(4, 4, 224, 112, 48)).ConfigureAwait(false);
+            var materialTexturePath = Path.Combine(textureRoot, "material.dds");
+            await File.WriteAllBytesAsync(materialTexturePath, BuildRgba8Dds(4, 4, 255, 128, 64)).ConfigureAwait(false);
+            var specularTexturePath = Path.Combine(textureRoot, "specular.dds");
+            await File.WriteAllBytesAsync(specularTexturePath, BuildRgba8Dds(4, 4, 192, 192, 192)).ConfigureAwait(false);
+            var damageTexturePath = Path.Combine(textureRoot, "damage.dds");
+            await File.WriteAllBytesAsync(damageTexturePath, BuildRgba8Dds(4, 4, 255, 0, 255)).ConfigureAwait(false);
             var manifestPath = Path.Combine(root, "manifest.json");
             await File.WriteAllTextAsync(
                 manifestPath,
@@ -2037,12 +2076,51 @@ internal static class ArchiveLiteTestRunner
                             roughness = 0.4f,
                             metalness = 0.8f,
                             specular = 0.5f,
-                            material_category = "metal",
+                            base_tint_strength = 0.0f,
+                            native_material_hints = new
+                            {
+                                roughness = 0.4f,
+                                metalness = 0.8f,
+                                specular = 0.5f,
+                            },
+                            material_category = "skin",
                             material_category_confidence = 0.9f,
                             material_response_promoted = true,
+                            shader_family = "SkinnedMeshSkin",
+                            shader_rule = "skin_sidecar",
+                            normal_y_policy = "preserve",
+                            texture_flip_vertical = true,
+                            alpha_mode = "mask",
+                            alpha_threshold = 0.25f,
+                            two_sided = true,
                             dds_textures = new Dictionary<string, object>
                             {
-                                ["base"] = new { source_path = "textures/base.dds" },
+                                ["base"] = new { source_path = "textures/base.dds", srgb_mode = "srgb" },
+                                ["material"] = new
+                                {
+                                    source_path = "textures/material.dds",
+                                    packed_channels = "r=occlusion,g=roughness,b=metalness",
+                                    srgb_mode = "linear",
+                                },
+                                ["material_inputs"] = new object[]
+                                {
+                                    new
+                                    {
+                                        slot = "specular",
+                                        source_path = "textures/specular.dds",
+                                        semantic_type = "specular",
+                                        layer_role = "specular_response",
+                                        source_authority = "exact_sidecar",
+                                    },
+                                    new
+                                    {
+                                        slot = "specular",
+                                        source_path = "textures/damage.dds",
+                                        semantic_type = "specular",
+                                        layer_role = "damage",
+                                        source_authority = "exact_sidecar",
+                                    },
+                                },
                             },
                         },
                     },
@@ -2055,7 +2133,7 @@ internal static class ArchiveLiteTestRunner
             Require(File.Exists(Path.Combine(root, "net_materials.json")), "renderer materials sidecar was not created");
             Require(File.Exists(Path.Combine(root, "dotnet_scene.json")), "renderer scene sidecar was not created");
             Require(File.Exists(Path.Combine(root, "mesh.cdmeta.json")), "renderer metadata sidecar was not created");
-            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v2.json")), "renderer adapter version marker was not created");
+            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v3.json")), "renderer adapter version marker was not created");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
                 Require(!scene.RootElement.GetProperty("grid").GetProperty("visible").GetBoolean(), "read-only preview scene exposed the grid");
@@ -2083,15 +2161,73 @@ internal static class ArchiveLiteTestRunner
                 includeTextures: true).ConfigureAwait(false);
             using (var materials = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "net_materials.json")).ConfigureAwait(false)))
             {
+                Require(
+                    materials.RootElement.GetProperty("format").GetString() == "cdmw_mesh_dotnet_materials_v1"
+                    && materials.RootElement.GetProperty("renderer_authority").GetString() == "dotnet_mesh_editor",
+                    "Archive Lite did not emit the Full Mesh Editor material-sidecar contract");
                 var submesh = materials.RootElement.GetProperty("submeshes")[0];
+                var channels = submesh.GetProperty("resolved_channels");
                 Require(
                     string.Equals(
-                        submesh.GetProperty("resolved_channels").GetProperty("base").GetString(),
+                        channels.GetProperty("base").GetString(),
                         Path.GetFullPath(baseTexturePath),
                         StringComparison.OrdinalIgnoreCase)
                     && string.Equals(submesh.GetProperty("texture").GetString(), Path.GetFullPath(baseTexturePath), StringComparison.OrdinalIgnoreCase),
                     "opt-in native preview did not carry the Full material graph's resolved base texture");
+                Require(
+                    string.Equals(channels.GetProperty("material").GetString(), Path.GetFullPath(materialTexturePath), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(channels.GetProperty("roughness").GetString(), Path.GetFullPath(materialTexturePath), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(channels.GetProperty("metallic").GetString(), Path.GetFullPath(materialTexturePath), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(channels.GetProperty("occlusion").GetString(), Path.GetFullPath(materialTexturePath), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(channels.GetProperty("specular").GetString(), Path.GetFullPath(specularTexturePath), StringComparison.OrdinalIgnoreCase)
+                    && !channels.EnumerateObject().Any(channel =>
+                        string.Equals(channel.Value.GetString(), Path.GetFullPath(damageTexturePath), StringComparison.OrdinalIgnoreCase)),
+                    "the Full-compatible bridge lost packed material channels, primary specular input, or layer-only filtering");
+                var resourceChannels = submesh.GetProperty("resource_channels");
+                Require(
+                    materials.RootElement.GetProperty("resources").GetArrayLength() == 3
+                    && resourceChannels.EnumerateObject().Count() == 6
+                    && resourceChannels.GetProperty("material").GetString() == resourceChannels.GetProperty("roughness").GetString()
+                    && resourceChannels.GetProperty("material").GetString() == resourceChannels.GetProperty("metallic").GetString()
+                    && resourceChannels.GetProperty("material").GetString() == resourceChannels.GetProperty("occlusion").GetString(),
+                    "the Full-compatible bridge did not emit deduplicated resident texture resources");
+                var components = submesh.GetProperty("channel_components");
+                Require(
+                    components.GetProperty("occlusion").GetString() == "r"
+                    && components.GetProperty("roughness").GetString() == "g"
+                    && components.GetProperty("metallic").GetString() == "b",
+                    "packed material component routing does not match the native material graph");
+                var parameters = submesh.GetProperty("parameters");
+                Require(
+                    parameters.GetProperty("base_tint_strength").GetSingle() == 0.0f
+                    && parameters.GetProperty("roughness_hint").GetSingle() == 0.4f
+                    && parameters.GetProperty("metalness_hint").GetSingle() == 0.8f
+                    && parameters.GetProperty("specular_hint").GetSingle() == 0.5f
+                    && !parameters.TryGetProperty("roughness", out _),
+                    "native material hints were replaced by the flat fallback tint/scalar policy");
+                Require(
+                    submesh.GetProperty("shader_family").GetString() == "skin"
+                    && submesh.GetProperty("shader_technique").GetString() == "SkinnedMeshSkin"
+                    && submesh.GetProperty("normal_y_policy").GetString() == "preserve"
+                    && submesh.GetProperty("texture_flip_vertical").GetBoolean()
+                    && submesh.GetProperty("alpha_mode").GetString() == "cutout"
+                    && submesh.GetProperty("alpha_cutoff").GetSingle() == 0.25f
+                    && submesh.GetProperty("double_sided").GetBoolean()
+                    && submesh.GetProperty("channel_color_spaces").GetProperty("base").GetString() == "srgb"
+                    && submesh.GetProperty("channel_authorities").GetProperty("specular").GetString() == "exact_sidecar",
+                    "the .NET sidecar did not preserve Full's shader, UV, alpha, sidedness, or channel authority contract");
             }
+            var packedParser = typeof(NativePreviewPackageAdapter).GetMethod(
+                "ParsePackedComponents",
+                BindingFlags.NonPublic | BindingFlags.Static)
+                ?? throw new MissingMethodException("packed material parser is missing");
+            var packedComponents = (Dictionary<string, string>)(packedParser.Invoke(
+                null,
+                ["r=occlusion,g=roughness,b=metalness,a=specular_response"])
+                ?? throw new InvalidOperationException("packed material parser returned no map"));
+            Require(
+                packedComponents.GetValueOrDefault("specular") == "a",
+                "specular_response is not routed from the packed material alpha channel");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
                 Require(
@@ -2104,6 +2240,18 @@ internal static class ArchiveLiteTestRunner
                 && !ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/body/example.pac")
                 && ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").PitchDegrees == 0.0f,
                 "archive model camera policy no longer matches Full's weapon-overhead and body-front classification");
+
+            var rendererPath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DOTNET_PREVIEW_PATH");
+            if (!string.IsNullOrWhiteSpace(rendererPath))
+            {
+                var warmupRoot = await GetRendererWarmupPackageAsync().ConfigureAwait(false);
+                await RunConfiguredResidentRendererSwitchAsync(
+                    rendererPath,
+                    warmupRoot,
+                    Path.Combine(warmupRoot, "manifest.json"),
+                    root,
+                    expectTexturedReplacement: true).ConfigureAwait(false);
+            }
 
             // Restore the default texture-free package before export and optional renderer smoke coverage.
             await NativePreviewPackageAdapter.PrepareAsync(root, "synthetic:test", CancellationToken.None).ConfigureAwait(false);
@@ -2212,16 +2360,9 @@ internal static class ArchiveLiteTestRunner
                 "synthetic:unsafe",
                 CancellationToken.None)).ConfigureAwait(false);
 
-            var rendererPath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DOTNET_PREVIEW_PATH");
             if (!string.IsNullOrWhiteSpace(rendererPath))
             {
                 await RunConfiguredRendererSmokeAsync(rendererPath, root, manifestPath).ConfigureAwait(false);
-                var warmupRoot = await GetRendererWarmupPackageAsync().ConfigureAwait(false);
-                await RunConfiguredResidentRendererSwitchAsync(
-                    rendererPath,
-                    warmupRoot,
-                    Path.Combine(warmupRoot, "manifest.json"),
-                    root).ConfigureAwait(false);
             }
             Require(await Sha256Async(geometryPath).ConfigureAwait(false) == geometryHash, "preview preparation or rendering changed native geometry");
         }
@@ -2264,6 +2405,36 @@ internal static class ArchiveLiteTestRunner
                 packageRoot,
                 Path.Combine(packageRoot, "manifest.json")).ConfigureAwait(false);
         }
+    }
+
+    private static byte[] BuildRgba8Dds(int width, int height, byte red, byte green, byte blue, byte alpha = 255)
+    {
+        Require(width > 0 && height > 0, "synthetic DDS dimensions must be positive");
+        var pixelsLength = checked(width * height * 4);
+        var dds = new byte[checked(128 + pixelsLength)];
+        "DDS "u8.CopyTo(dds);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(4, 4), 124);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(8, 4), 0x100F);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(12, 4), checked((uint)height));
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(16, 4), checked((uint)width));
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(20, 4), checked((uint)(width * 4)));
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(28, 4), 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(76, 4), 32);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(80, 4), 0x41);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(88, 4), 32);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(92, 4), 0x000000FF);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(96, 4), 0x0000FF00);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(100, 4), 0x00FF0000);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(104, 4), 0xFF000000);
+        BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(108, 4), 0x1000);
+        for (var offset = 128; offset < dds.Length; offset += 4)
+        {
+            dds[offset] = red;
+            dds[offset + 1] = green;
+            dds[offset + 2] = blue;
+            dds[offset + 3] = alpha;
+        }
+        return dds;
     }
 
     private static async Task<string> GetRendererWarmupPackageAsync()
@@ -2371,7 +2542,7 @@ internal static class ArchiveLiteTestRunner
         Console.WriteLine(
             $"INFO: native model cache cold={coldTimer.Elapsed.TotalMilliseconds:N1}ms cross-session-warm={warmTimer.Elapsed.TotalMilliseconds:N1}ms");
 
-        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v2.json");
+        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v3.json");
         File.Delete(adapterMarker);
         var migrationProgress = new List<ProgressUpdate>();
         var migrated = await previews.BuildAsync(
@@ -3238,7 +3409,8 @@ internal static class ArchiveLiteTestRunner
         string rendererPath,
         string initialPackageRoot,
         string initialManifestPath,
-        string? replacementPackageRoot = null)
+        string? replacementPackageRoot = null,
+        bool expectTexturedReplacement = false)
     {
         replacementPackageRoot ??= initialPackageRoot;
         using var parentHost = new TestRendererHost(-32000, -32000, 640, 480);
@@ -3363,6 +3535,20 @@ internal static class ArchiveLiteTestRunner
                 Require(
                     applied.RootElement.GetProperty("renderer").GetProperty("backend").GetString() == "d3d11_vortice_shader",
                     "resident package switch left the production backend");
+                if (expectTexturedReplacement)
+                {
+                    var renderer = applied.RootElement.GetProperty("renderer");
+                    Require(
+                        renderer.GetProperty("textures_enabled").GetBoolean()
+                        && renderer.GetProperty("display_mode").GetString() == "textured"
+                        && renderer.GetProperty("material_parameter_state_count").GetInt32() == 1
+                        && renderer.GetProperty("resolved_texture_references").GetInt32() == 3
+                        && renderer.GetProperty("existing_texture_files").GetInt32() == 3
+                        && renderer.GetProperty("dds_resources").GetInt32() == 3
+                        && renderer.GetProperty("native_dds_resources").GetInt32() == 3
+                        && renderer.GetProperty("texture_load_failures").GetInt32() == 0,
+                        $"resident Vortice renderer did not load the synthetic Full-compatible DDS material graph: {renderer.GetRawText()}");
+                }
             }
 
             await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new

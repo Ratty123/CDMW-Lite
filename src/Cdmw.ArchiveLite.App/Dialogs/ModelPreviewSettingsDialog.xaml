@@ -74,7 +74,8 @@
 
             <TabControl x:Name="SettingsTabs"
                         Grid.Row="1"
-                        Margin="20,18,20,8">
+                        Margin="20,18,20,8"
+                        Style="{StaticResource SettingsTabControlStyle}">
                 <TabItem Header="{infra:Loc Key=CameraInput}">
                     <ScrollViewer Padding="4,14,4,4"
                                   HorizontalScrollBarVisibility="Disabled"
@@ -94,6 +95,7 @@
                                            Text="{infra:Loc Key=OrbitSensitivity}" />
                                 <Slider Grid.Column="1"
                                         Margin="10,0"
+                                        Style="{StaticResource SettingsSliderStyle}"
                                         Minimum="0.05"
                                         Maximum="1.0"
                                         TickFrequency="0.01"
@@ -115,6 +117,7 @@
                                            Text="{infra:Loc Key=PanSensitivity}" />
                                 <Slider Grid.Column="1"
                                         Margin="10,0"
+                                        Style="{StaticResource SettingsSliderStyle}"
                                         Minimum="0.05"
                                         Maximum="3.0"
                                         TickFrequency="0.05"
