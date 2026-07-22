@@ -7,7 +7,8 @@ namespace Cdmw.ArchiveLite.Core;
 
 public sealed class ArchiveItemNameIndexService(
     ArchiveSessionManager sessions,
-    NativeArchiveCore native)
+    NativeArchiveCore native,
+    ArchiveWorkPriority? workPriority = null)
 {
     private const int CacheSchemaVersion = 3;
     private const int NativeCatalogSchemaVersion = 1;
@@ -40,7 +41,8 @@ public sealed class ArchiveItemNameIndexService(
     public async Task<BuildNameIndexResult> BuildAsync(
         BuildNameIndexRequest request,
         Func<ProgressUpdate, Task>? publishProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool yieldToForeground = false)
     {
         ArgumentNullException.ThrowIfNull(request);
         var session = sessions.GetRequired(request.SessionId);
@@ -63,6 +65,7 @@ public sealed class ArchiveItemNameIndexService(
                 session.SetCatalogue(cached.NameIndex, cached.ItemCatalog);
                 return Result(session, cached.NameIndex, cached.ItemCatalog, usedCache: true);
             }
+            await WaitForForegroundAsync(yieldToForeground, cancellationToken).ConfigureAwait(false);
 
             var workRoot = Path.Combine(ArchiveLiteDataPaths.NameIndexCache, $".work-{Guid.NewGuid():N}");
             Directory.CreateDirectory(workRoot);
@@ -75,7 +78,8 @@ public sealed class ArchiveItemNameIndexService(
                     session,
                     entriesPath,
                     publishProgress,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    yieldToForeground).ConfigureAwait(false);
                 if (sources.ItemInfo is null)
                 {
                     return new BuildNameIndexResult(
@@ -88,7 +92,13 @@ public sealed class ArchiveItemNameIndexService(
                         ItemCount: 0);
                 }
 
-                await ExtractSourcesAsync(sources, payloadRoot, publishProgress, cancellationToken).ConfigureAwait(false);
+                await ExtractSourcesAsync(
+                    sources,
+                    payloadRoot,
+                    publishProgress,
+                    cancellationToken,
+                    yieldToForeground).ConfigureAwait(false);
+                await WaitForForegroundAsync(yieldToForeground, cancellationToken).ConfigureAwait(false);
                 var reportPath = Path.Combine(workRoot, "item-index.json");
                 if (publishProgress is not null)
                 {
@@ -115,6 +125,11 @@ public sealed class ArchiveItemNameIndexService(
         }
     }
 
+    private Task WaitForForegroundAsync(bool yieldToForeground, CancellationToken cancellationToken) =>
+        yieldToForeground && workPriority is not null
+            ? workPriority.WaitForForegroundAsync(cancellationToken)
+            : Task.CompletedTask;
+
     private static BuildNameIndexResult Result(
         ArchiveSession session,
         ArchiveItemNameIndex index,
@@ -127,11 +142,12 @@ public sealed class ArchiveItemNameIndexService(
             RelatedNameCount: index.RelatedNameCount,
             ItemCount: catalog.Count);
 
-    private static async Task<NameIndexSources> WriteEntriesAndFindSourcesAsync(
+    private async Task<NameIndexSources> WriteEntriesAndFindSourcesAsync(
         ArchiveSession session,
         string entriesPath,
         Func<ProgressUpdate, Task>? publishProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool yieldToForeground)
     {
         var sources = new NameIndexSources();
         var total = session.Index.EntryCount;
@@ -151,6 +167,7 @@ public sealed class ArchiveItemNameIndexService(
             if ((entryId & 0x1FFF) == 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                await WaitForForegroundAsync(yieldToForeground, cancellationToken).ConfigureAwait(false);
                 if (publishProgress is not null)
                 {
                     await publishProgress(new ProgressUpdate(entryId, total, "name_scan")).ConfigureAwait(false);
@@ -225,7 +242,8 @@ public sealed class ArchiveItemNameIndexService(
         NameIndexSources sources,
         string payloadRoot,
         Func<ProgressUpdate, Task>? publishProgress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool yieldToForeground)
     {
         var payloads = new List<(string Name, ArchiveEntryDto Entry)>
         {
@@ -244,6 +262,7 @@ public sealed class ArchiveItemNameIndexService(
         for (var index = 0; index < payloads.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            await WaitForForegroundAsync(yieldToForeground, cancellationToken).ConfigureAwait(false);
             var (name, entry) = payloads[index];
             if (publishProgress is not null)
             {

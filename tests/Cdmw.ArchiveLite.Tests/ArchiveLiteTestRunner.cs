@@ -49,6 +49,7 @@ internal static class ArchiveLiteTestRunner
             ("shared content manifest and semantic analyzers stay decoder-parity safe", TestSharedContentAnalyzersAsync),
             ("native preview core parses PAT LOD0 geometry", TestNativePatGeometryAsync),
             ("native model packages adapt safely and export Blender interchange formats", TestNativeModelPreviewPackageAsync),
+            ("renderer warmup package is complete and loadable", TestRendererWarmupPackageAsync),
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
             ("native item-name discovery handles shifted records and semantic icon links", TestArchiveItemNameDiscoveryAsync),
@@ -2074,7 +2075,12 @@ internal static class ArchiveLiteTestRunner
             if (!string.IsNullOrWhiteSpace(rendererPath))
             {
                 await RunConfiguredRendererSmokeAsync(rendererPath, root, manifestPath).ConfigureAwait(false);
-                await RunConfiguredResidentRendererSwitchAsync(rendererPath, root, manifestPath).ConfigureAwait(false);
+                var warmupRoot = await GetRendererWarmupPackageAsync().ConfigureAwait(false);
+                await RunConfiguredResidentRendererSwitchAsync(
+                    rendererPath,
+                    warmupRoot,
+                    Path.Combine(warmupRoot, "manifest.json"),
+                    root).ConfigureAwait(false);
             }
             Require(await Sha256Async(geometryPath).ConfigureAwait(false) == geometryHash, "preview preparation or rendering changed native geometry");
         }
@@ -2082,6 +2088,55 @@ internal static class ArchiveLiteTestRunner
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    private static async Task TestRendererWarmupPackageAsync()
+    {
+        var packageRoot = await GetRendererWarmupPackageAsync().ConfigureAwait(false);
+        var expectedCacheRoot = Path.GetFullPath(Path.Combine(
+            Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DATA_ROOT")!,
+            "cache"))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        Require(
+            Path.GetFullPath(packageRoot).StartsWith(expectedCacheRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase),
+            "renderer warmup package escaped the isolated application cache");
+        foreach (var required in new[] { "manifest.json", "mesh.cdmeta.json", "net_materials.json", "dotnet_scene.json" })
+        {
+            Require(File.Exists(Path.Combine(packageRoot, required)), $"renderer warmup package omitted {required}");
+        }
+        var geometryPath = Path.Combine(packageRoot, "geometry", "batch_000.bin");
+        Require(new FileInfo(geometryPath).Length == 3 * 23 * sizeof(float), "renderer warmup geometry length is invalid");
+        using (var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(packageRoot, "manifest.json")).ConfigureAwait(false)))
+        {
+            Require(
+                manifest.RootElement.GetProperty("schema_version").GetInt32() == 8
+                && manifest.RootElement.GetProperty("batches")[0].GetProperty("vertex_count").GetInt32() == 3,
+                "renderer warmup manifest is incompatible with the production package schema");
+        }
+
+        var rendererPath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DOTNET_PREVIEW_PATH");
+        if (!string.IsNullOrWhiteSpace(rendererPath))
+        {
+            await RunConfiguredRendererSmokeAsync(
+                rendererPath,
+                packageRoot,
+                Path.Combine(packageRoot, "manifest.json")).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task<string> GetRendererWarmupPackageAsync()
+    {
+        var warmupType = typeof(ArchiveBrowserViewModel).Assembly.GetType(
+            "Cdmw.ArchiveLite.App.Services.PreviewRendererWarmupPackage")
+            ?? throw new InvalidOperationException("PreviewRendererWarmupPackage was not found");
+        var factory = warmupType.GetMethod(
+            "GetOrCreateAsync",
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("renderer warmup package factory was not found");
+        var task = factory.Invoke(null, [CancellationToken.None]) as Task<string>
+            ?? throw new InvalidOperationException("renderer warmup package factory returned the wrong task type");
+        return await task.ConfigureAwait(false);
     }
 
     private static async Task TestNativeModelPreviewCacheDwellAsync()
@@ -2280,6 +2335,15 @@ internal static class ArchiveLiteTestRunner
             && rendererHostSource.Contains("The old scene remains live while a fresh-process fallback starts", StringComparison.Ordinal)
             && rendererHostSource.Contains("prior is { IsAlive: true }", StringComparison.Ordinal),
             "Archive Lite does not reuse the resident renderer with generation and rollback guards");
+        Require(
+            rendererHostSource.Contains("PreviewRendererWarmupPackage.GetOrCreateAsync", StringComparison.Ordinal)
+            && rendererHostSource.Contains("!session.SupportsResidentPackageLoad", StringComparison.Ordinal)
+            && rendererHostSource.Contains("session.SupportsResidentHostAttach", StringComparison.Ordinal)
+            && rendererHostSource.Contains("AttachToHostAsync(visibleHost", StringComparison.Ordinal)
+            && rendererHostSource.Contains("WsPopup | WsVisible | WsClipChildren", StringComparison.Ordinal)
+            && viewModelSource.Contains("ShouldPrewarmModelRenderer = true", StringComparison.Ordinal)
+            && viewModelSource.Contains("entry.Extension.Equals(\".pat\"", StringComparison.Ordinal),
+            "Archive Lite does not safely prewarm and attach the resident renderer after first-page readiness");
         Require(
             buildSource.Contains("-p:PublishSingleFile=false", StringComparison.Ordinal)
             && !buildSource.Contains("-p:IncludeNativeLibrariesForSelfExtract=true", StringComparison.Ordinal),
@@ -2721,10 +2785,19 @@ internal static class ArchiveLiteTestRunner
             "src",
             "Cdmw.ArchiveLite.Core",
             "ArchiveItemNameIndexService.cs"));
+        var workerRuntimeSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "Cdmw.ArchiveLite.Worker",
+            "WorkerRuntime.cs"));
         Require(
             acceleratorSource.Contains("\\\"catalog_schema\\\":1", StringComparison.Ordinal)
             && liteCatalogSource.Contains("item-index-job", StringComparison.Ordinal),
             "Lite does not consume its versioned native item catalog");
+        Require(
+            workerRuntimeSource.Contains("WorkerProtocol.WarmItemIcons or WorkerProtocol.BuildNameIndex", StringComparison.Ordinal)
+            && liteCatalogSource.Contains("WaitForForegroundAsync(yieldToForeground", StringComparison.Ordinal),
+            "background item-catalog construction does not yield to foreground archive work");
 
         var appRoot = Path.Combine(repositoryRoot, "src", "Cdmw.ArchiveLite.App");
         var mainWindow = File.ReadAllText(Path.Combine(appRoot, "MainWindow.xaml"));
@@ -2995,24 +3068,16 @@ internal static class ArchiveLiteTestRunner
 
     private static async Task RunConfiguredResidentRendererSwitchAsync(
         string rendererPath,
-        string packageRoot,
-        string manifestPath)
+        string initialPackageRoot,
+        string initialManifestPath,
+        string? replacementPackageRoot = null)
     {
-        var parentHandle = CreateWindowExW(
-            0,
-            "STATIC",
-            string.Empty,
-            0x10000000 | 0x02000000 | 0x04000000,
-            -32000,
-            -32000,
-            640,
-            480,
-            IntPtr.Zero,
-            IntPtr.Zero,
-            GetModuleHandleW(null),
-            IntPtr.Zero);
-        Require(parentHandle != IntPtr.Zero, $"hidden renderer parent window could not be created (Win32 {Marshal.GetLastWin32Error()})");
-        var runtimeRoot = Path.Combine(packageRoot, "resident-switch-smoke");
+        replacementPackageRoot ??= initialPackageRoot;
+        using var parentHost = new TestRendererHost(-32000, -32000, 640, 480);
+        using var secondParentHost = new TestRendererHost(-31000, -31000, 720, 540);
+        var parentHandle = parentHost.Handle;
+        var secondParentHandle = secondParentHost.Handle;
+        var runtimeRoot = Path.Combine(replacementPackageRoot, "resident-switch-smoke");
         Directory.CreateDirectory(runtimeRoot);
         var startInfo = new ProcessStartInfo
         {
@@ -3026,9 +3091,9 @@ internal static class ArchiveLiteTestRunner
         };
         foreach (var argument in new[]
         {
-            "--input-package", packageRoot,
-            "--mesh", manifestPath,
-            "--metadata", Path.Combine(packageRoot, "mesh.cdmeta.json"),
+            "--input-package", initialPackageRoot,
+            "--mesh", initialManifestPath,
+            "--metadata", Path.Combine(initialPackageRoot, "mesh.cdmeta.json"),
             "--status", Path.Combine(runtimeRoot, "status.json"),
             "--output", Path.Combine(runtimeRoot, "output"),
             "--edit-operations", Path.Combine(runtimeRoot, "edit_operations.json"),
@@ -3048,18 +3113,61 @@ internal static class ArchiveLiteTestRunner
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+            long rendererWindowHandle;
             using (var protocolReady = await ReadRendererEventAsync(process.StandardOutput, "protocol_ready", timeout.Token).ConfigureAwait(false))
             {
                 Require(
                     protocolReady.RootElement.GetProperty("capabilities").EnumerateArray()
                         .Any(value => value.GetString() == "resident_package_load_v1"),
                     "renderer did not advertise resident package loading");
+                Require(
+                    protocolReady.RootElement.GetProperty("capabilities").EnumerateArray()
+                        .Any(value => value.GetString() == "resident_host_attach_v1"),
+                    "renderer did not advertise resident host attachment");
+                rendererWindowHandle = protocolReady.RootElement.GetProperty("window_handle").GetInt64();
+                Require(rendererWindowHandle > 0, "renderer did not publish its embedded window handle");
             }
             using (var metrics = await ReadRendererEventAsync(process.StandardOutput, "metrics", timeout.Token).ConfigureAwait(false))
             {
                 Require(
                     metrics.RootElement.GetProperty("renderer").GetProperty("backend").GetString() == "d3d11_vortice_shader",
                     "resident renderer did not initialize the production backend");
+            }
+
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
+            {
+                @event = "host_attach_request",
+                request_id = 1,
+                parent_hwnd = secondParentHandle.ToInt64(),
+                activate = false,
+            })).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            using (var attached = await ReadRendererEventAsync(
+                       process.StandardOutput,
+                       "host_attach_applied",
+                       timeout.Token).ConfigureAwait(false))
+            {
+                Require(attached.RootElement.GetProperty("request_id").GetInt64() == 1, "renderer acknowledged the wrong host attachment");
+                Require(attached.RootElement.GetProperty("parent_hwnd").GetInt64() == secondParentHandle.ToInt64(), "renderer attached to the wrong hidden host");
+                Require(attached.RootElement.GetProperty("process_id").GetInt32() == process.Id, "renderer host attachment changed process");
+                Require(GetParent(new IntPtr(rendererWindowHandle)) == secondParentHandle, "renderer protocol acknowledged host attachment before reparenting");
+            }
+
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new
+            {
+                @event = "host_attach_request",
+                request_id = 2,
+                parent_hwnd = parentHandle.ToInt64(),
+                activate = false,
+            })).ConfigureAwait(false);
+            await process.StandardInput.FlushAsync().ConfigureAwait(false);
+            using (var reattached = await ReadRendererEventAsync(
+                       process.StandardOutput,
+                       "host_attach_applied",
+                       timeout.Token).ConfigureAwait(false))
+            {
+                Require(reattached.RootElement.GetProperty("request_id").GetInt64() == 2, "renderer acknowledged the wrong return host attachment");
+                Require(GetParent(new IntPtr(rendererWindowHandle)) == parentHandle, "renderer did not return to its original host");
             }
 
             for (var generation = 2; generation <= 3; generation++)
@@ -3069,7 +3177,7 @@ internal static class ArchiveLiteTestRunner
                     @event = "package_load_request",
                     request_id = generation,
                     generation,
-                    package_path = packageRoot,
+                    package_path = replacementPackageRoot,
                 })).ConfigureAwait(false);
                 await process.StandardInput.FlushAsync().ConfigureAwait(false);
                 using var applied = await ReadRendererEventAsync(
@@ -3108,7 +3216,7 @@ internal static class ArchiveLiteTestRunner
                 @event = "package_load_request",
                 request_id = 5,
                 generation = 5,
-                package_path = packageRoot,
+                package_path = replacementPackageRoot,
             })).ConfigureAwait(false);
             await process.StandardInput.FlushAsync().ConfigureAwait(false);
             using (var recovered = await ReadRendererEventAsync(
@@ -3136,9 +3244,72 @@ internal static class ArchiveLiteTestRunner
             _ = await stderrTask.ConfigureAwait(false);
             throw;
         }
-        finally
+    }
+
+    private sealed class TestRendererHost : IDisposable
+    {
+        private readonly Thread _thread;
+        private readonly Dispatcher _dispatcher;
+
+        public TestRendererHost(int x, int y, int width, int height)
         {
-            _ = DestroyWindow(parentHandle);
+            var ready = new TaskCompletionSource<(IntPtr Handle, Dispatcher Dispatcher)>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            _thread = new Thread(() =>
+            {
+                IntPtr handle = IntPtr.Zero;
+                try
+                {
+                    var dispatcher = Dispatcher.CurrentDispatcher;
+                    handle = CreateWindowExW(
+                        0,
+                        "STATIC",
+                        string.Empty,
+                        0x10000000 | 0x02000000 | 0x04000000,
+                        x,
+                        y,
+                        width,
+                        height,
+                        IntPtr.Zero,
+                        IntPtr.Zero,
+                        GetModuleHandleW(null),
+                        IntPtr.Zero);
+                    if (handle == IntPtr.Zero)
+                    {
+                        throw new InvalidOperationException($"Test renderer host could not be created (Win32 {Marshal.GetLastWin32Error()}).");
+                    }
+                    ready.TrySetResult((handle, dispatcher));
+                    Dispatcher.Run();
+                }
+                catch (Exception exception)
+                {
+                    ready.TrySetException(exception);
+                }
+                finally
+                {
+                    if (handle != IntPtr.Zero)
+                    {
+                        _ = DestroyWindow(handle);
+                    }
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "ArchiveLite renderer host smoke",
+            };
+            _thread.SetApartmentState(ApartmentState.STA);
+            _thread.Start();
+            var state = ready.Task.GetAwaiter().GetResult();
+            Handle = state.Handle;
+            _dispatcher = state.Dispatcher;
+        }
+
+        public IntPtr Handle { get; }
+
+        public void Dispose()
+        {
+            _dispatcher.BeginInvokeShutdown(DispatcherPriority.Send);
+            _thread.Join(TimeSpan.FromSeconds(5));
         }
     }
 
@@ -3209,6 +3380,9 @@ internal static class ArchiveLiteTestRunner
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyWindow(IntPtr window);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr child);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandleW(string? moduleName);

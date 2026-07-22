@@ -775,10 +775,11 @@
                                             </Grid>
                                         </Border>
                                         <controls:DotNetModelPreviewHost x:Name="ModelPreviewHost"
-                                                                         Grid.Row="0"
-                                                                         Grid.RowSpan="3"
-                                                                         PackagePath="{Binding ArchiveBrowser.ModelPreviewPackagePath, Mode=OneWay}"
-                                                                         Visibility="{Binding ArchiveBrowser.IsModelPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                                          Grid.Row="0"
+                                                                          Grid.RowSpan="3"
+                                                                          PackagePath="{Binding ArchiveBrowser.ModelPreviewPackagePath, Mode=OneWay}"
+                                                                          Prewarm="{Binding ArchiveBrowser.ShouldPrewarmModelRenderer, Mode=OneWay}"
+                                                                          Visibility="{Binding ArchiveBrowser.IsModelPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         <Grid Grid.Row="0"
                                               Grid.RowSpan="3"
                                               ClipToBounds="True"

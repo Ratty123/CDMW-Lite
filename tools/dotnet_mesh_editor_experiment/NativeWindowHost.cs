@@ -16,7 +16,7 @@ internal static class NativeWindowHost
     private const uint SwpShowWindow = 0x0040;
     private static readonly IntPtr HwndTop = IntPtr.Zero;
 
-    public static bool Embed(Form form, IntPtr parent)
+    public static bool Embed(Form form, IntPtr parent, bool activate = true)
     {
         if (parent == IntPtr.Zero || !IsWindow(parent))
         {
@@ -34,7 +34,10 @@ internal static class NativeWindowHost
             return false;
         }
         ResizeToParent(form, parent, forceFrameRefresh: true);
-        BringEmbeddedChildToFront(form, parent);
+        if (activate)
+        {
+            BringEmbeddedChildToFront(form, parent);
+        }
         return true;
     }
 

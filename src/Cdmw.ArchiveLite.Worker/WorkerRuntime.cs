@@ -30,7 +30,7 @@ internal sealed class WorkerRuntime : IDisposable
         _cacheHealth = new ArchiveCacheHealthService();
         _gameDiscovery = new GameInstallDiscoveryService();
         _facets = new ArchiveFacetsService(_sessions);
-        _nameIndex = new ArchiveItemNameIndexService(_sessions, _native);
+        _nameIndex = new ArchiveItemNameIndexService(_sessions, _native, _workPriority);
         _itemCatalog = new ArchiveItemCatalogService(_sessions, _nameIndex);
         _associations = new ArchiveAssociationService(_sessions, _native);
         _itemScopes = new ArchiveItemCatalogScopeService(_sessions, _nameIndex, _associations);
@@ -51,7 +51,7 @@ internal sealed class WorkerRuntime : IDisposable
         Func<ProgressUpdate, Task> publishProgress,
         CancellationToken cancellationToken)
     {
-        using var foregroundLease = request.Kind == WorkerProtocol.WarmItemIcons
+        using var foregroundLease = request.Kind is WorkerProtocol.WarmItemIcons or WorkerProtocol.BuildNameIndex
             ? null
             : _workPriority.EnterForeground();
         switch (request.Kind)
@@ -89,7 +89,11 @@ internal sealed class WorkerRuntime : IDisposable
             case WorkerProtocol.BuildNameIndex:
                 {
                     var payload = RequirePayload<BuildNameIndexRequest>(request);
-                    var result = await _nameIndex.BuildAsync(payload, publishProgress, cancellationToken).ConfigureAwait(false);
+                    var result = await _nameIndex.BuildAsync(
+                        payload,
+                        publishProgress,
+                        cancellationToken,
+                        yieldToForeground: true).ConfigureAwait(false);
                     return WorkerProtocol.Response(request, WorkerMessageStatus.Result, result);
                 }
             case WorkerProtocol.SearchItemCatalog:

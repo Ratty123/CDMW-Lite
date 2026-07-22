@@ -49,6 +49,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private string? _modelPreviewPackagePath;
     private PreviewKind _previewKind = PreviewKind.Metadata;
     private bool _isPreviewBusy;
+    private bool _shouldPrewarmModelRenderer;
     private string _previewProgressText = string.Empty;
     private long _totalMatches;
     private int _pageStart;
@@ -561,6 +562,12 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         private set => SetProperty(ref _isPreviewBusy, value);
     }
 
+    public bool ShouldPrewarmModelRenderer
+    {
+        get => _shouldPrewarmModelRenderer;
+        private set => SetProperty(ref _shouldPrewarmModelRenderer, value);
+    }
+
     public string PreviewProgressText
     {
         get => _previewProgressText;
@@ -870,6 +877,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             _setShellStatus(LocalizationManager.Format("OpenedEntries", result.EntryCount));
             SetOperationProgress(LocalizationManager.Get("ProgressLoadingEntries"));
             await QueryPageCoreAsync(0, generation, operation.Token).ConfigureAwait(true);
+            ShouldPrewarmModelRenderer = true;
             StartCatalogueLoad(result.SessionId);
         }
         catch (WorkerRequestException exception) when (exception.Error.Code == "cache_refresh_required")
@@ -1468,7 +1476,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             var isNativeModel = entry.Extension.Equals(".pac", StringComparison.OrdinalIgnoreCase)
                 || entry.Extension.Equals(".pam", StringComparison.OrdinalIgnoreCase)
-                || entry.Extension.Equals(".pamlod", StringComparison.OrdinalIgnoreCase);
+                || entry.Extension.Equals(".pamlod", StringComparison.OrdinalIgnoreCase)
+                || entry.Extension.Equals(".pat", StringComparison.OrdinalIgnoreCase);
             if (!isNativeModel)
             {
                 await Task.Delay(90, operation.Token).ConfigureAwait(true);

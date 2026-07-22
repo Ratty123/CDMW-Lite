@@ -26,6 +26,7 @@ internal static class HelperBuildProvenance
         "deterministic_offscreen_capture_v1",
         "performance_capture_v1",
         "resident_package_load_v1",
+        "resident_host_attach_v1",
     };
 
     public static Dictionary<string, object?> Payload(IEnumerable<string> capabilities)

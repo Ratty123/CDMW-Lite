@@ -79,6 +79,7 @@ internal sealed partial class ExperimentForm
 
     private void StartProtocolReader()
     {
+        var rendererWindowHandle = Handle.ToInt64();
         _ = Task.Run(() =>
         {
             try
@@ -94,6 +95,7 @@ internal sealed partial class ExperimentForm
                 {
                     ["capabilities"] = protocolCapabilities,
                     ["provenance"] = HelperBuildProvenance.Payload(protocolCapabilities),
+                    ["window_handle"] = rendererWindowHandle,
                 });
                 string? line;
                 while ((line = reader.ReadLine()) is not null)
@@ -408,6 +410,9 @@ internal sealed partial class ExperimentForm
                     break;
                 case "package_load_request":
                     HandleResidentPackageLoadRequest(root);
+                    break;
+                case "host_attach_request":
+                    HandleHostAttachRequest(root);
                     break;
                 case "deactivate_request":
                     _embeddedViewportActive = false;

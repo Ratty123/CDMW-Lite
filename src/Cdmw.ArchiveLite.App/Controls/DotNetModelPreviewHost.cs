@@ -18,14 +18,25 @@ public sealed class DotNetModelPreviewHost : HwndHost
     private const int WsVisible = 0x10000000;
     private const int WsClipChildren = 0x02000000;
     private const int WsClipSiblings = 0x04000000;
+    private const int WsPopup = unchecked((int)0x80000000);
+    private const int WsExToolWindow = 0x00000080;
+    private const int WsExNoActivate = 0x08000000;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+    private const uint SwpShowWindow = 0x0040;
     private readonly SemaphoreSlim _switchGate = new(1, 1);
     private readonly object _sessionGate = new();
+    private readonly CancellationTokenSource _warmupCancellation = new();
     private CancellationTokenSource? _switchCancellation;
     private ModelRendererSession? _currentSession;
     private ModelRendererSession? _startingSession;
     private IntPtr _hostHandle;
+    private IntPtr _warmupHostHandle;
     private long _generation;
+    private int _prewarmStarted;
     private int _shutdown;
+    private bool _hasPresentedPackage;
 
     public static readonly DependencyProperty PackagePathProperty = DependencyProperty.Register(
         nameof(PackagePath),
@@ -57,6 +68,12 @@ public sealed class DotNetModelPreviewHost : HwndHost
 
     public static readonly DependencyProperty IsReadyProperty = IsReadyPropertyKey.DependencyProperty;
 
+    public static readonly DependencyProperty PrewarmProperty = DependencyProperty.Register(
+        nameof(Prewarm),
+        typeof(bool),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.None, OnPrewarmChanged));
+
     public string? PackagePath
     {
         get => (string?)GetValue(PackagePathProperty);
@@ -66,7 +83,11 @@ public sealed class DotNetModelPreviewHost : HwndHost
     public string StatusText => (string)GetValue(StatusTextProperty);
     public bool IsLoading => (bool)GetValue(IsLoadingProperty);
     public bool IsReady => (bool)GetValue(IsReadyProperty);
-
+    public bool Prewarm
+    {
+        get => (bool)GetValue(PrewarmProperty);
+        set => SetValue(PrewarmProperty, value);
+    }
     public async Task ShutdownAsync()
     {
         if (Interlocked.Exchange(ref _shutdown, 1) != 0)
@@ -74,6 +95,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
             return;
         }
         Interlocked.Increment(ref _generation);
+        _warmupCancellation.Cancel();
         Interlocked.Exchange(ref _switchCancellation, null)?.Cancel();
         await _switchGate.WaitAsync().ConfigureAwait(true);
         try
@@ -98,6 +120,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
             SetValue(IsLoadingPropertyKey, false);
             SetValue(IsReadyPropertyKey, false);
             SetValue(StatusTextPropertyKey, string.Empty);
+            DestroyWarmupHost();
         }
         finally
         {
@@ -124,18 +147,32 @@ public sealed class DotNetModelPreviewHost : HwndHost
         {
             throw new InvalidOperationException($"Could not create the .NET preview host window (Win32 {Marshal.GetLastWin32Error()}).");
         }
-        BeginSwitch(PackagePath);
+        if (Prewarm)
+        {
+            BeginPrewarm();
+        }
+        if (!string.IsNullOrWhiteSpace(PackagePath))
+        {
+            BeginSwitch(PackagePath);
+        }
         return new HandleRef(this, _hostHandle);
     }
 
     protected override void DestroyWindowCore(HandleRef hwnd)
     {
-        DisposeSessionsImmediately();
+        _hostHandle = IntPtr.Zero;
+        if (Volatile.Read(ref _shutdown) == 0)
+        {
+            DetachResidentFromVisibleHost(hwnd.Handle);
+        }
+        else
+        {
+            DisposeSessionsImmediately();
+        }
         if (hwnd.Handle != IntPtr.Zero)
         {
             _ = DestroyWindow(hwnd.Handle);
         }
-        _hostHandle = IntPtr.Zero;
     }
 
     private static void OnPackagePathChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
@@ -143,9 +180,96 @@ public sealed class DotNetModelPreviewHost : HwndHost
         ((DotNetModelPreviewHost)dependencyObject).BeginSwitch(args.NewValue as string);
     }
 
+    private static void OnPrewarmChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
+    {
+        if (args.NewValue is true)
+        {
+            ((DotNetModelPreviewHost)dependencyObject).BeginPrewarm();
+        }
+    }
+
+    private void BeginPrewarm()
+    {
+        if (Volatile.Read(ref _shutdown) != 0
+            || Interlocked.Exchange(ref _prewarmStarted, 1) != 0)
+        {
+            return;
+        }
+        _ = PrewarmAsync();
+    }
+
+    private async Task PrewarmAsync()
+    {
+        var cancellationToken = _warmupCancellation.Token;
+        try
+        {
+            await _switchGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            try
+            {
+                if (GetCurrentSession() is { IsAlive: true })
+                {
+                    return;
+                }
+                var package = await PreviewRendererWarmupPackage.GetOrCreateAsync(cancellationToken).ConfigureAwait(true);
+                var warmupHost = EnsureWarmupHost();
+                var session = await ModelRendererSession.StartAsync(
+                    package,
+                    warmupHost,
+                    static _ => { },
+                    cancellationToken).ConfigureAwait(true);
+                lock (_sessionGate)
+                {
+                    _startingSession = session;
+                }
+                try
+                {
+                    using var readyTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    readyTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+                    var backend = await session.Ready.WaitAsync(readyTimeout.Token).ConfigureAwait(true);
+                    if (!string.Equals(backend, RequiredRendererBackend, StringComparison.Ordinal)
+                        || !session.SupportsResidentPackageLoad
+                        || !session.SupportsResidentHostAttach)
+                    {
+                        throw new InvalidDataException("The preview renderer does not support safe resident warmup.");
+                    }
+                    lock (_sessionGate)
+                    {
+                        _currentSession = session;
+                        _startingSession = null;
+                    }
+                }
+                catch
+                {
+                    lock (_sessionGate)
+                    {
+                        if (ReferenceEquals(_startingSession, session))
+                        {
+                            _startingSession = null;
+                        }
+                    }
+                    await session.ShutdownAsync().ConfigureAwait(true);
+                    throw;
+                }
+            }
+            finally
+            {
+                _switchGate.Release();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Application shutdown owns renderer warmup cancellation.
+        }
+        catch
+        {
+            // Warmup is opportunistic; the first real package retains the normal launch fallback.
+        }
+    }
+
     private void BeginSwitch(string? packagePath)
     {
-        if (_hostHandle == IntPtr.Zero || Volatile.Read(ref _shutdown) != 0)
+        if (Volatile.Read(ref _shutdown) != 0
+            || (!string.IsNullOrWhiteSpace(packagePath) && _hostHandle == IntPtr.Zero))
         {
             return;
         }
@@ -164,11 +288,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
             {
                 if (string.IsNullOrWhiteSpace(packagePath))
                 {
-                    var prior = TakeCurrentSession();
-                    if (prior is not null)
-                    {
-                        await prior.ShutdownAsync().ConfigureAwait(true);
-                    }
+                    _hasPresentedPackage = false;
                     if (generation == Volatile.Read(ref _generation))
                     {
                         SetValue(IsLoadingPropertyKey, false);
@@ -181,7 +301,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 SetValue(IsLoadingPropertyKey, true);
                 SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererStarting"));
                 var resident = GetCurrentSession();
-                if (resident is { IsAlive: true, SupportsResidentPackageLoad: true })
+                if (resident is { IsAlive: true, SupportsResidentPackageLoad: true, SupportsResidentHostAttach: true })
                 {
                     try
                     {
@@ -197,19 +317,30 @@ public sealed class DotNetModelPreviewHost : HwndHost
                         {
                             throw new OperationCanceledException(operation.Token);
                         }
+                        var visibleHost = _hostHandle;
+                        if (visibleHost == IntPtr.Zero)
+                        {
+                            throw new OperationCanceledException(operation.Token);
+                        }
+                        await resident.AttachToHostAsync(visibleHost, activate: true, loadTimeout.Token).ConfigureAwait(true);
                         SetValue(IsReadyPropertyKey, true);
                         SetValue(IsLoadingPropertyKey, false);
                         SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
+                        _hasPresentedPackage = true;
                         return;
                     }
                     catch (OperationCanceledException)
                     {
                         throw;
                     }
-                    catch
+                    catch (Exception exception)
                     {
                         // The old scene remains live while a fresh-process fallback starts.
                         SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererStarting"));
+                        await DiagnosticLog.WriteAsync(
+                            "renderer-resident-fallback",
+                            exception.ToString(),
+                            CancellationToken.None).ConfigureAwait(true);
                     }
                 }
                 var session = await ModelRendererSession.StartAsync(
@@ -246,6 +377,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                     SetValue(IsReadyPropertyKey, true);
                     SetValue(IsLoadingPropertyKey, false);
                     SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
+                    _hasPresentedPackage = true;
                     if (prior is not null)
                     {
                         await prior.ShutdownAsync().ConfigureAwait(true);
@@ -278,7 +410,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
             if (generation == Volatile.Read(ref _generation) && Volatile.Read(ref _shutdown) == 0)
             {
                 var prior = GetCurrentSession();
-                SetValue(IsReadyPropertyKey, prior is { IsAlive: true });
+                SetValue(IsReadyPropertyKey, _hasPresentedPackage && prior is { IsAlive: true });
                 SetValue(IsLoadingPropertyKey, false);
                 SetValue(StatusTextPropertyKey, LocalizationManager.Format("RendererFailed", exception.Message));
             }
@@ -303,16 +435,6 @@ public sealed class DotNetModelPreviewHost : HwndHost
         }
     }
 
-    private ModelRendererSession? TakeCurrentSession()
-    {
-        lock (_sessionGate)
-        {
-            var current = _currentSession;
-            _currentSession = null;
-            return current;
-        }
-    }
-
     private ModelRendererSession? GetCurrentSession()
     {
         lock (_sessionGate)
@@ -321,9 +443,106 @@ public sealed class DotNetModelPreviewHost : HwndHost
         }
     }
 
+    private IntPtr EnsureWarmupHost()
+    {
+        if (_warmupHostHandle != IntPtr.Zero && IsWindow(_warmupHostHandle))
+        {
+            return _warmupHostHandle;
+        }
+        _warmupHostHandle = CreateWindowExW(
+            WsExToolWindow | WsExNoActivate,
+            "STATIC",
+            string.Empty,
+            WsPopup | WsVisible | WsClipChildren | WsClipSiblings,
+            -32000,
+            -32000,
+            640,
+            480,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            GetModuleHandleW(null),
+            IntPtr.Zero);
+        if (_warmupHostHandle == IntPtr.Zero)
+        {
+            throw new InvalidOperationException($"Could not create the hidden renderer warmup host (Win32 {Marshal.GetLastWin32Error()}).");
+        }
+        return _warmupHostHandle;
+    }
+
+    private void DestroyWarmupHost()
+    {
+        var warmupHost = _warmupHostHandle;
+        _warmupHostHandle = IntPtr.Zero;
+        if (warmupHost != IntPtr.Zero)
+        {
+            _ = DestroyWindow(warmupHost);
+        }
+    }
+
+    private void DetachResidentFromVisibleHost(IntPtr visibleHost)
+    {
+        _hasPresentedPackage = false;
+        Interlocked.Increment(ref _generation);
+        Interlocked.Exchange(ref _switchCancellation, null)?.Cancel();
+        SetValue(IsLoadingPropertyKey, false);
+        SetValue(IsReadyPropertyKey, false);
+        SetValue(StatusTextPropertyKey, string.Empty);
+
+        IntPtr warmupHost;
+        try
+        {
+            warmupHost = EnsureWarmupHost();
+        }
+        catch
+        {
+            DisposeSessionsImmediately();
+            return;
+        }
+
+        lock (_sessionGate)
+        {
+            if (_currentSession is { IsAlive: true } current
+                && current.IsAttachedTo(visibleHost))
+            {
+                if (current.TryAttachToHostImmediately(warmupHost))
+                {
+                    _ = ConfirmHiddenHostAttachmentAsync(current, warmupHost);
+                }
+                else
+                {
+                    current.DisposeImmediately();
+                    _currentSession = null;
+                }
+            }
+
+            if (_startingSession is { } starting
+                && !ReferenceEquals(starting, _currentSession)
+                && starting.IsAttachedTo(visibleHost))
+            {
+                starting.DisposeImmediately();
+                _startingSession = null;
+            }
+        }
+    }
+
+    private async Task ConfirmHiddenHostAttachmentAsync(ModelRendererSession session, IntPtr warmupHost)
+    {
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_warmupCancellation.Token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            await session.AttachToHostAsync(warmupHost, activate: false, timeout.Token).ConfigureAwait(true);
+        }
+        catch
+        {
+            // The synchronous reparent already protects the resident process from HWND teardown.
+        }
+    }
+
     private void DisposeSessionsImmediately()
     {
         Interlocked.Increment(ref _generation);
+        _warmupCancellation.Cancel();
         Interlocked.Exchange(ref _switchCancellation, null)?.Cancel();
         lock (_sessionGate)
         {
@@ -356,8 +575,42 @@ public sealed class DotNetModelPreviewHost : HwndHost
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DestroyWindow(IntPtr window);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetParent(IntPtr child, IntPtr parent);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr child);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(IntPtr window, out NativeRect rect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr window,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandleW(string? moduleName);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 
     private sealed class ModelRendererSession : IDisposable
     {
@@ -372,20 +625,27 @@ public sealed class DotNetModelPreviewHost : HwndHost
         private readonly Task _exitTask;
         private readonly TaskCompletionSource<string> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ConcurrentDictionary<long, TaskCompletionSource<ResidentPackageLoadResult>> _packageLoads = new();
+        private readonly ConcurrentDictionary<long, TaskCompletionSource<long>> _hostAttachments = new();
         private readonly SemaphoreSlim _writeGate = new(1, 1);
         private long _packageLoadRequestId;
+        private long _hostAttachRequestId;
+        private long _rendererWindowHandle;
+        private long _attachedHostHandle;
         private volatile bool _supportsResidentPackageLoad;
+        private volatile bool _supportsResidentHostAttach;
         private int _disposed;
 
         private ModelRendererSession(
             Process process,
             WorkerJob job,
             string runtimeRoot,
+            IntPtr parentHandle,
             Action<string> status)
         {
             _process = process;
             _job = job;
             _runtimeRoot = runtimeRoot;
+            _attachedHostHandle = parentHandle.ToInt64();
             _stdoutTask = ReadProtocolAsync(process.StandardOutput, status, _lifetime.Token);
             _stderrTask = DrainAsync(process.StandardError, _stderr, _lifetime.Token);
             _exitTask = ObserveExitAsync();
@@ -394,6 +654,98 @@ public sealed class DotNetModelPreviewHost : HwndHost
         public Task<string> Ready => _ready.Task;
         public bool IsAlive => Volatile.Read(ref _disposed) == 0 && !_process.HasExited;
         public bool SupportsResidentPackageLoad => _supportsResidentPackageLoad;
+        public bool SupportsResidentHostAttach => _supportsResidentHostAttach;
+
+        public bool IsAttachedTo(IntPtr hostHandle) =>
+            hostHandle != IntPtr.Zero
+            && Interlocked.Read(ref _attachedHostHandle) == hostHandle.ToInt64();
+
+        public bool TryAttachToHostImmediately(IntPtr parentHandle)
+        {
+            if (parentHandle == IntPtr.Zero || !IsWindow(parentHandle))
+            {
+                return false;
+            }
+            var rendererHandle = new IntPtr(Interlocked.Read(ref _rendererWindowHandle));
+            if (rendererHandle == IntPtr.Zero || !IsWindow(rendererHandle))
+            {
+                return false;
+            }
+            _ = SetParent(rendererHandle, parentHandle);
+            if (GetParent(rendererHandle) != parentHandle
+                || !GetClientRect(parentHandle, out var rect))
+            {
+                return false;
+            }
+            var width = Math.Max(1, rect.Right - rect.Left);
+            var height = Math.Max(1, rect.Bottom - rect.Top);
+            if (!SetWindowPos(
+                    rendererHandle,
+                    IntPtr.Zero,
+                    0,
+                    0,
+                    width,
+                    height,
+                    SwpNoZOrder | SwpNoActivate | SwpFrameChanged | SwpShowWindow))
+            {
+                return false;
+            }
+            Interlocked.Exchange(ref _attachedHostHandle, parentHandle.ToInt64());
+            return true;
+        }
+
+        public async Task AttachToHostAsync(
+            IntPtr parentHandle,
+            bool activate,
+            CancellationToken cancellationToken)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            if (!_supportsResidentHostAttach)
+            {
+                throw new NotSupportedException("The active renderer does not support resident host attachment.");
+            }
+            if (parentHandle == IntPtr.Zero || !IsWindow(parentHandle))
+            {
+                throw new InvalidOperationException("The requested preview host window is unavailable.");
+            }
+
+            var requestId = Interlocked.Increment(ref _hostAttachRequestId);
+            var completion = new TaskCompletionSource<long>(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (!_hostAttachments.TryAdd(requestId, completion))
+            {
+                throw new InvalidOperationException("Could not register the resident host attachment request.");
+            }
+            try
+            {
+                var message = JsonSerializer.Serialize(new
+                {
+                    @event = "host_attach_request",
+                    request_id = requestId,
+                    parent_hwnd = parentHandle.ToInt64(),
+                    activate,
+                });
+                await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+                    await _process.StandardInput.WriteLineAsync(message).WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _writeGate.Release();
+                }
+                var attachedHandle = await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                if (attachedHandle != parentHandle.ToInt64())
+                {
+                    throw new InvalidDataException("The resident renderer acknowledged the wrong host window.");
+                }
+                Interlocked.Exchange(ref _attachedHostHandle, attachedHandle);
+            }
+            finally
+            {
+                _hostAttachments.TryRemove(requestId, out _);
+            }
+        }
 
         public async Task<ResidentPackageLoadResult> LoadPackageAsync(
             string packagePath,
@@ -492,7 +844,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 process.StandardInput.AutoFlush = true;
                 job = WorkerJob.Create();
                 job.Add(process);
-                return Task.FromResult(new ModelRendererSession(process, job, runtimeRoot, status));
+                return Task.FromResult(new ModelRendererSession(process, job, runtimeRoot, parentHandle, status));
             }
             catch
             {
@@ -580,6 +932,13 @@ public sealed class DotNetModelPreviewHost : HwndHost
                         {
                             case "protocol_ready":
                                 _supportsResidentPackageLoad = HasCapability(root, "resident_package_load_v1");
+                                _supportsResidentHostAttach = HasCapability(root, "resident_host_attach_v1");
+                                if (root.TryGetProperty("window_handle", out var windowHandle)
+                                    && windowHandle.TryGetInt64(out var parsedWindowHandle)
+                                    && parsedWindowHandle > 0)
+                                {
+                                    Interlocked.Exchange(ref _rendererWindowHandle, parsedWindowHandle);
+                                }
                                 status(LocalizationManager.Get("RendererLoading"));
                                 break;
                             case "ready":
@@ -598,6 +957,12 @@ public sealed class DotNetModelPreviewHost : HwndHost
                             case "package_load_failed":
                                 CompletePackageLoad(root, failed: true);
                                 break;
+                            case "host_attach_applied":
+                                CompleteHostAttachment(root, failed: false);
+                                break;
+                            case "host_attach_failed":
+                                CompleteHostAttachment(root, failed: true);
+                                break;
                         }
                     }
                     catch (JsonException)
@@ -614,6 +979,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
             {
                 _ready.TrySetException(exception);
                 FailPendingPackageLoads(exception);
+                FailPendingHostAttachments(exception);
             }
         }
 
@@ -631,6 +997,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 }
                 FailPendingPackageLoads(new InvalidOperationException(
                     $"The .NET previewer exited during resident package loading (code {_process.ExitCode})."));
+                FailPendingHostAttachments(new InvalidOperationException(
+                    $"The .NET previewer exited during host attachment (code {_process.ExitCode})."));
             }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
             {
@@ -642,6 +1010,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
         {
             _lifetime.Cancel();
             FailPendingPackageLoads(new OperationCanceledException("The resident preview renderer is shutting down."));
+            FailPendingHostAttachments(new OperationCanceledException("The resident preview renderer is shutting down."));
             _job.Dispose();
             try
             {
@@ -668,6 +1037,10 @@ public sealed class DotNetModelPreviewHost : HwndHost
                 {
                     // Bounded protocol and stderr diagnostics own the useful failure detail.
                 }
+            }
+            if (_ready.Task.IsFaulted)
+            {
+                _ = _ready.Task.Exception;
             }
             _lifetime.Dispose();
             _writeGate.Dispose();
@@ -794,6 +1167,37 @@ public sealed class DotNetModelPreviewHost : HwndHost
         private void FailPendingPackageLoads(Exception exception)
         {
             foreach (var pending in _packageLoads.Values)
+            {
+                pending.TrySetException(exception);
+            }
+        }
+
+        private void CompleteHostAttachment(JsonElement root, bool failed)
+        {
+            var requestId = root.TryGetProperty("request_id", out var request)
+                && request.TryGetInt64(out var parsed)
+                ? parsed
+                : 0;
+            if (requestId <= 0 || !_hostAttachments.TryGetValue(requestId, out var completion))
+            {
+                return;
+            }
+            if (failed)
+            {
+                completion.TrySetException(new InvalidDataException(
+                    JsonString(root, "message", "Resident host attachment failed.")));
+                return;
+            }
+            var parentHandle = root.TryGetProperty("parent_hwnd", out var parent)
+                && parent.TryGetInt64(out var parsedParent)
+                ? parsedParent
+                : 0;
+            completion.TrySetResult(parentHandle);
+        }
+
+        private void FailPendingHostAttachments(Exception exception)
+        {
+            foreach (var pending in _hostAttachments.Values)
             {
                 pending.TrySetException(exception);
             }
