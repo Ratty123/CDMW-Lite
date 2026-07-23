@@ -1,4 +1,4 @@
-name: Archive Lite (Python-free)
+name: Archive Lite
 
 on:
   push:
@@ -11,8 +11,28 @@ permissions:
   contents: read
 
 jobs:
-  build-test-package:
-    name: .NET 10 / native x64 / portable ZIP
+  test:
+    name: Focused Debug gate
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Verify and test
+        shell: pwsh
+        run: .\scripts\test_archive_lite.ps1 -Configuration Debug
+
+  package:
+    name: Native x64 Release package
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
     runs-on: windows-latest
     timeout-minutes: 45
 
@@ -25,11 +45,11 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Verify, test, and package Archive Lite
+      - name: Verify, test, and package
         shell: pwsh
         run: .\scripts\build_archive_lite.ps1
 
-      - name: Upload portable Python-free ZIP
+      - name: Upload portable package
         uses: actions/upload-artifact@v4
         with:
           name: CDMW-Archive-Lite-win-x64

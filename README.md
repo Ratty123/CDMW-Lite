@@ -1,133 +1,108 @@
 # CDMW Archive Lite
 
-CDMW Archive Lite is an independent, read-only Windows desktop application for browsing Crimson Desert PAMT/PAZ archives and searching text. This repository contains its application, worker, semantic-content library, native archive and model-preview services, .NET/Vortice renderer, build, tests, and portable package. It has no source, build, or runtime dependency on another CDMW checkout and does not embed or invoke Python.
+CDMW Archive Lite is a standalone, read-only Windows desktop application for browsing Crimson Desert PAMT/PAZ archives. It can search, inspect, preview, and export archive content without modifying the source archives.
 
-## Included
+The application is self-contained in this repository, uses no Python runtime, and keeps archive queries, decoding, media conversion, and mesh rendering outside the UI process.
 
-- Modern resizable Windows 11 x64 WPF shell on .NET 10, localized in English, German, and Spanish, with immediate in-place language switching; six persistent Graphite, Midnight, Nord, Ember, Light, and Frost themes; four global font sizes; and compact, comfortable, or spacious layout density. A first launch defaults to Small text and Compact density, while later launches restore the saved appearance. The compact title row contains the product name, Archive Browser/Text Search navigation, the modal Item Finder action, appearance controls, and window controls. Every launch starts in Archive Browser, regardless of which workspace was last used.
-- Automatic Crimson Desert folder discovery from environment overrides, Steam libraries/registry data, and common Steam, Epic, Xbox, and standalone install locations. A manual Detect game action and folder picker remain available.
-- Stable memory-mapped archive index with archive fingerprints and isolated caches. Repeated PAMT and PAZ source paths share one string-table entry, while compact basename and extension-posting sidecars are built atomically, memory-mapped on later sessions, and shared by associated-asset discovery, native model dependency resolution, filtered archive queries, and extension facets; this avoids allocating full managed lookup dictionaries or rescanning every archive entry for each request. At startup, the selected or detected game root is checked and a current persistent cache is opened automatically without a prompt or rebuild. If no cache exists, the normal archive-loading choice opens so the user can build a persistent cache or load only for that session. A stale cache stays closed, clearly recommends **Refresh**, and cannot be opened until the user manually refreshes it. Persistent indexes are reused only for the same verified source fingerprint and manual rebuilds release conflicting mappings at the atomic-publication boundary; one-time indexes always rescan, never publish persistent freshness metadata, and all three index files are removed when the worker session closes. Builds and refreshes report native discovery plus real PAMT parse, entry-sort, index-write, derived-index construction, and atomic-publication progress; cancellation is cooperatively forwarded into every build.
-- Flat, folder, category, and category-plus-folder navigation with focused path/extension/view/folder/sort filters and 256-row paging. Visible Archive and text-search filters, export options, font size, layout density, window placement/maximized state, workspace splitter widths, and result-column widths/order are restored from the portable settings file. Live preview splitters use the same bounded-width policy as restored settings, so a preview pane cannot grow off the right edge of the workspace. The file grid supports click-to-sort on every column, freely resizing/reordering columns, and a persistent visible-column chooser. Legacy saved Role/Type visibility, sort, order, and width migrate to separate **File type** and **Usage** columns without changing the other saved columns.
-- A categorized extension picker that expands every group into its individual extensions and per-extension counts, uses smooth pixel scrolling, and shares the full workbench's model/mesh/physics, texture/image, material/metadata, animation/scene, audio/video, UI/text, and other groups. A **Most common** popup applies All files or up to ten extensions immediately, ordered by count then name and calculated from the active Item Finder set when scoped or the whole archive otherwise.
-- Optional known in-game names and a searchable **Item Finder** built from the archive's ItemInfo/localization tables. The repository-owned native catalog recovers shifted ItemInfo layouts, bounded multi-prefab lists, alternate StringInfo icon prefixes, and semantically compatible item/model links. Lite preserves exact localized names separately from broader **Name Evidence**, propagates that evidence through model variants, icon textures, material textures, sidecars, and equipment components, and displays the recovered item name directly without a `Name hint:` prefix. It groups model variants, filters by category/material evidence, and pages 72 icon tiles at a time. The modal dialog uses the same resizable themed window chrome as the shell. Its view model owns one latest-wins 220 ms filter debounce and does not schedule searches while immutable facets are being refreshed. Double-clicking an item applies its exact links, returns to Archive Browser, and loads a directly linked model into the existing preview lane when available, with another previewable direct link as fallback. **Exact links** and **Related set** scope the normal Archive Browser; path, extension, role, search, and sorting continue to refine that set, whose extension counts remain active until **Clear item set** removes only the scope and restores archive-wide facets. Item rows publish once with cached or fallback icons, then missing icons load asynchronously with visible-first priority. Persistent 120-pixel DirectXTex thumbnails, converter-free warm hits, and the 96-image WPF LRU remain intact. Query, filters, and dialog size persist in Lite settings.
-- An on-demand **Associated assets** drawer that opens as a compact docked column beside the preview instead of overlapping the native mesh viewport or consuming permanent vertical space. Its color-coded sections resolve explicit paths embedded in PAC/material/XML metadata, expected model/material companions, and same-family names through the compact basename index rather than a 1.67-million-row scan; show only each file name in the list; group results as models, material sidecars, textures, physics, mesh metadata, prefabs, skeletons, animation, media, UI, or other; and keep the full path/evidence available on hover. Resolved families are remembered for the current worker session, so a discovered DDS can lead back to its PAC, sidecar, and sibling files. Selected associated rows can be exported together, **Export family** writes the source plus every resolved family member, and **Show in browser** opens a chosen result in the normal sortable file view.
-- A repository-owned, versioned archive-content capability manifest and Python-free semantic analyzer. Its schema remains contract-compatible with the full workbench without importing or referencing that repository. It gives all 107 audited extensions one declared role and capability path instead of product-specific fallbacks. Readable binary documents include candidate strings/references and bounded header/section evidence; specialized read-only documents cover MeshInfo, PAE/PAEM effects, BNK, PATHC, PAB, HKX/HKT, animation/sequence sidecars, and related metadata. Heuristic fields remain labeled as candidates, unsupported playback or visual conversion is explicit, and raw export is always preserved.
-- Full-file text and XML previews in a read-only AvalonEdit surface with theme-aware VS Code-style Dark+/Light+ syntax colors, muted line numbers, horizontal/vertical scrolling, selected search-result positioning, and in-file next/previous search. Switching any theme recolors both editors immediately. Text and normalized semantic documents are published through bounded cache artifacts rather than truncated to fit the named-pipe response. Binary `.meshinfo` now opens as readable field/type, reference, layout, bounds/physics, and candidate offset/vector evidence and can be exported as decode JSON in both products.
-- Image preview through Windows codecs plus the bundled native DirectXTex decoder for DDS. Every `.dds` row has file type **Texture** and a separate filename-inferred usage of **Color**, **Normal map**, **Material map**, or explicit **Unknown**. The shared path-only classifier uses terminal suffix families, so a word such as `metal` elsewhere in an asset name cannot override a terminal color suffix. Metadata identifies DDS dimensions, texture/array kind, pixel format and compression, mip levels, color space, alpha mode, payload layout, and relevant DX10 or RGB-mask details. Common Windows Media Foundation audio/video formats play directly; Wwise `.wem` files are decoded to cached WAV with the pinned bundled vgmstream runtime. Proprietary media such as BK2 still requires a compatible Windows codec.
-- Read-only PAC, PAM, PAMLOD, and PAT geometry preparation through `cdmw-preview-core.exe`, displayed by the embedded production `d3d11_vortice_shader` .NET renderer. The default remains a texture-free matte clay mesh with directional form shading, subtle per-part tone variation, and a restrained one-pixel topology overlay. A model-only **Display textures** checkbox beside **Associated assets** opts into the native Full-compatible material graph and resolved DDS channels; it starts unchecked on every launch and uses a separate textured package/cache version, so normal PAC selection keeps the existing texture-free preparation and cache path. The .NET bridge preserves Full's resolved direct and packed material channels, tint strength, native roughness/metalness/specular hints, normalized shader family, UV/normal policy, alpha mode, and sidedness instead of replacing them with Lite fallback colors and scalar values. Ordered diffuse layers are compiled through their authored mask channel in managed code and cached for the resident scene. Renderer-ready native UVs are converted into the shared Wavefront-oriented document convention before upload, so that upload restores the original V coordinate and the asset's explicit vertical-flip policy is applied exactly once. Existing valid packages gain revised adapter sidecars and camera metadata in place without rerunning native PAC preparation. PAT support decodes the proven LOD0 plant-mesh path: bounds, quantized vertices/normals/UVs, 16-bit indices, draw ranges, and material candidates; higher or unknown layouts remain explicitly unsupported. Cross-package prefab components are resolved through the compact global index, preserving rare components outside the selected PAMT without parsing every other PAMT. A missing or damaged derived lookup falls back safely to the legacy package scan. The overlay exposes intersecting pieces and face flow without the former bright rim/glow or a dense vertex display. Initial framing uses the same asset-family policy as Full: weapon-family paths such as swords, shields, bows, and firearms retain their existing overhead yaw, pitch, and zoom, while bodies, armor, and other non-weapon models rotate to the asset-facing front. Lite uses a viewport-specific 50% fit-relative safety margin so the complete mesh remains in view. The resident renderer child is resized whenever the WPF preview host moves or changes size, so a prewarmed surface cannot extend beneath neighboring controls or clip a fitted mesh. A model-only **Preview settings** window opens its explicitly theme-owned **Camera input** tab for live Orbit/Pan sensitivity and axis inversion; its tabs, sliders, and panel surfaces follow the active theme, those navigation settings persist, and a texture refresh of the same model preserves the user's current camera. The Lite surface has one mesh viewport and omits Original/Imported selectors, the edit gizmo, and the grid. Model selections bypass the general preview debounce, including PAT, warm immutable packages return immediately, and cold requests retain only a 35 ms cancellable coalescing window before native preparation. Model-package keys no longer include the whole archive-session fingerprint: the cache records the selected PAMT, exact SHA-256 hashes of each decoded PAZ byte range, and every global basename query including zero-result misses, so an unrelated package update can retain a valid model while an added, removed, or changed matching prefab invalidates it. Dependency validation catches content changes even when the PAZ length and timestamp are preserved; a damaged or legacy dependency report falls back safely to same-session reuse only. After the first archive page is usable, an immutable generated triangle package starts the hidden renderer opportunistically; the first validated real model then uses resident package replacement and reveals the native host only after success. Clearing or changing preview types keeps that process and D3D11 device resident, while background item-catalog scans yield at bounded checkpoints to foreground queries and previews. Latest-generation cancellation prevents stale publication; a rejected replacement leaves the previous scene live, and a fresh renderer is started only as a compatibility or recovery fallback. Rebuildable package sidecars skip redundant durable flushes while the complete package remains in compact private staging and still publishes by one final directory move.
-- Read-only HKX/HKT metadata preview without geometry synthesis or renderer startup. The preview reports archive provenance plus safely recognized Havok container, SDK, and tag-section details, and keeps the original entry available for raw export. Archive Lite does not invent skeletons, collision surfaces, proxy bones, or dots for HKX/HKT files.
-- Native raw, LZ4, ChaCha20, partial PAR, and PATHC-backed partial DDS extraction.
-- Literal or regular-expression text search across archives or loose folders, with bounded parallelism, per-pattern timeouts, result caps, line/column/context, cancellation, and Enter-to-search from the query field. Selecting a result asynchronously opens and highlights the complete source file in the same editor used by Archive Browser.
-- Multi-selected file, selected-folder, filtered-set, associated-family, and search-result export. Raw archive output can either match the full CDMW extractor layout as `<PAMT parent folder>/<archive virtual path>` or place selected files directly in the chosen folder; every file is written through a sibling staging file, collisions default to skip, and JSON manifests record archive provenance.
-- **Export selected** opens one choice dialog for the original file(s), the complete archive folder structure, or the selected file's resolved associated-asset family. A single PAC, PAM, or PAMLOD also offers Blender-friendly GLB, Wavefront OBJ, or binary FBX 7400. Geometry, normals, UVs, submesh boundaries, and material identities are retained for interchange output; textures, rigs, and animations are intentionally omitted. **Export family** is also available directly under **Export Options** and performs family discovery first when needed. Preparation and conversion run in the cancellable worker with determinate progress and atomic final-file publication.
-- A versioned 1 MiB JSONL protocol over a private named pipe. Slow scan, query, preview, search, and export work runs in the owned worker process, never on the WPF dispatcher.
-- Portable self-contained ZIP packaging with Python payload/import guards, x64 checks, application/worker/native self-tests, a synthetic native-package load, and a hidden Vortice GPU smoke.
+## Highlights
 
-Archive Lite has no archive-write, replacement, import-mesh, Modify Original, Build Mod, patch, backup, or restore authority. The native archive ABI intentionally exposes only scan and decode operations.
+- Browse large archives with flat, folder, and category views, paging, filters, sorting, and persistent indexes.
+- Search text across archives or loose folders with cancellation, result limits, and in-file navigation.
+- Find known items by localized name and follow exact or related archive links.
+- Preview text, XML, images, DDS textures, supported media, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
+- Discover and export associated assets without altering game data.
+- Run as a portable Windows application or a single self-extracting executable.
+- Keep settings, caches, logs, and crash reports isolated from the full CDMW workbench.
 
-Unsupported specialized conversions (WAV, HKX JSON/XML, structured JSON, and dependency-set export) fail explicitly instead of silently exporting a different format. PAC/PAM/PAMLOD display, model interchange export, and HKX/HKT metadata remain read-only: editing controls, source replacement, mesh import, and archive mutation are absent.
+## Safety boundary
 
-Optional prefab model components remain discoverable through the compact cross-package index, but Lite no longer auto-composites them into a selected PAC. The versioned geometry and textured caches therefore rebuild once and cannot keep showing companion underwear or gear in a model-only preview.
+Archive Lite has no archive-write, replacement, patching, backup, restore, or mod-building authority. PAMT, PAZ, and PATHC sources are opened read-only, and exports are written to a separate destination selected by the user.
+
+The repository does not contain game archives, extracted game assets, or other local game data.
+
+## Requirements
+
+- Windows 11 x64
+- .NET 10 SDK
+- CMake 3.24 or newer
+- Visual Studio 2022 Build Tools with the Desktop C++ workload
+- PowerShell
+
+Pinned third-party sources are documented in [DEPENDENCY-SOURCES.md](DEPENDENCY-SOURCES.md).
 
 ## Run from source
 
-Requirements are Windows 11 x64, the .NET 10 SDK, CMake 3.24 or newer, Visual Studio 2022 Build Tools with the Desktop C++ workload, and PowerShell.
+First run the focused nonvisual gate:
 
 ```powershell
-.\scripts\test_archive_lite.ps1
+.\scripts\test_archive_lite.ps1 -Configuration Debug
+```
+
+Then launch the desktop application:
+
+```powershell
 dotnet run --project .\src\Cdmw.ArchiveLite.App\Cdmw.ArchiveLite.App.csproj -c Debug
 ```
 
-The second command launches a visible desktop window and is intentionally not part of automated validation.
+The launch command opens a visible desktop window and is intentionally separate from automated validation.
 
-Source provenance and externally pinned components are recorded in [DEPENDENCY-SOURCES.md](DEPENDENCY-SOURCES.md). `scripts/verify_repository_independence.ps1` runs before every focused or package gate and rejects missing repository-owned sources, escaping project/resource references, or references to the former repository layout.
+## Build
 
-## Build the standalone EXE or full portable package
+For a fresh standalone executable, run:
 
-For the simplest fresh build, double-click `BUILD-FRESH-EXE.bat` in this folder. It runs the complete verified release pipeline in standalone-only mode, leaves the result window open, and writes only the new standalone EXE beneath `artifacts/`. The embedded runtime is assembled through temporary payload files that are removed after a successful build.
+```text
+BUILD-FRESH-EXE.bat
+```
+
+For the complete verified Release package:
 
 ```powershell
 .\scripts\build_archive_lite.ps1
 ```
 
-The PowerShell command without `-StandaloneOnly` writes both `CDMW-Archive-Lite-0.6.1-Standalone-win-x64.exe` and the conventional portable ZIP and folder beneath `artifacts/`. On a clean checkout it downloads and verifies the pinned vgmstream archive into the ignored `.tools/` directory; DirectXTex is fetched at its pinned commit by CMake when it is not already available. The standalone file is the simplest distribution: copy that one EXE and run it. On first launch it verifies and atomically extracts its worker, native codecs, exporters, and renderer into a content-addressed local runtime; later launches reuse that verified runtime. Separate worker and renderer processes remain intact after extraction because they provide crash isolation and responsive archive/preview work. The renderer is kept as a ReadyToRun self-contained directory inside that verified payload rather than another nested single-file bundle, avoiding redundant extraction work on every mesh-process launch while the distributed product remains one EXE.
-
-Packaging builds the native archive, preview, item-name-index, DDS, and mesh-interchange helpers; publishes the app, worker, and renderer self-contained for `win-x64`; scans every packaged PE for Python runtime references; verifies the x64 application/native entry points and the separately hosted pinned x86 vgmstream runtime; smokes binary FBX output; verifies the managed HKX/HKT metadata-only route; loads a synthetic native model package in the packaged renderer; proves the hidden production Vortice backend; constructs and lays out the real WPF window without showing it; exercises the packaged application-to-worker connection; and checks that no worker remains. It then publishes the single-file Native AOT launcher, runs it once through first-run extraction and again through cached reuse, and requires both hidden application/worker self-tests to exit cleanly.
-
-## Data isolation
-
-Archive Lite stores its reusable archive, name, and preview caches beside the distributed executable:
-
-```text
-<folder containing the standalone EXE or portable CdmwArchiveLite.exe>\
-  settings.json
-  cache\index\
-  cache\index\<archive-fingerprint>.ali
-  cache\index\<archive-fingerprint>.abi
-  cache\index\<archive-fingerprint>.aex
-  cache\index\roots\
-  cache\names\
-  cache\preview\models\
-  cache\preview\native\
-  cache\preview\textures\
-  cache\preview\item-icons\
-  cache\preview\content-analysis\
-  cache\preview\media\
-  cache\preview\text\
-  cache\preview\runtime\
-  logs\
-  crash\
-```
-
-Only the standalone launcher's internally extracted worker/renderer runtime remains under:
-
-```text
-%LocalAppData%\Ratrider\CDMWArchiveLite\
-  standalone\payloads\<payload-sha256>\
-```
-
-The executable's folder therefore needs to be writable for settings, logs, crash diagnostics, and persistent caches. `settings.json` retains the selected game root, filters, search inputs, export options, Item Finder query/facets/window size, theme/language, font size, layout density, window placement, splitter widths, and result-grid layout; it intentionally does not retain the active workspace, so Archive Browser remains the startup view. The `standalone` Local AppData folder contains only the extracted runtime bundled inside the EXE; it does not contain settings, cache data, logs, game data, or exported assets. A damaged or incomplete runtime is never reused: it is quarantined under the same app-owned folder and replaced from the embedded, manifest-verified payload. Different standalone versions use different content hashes, so an application that is already running is not disrupted by launching a newer build.
-
-It does not read or write the full workbench's settings, caches, restore points, mod workspace, or Python environment. PAMT, PAZ, and PATHC sources are opened read-only. Before export, the worker recomputes the source fingerprint and refuses stale sessions.
-
-Choosing **Load this time only** creates one uniquely named `cdmw-archive-lite-session-*.ali` file under the current user's system temporary directory. It remains available only while the worker owns that archive session and is deleted during normal worker shutdown. It is never used as a later cache hit. A process or operating-system crash can leave a temporary file for normal OS temporary-file cleanup, but cannot publish it as a persistent Archive Lite cache.
-
-The cache choice is shown for manual Open/Refresh and automatically at startup when a game root is available but no persistent index exists. Startup reuses a current persistent index silently and never rebuilds a stale one; stale sources require a manual Refresh. Bounded known-name and preview caches keep their existing behavior so repeated names and previews do not needlessly decode the same immutable content again. Associated-asset families are retained only in worker memory for the open session and do not create another persistent cache.
+Build outputs are written beneath the ignored `artifacts/` directory. On a clean checkout, pinned native dependencies are downloaded into the ignored `.tools/` directory.
 
 ## Architecture
 
 ```text
-CDMW-Archive-Lite-0.6.1-Standalone-win-x64.exe (single-file Native AOT launcher)
-          |
-          | verified, atomic first-run extraction; content-addressed reuse
-          v
-CdmwArchiveLite.exe (WPF dispatcher)
-          |
-          | private named pipe, protocol v1, request IDs + generations
-          v
-CdmwArchiveLite.Worker.exe (.NET 10, cancellable operations)
-          +-- text search / preview cache / atomic export
-          +-- game-install discovery / cache-health inspection
-          +-- repository-owned semantic content documents + categorized extension scan
-          +-- paged Item Finder search / exact and related Archive Browser scopes
-          +-- bounded visible-priority item-icon preload
-          +-- cancellable associated-asset reference/family discovery
-          +-- cdmw-archive-accelerator.exe (C++17, canonical item rows + name maps)
-          +-- cdmw-preview-core.exe (C++20, PAC/PAM/PAMLOD/PAT package preparation)
-          +-- cdmw-mesh-core.exe (C++17, production OBJ/FBX interchange writers)
-          +-- cd-texture-dx.exe (C++20 + DirectXTex, DDS to PNG preview)
-          +-- vgmstream-cli.exe (pinned Wwise audio to WAV preview runtime)
-          |
-          +-- memory-mapped archive_index_v1
-          v
-cdmw-archive-core.dll (C++17, read-only PAMT/PAZ/PATHC decode ABI)
+CdmwArchiveLite.exe                  WPF presentation and selection state
+        |
+        | private named pipe, request IDs, cancellation
+        v
+CdmwArchiveLite.Worker.exe           archive queries, search, preview, export
+        |
+        +-- cdmw-archive-core.dll     read-only PAMT/PAZ/PATHC decoding
+        +-- native helper processes   indexing, DDS, model and media preparation
+        +-- managed content library   semantic archive documents
 
 CdmwArchiveLite.exe
-          +-- preview-only child HWND + process/job ownership
-          v
-cdmw-mesh-dotnet-editor.exe (.NET 8 + Vortice D3D11, read-only scene display)
+        |
+        +-- cdmw-mesh-dotnet-editor.exe
+            read-only Vortice D3D11 mesh viewport
 ```
 
-The app owns presentation and latest-selection acceptance. The worker owns expensive I/O and CPU work. The native archive DLL owns archive parsing and codecs; the native preview executable prepares immutable renderer packages; the bundled production mesh core writes OBJ and FBX while the managed worker writes GLB 2.0. The app keeps the previous model visible until an in-process replacement is applied or a fallback renderer is ready, rejects any renderer backend other than `d3d11_vortice_shader`, and never publishes a stale selection generation. Closing the app requests cooperative shutdown and then closes Windows Job Objects so the owned worker, native-helper descendants, and renderer are terminated.
+The UI owns presentation. Long-running work remains cancellable in the worker or a dedicated native process, and the renderer runs in its own child process.
 
-See [TESTING.md](TESTING.md) for the validation matrix and proof boundaries.
+## Repository layout
+
+- `src/` — WPF application, worker, shared contracts, and managed archive services
+- `native/` — read-only archive and preview implementations
+- `tools/` — repository-owned helper and renderer projects
+- `tests/` — managed regression coverage and synthetic fixtures
+- `scripts/` — focused validation and packaging entry points
+- `schemas/` — versioned repository-owned data contracts
+- `.github/` — GitHub Actions and collaboration templates
+
+## Local data
+
+Portable builds keep settings, caches, logs, and crash reports beside the executable. The single-file launcher extracts its verified runtime beneath `%LocalAppData%\Ratrider\CDMWArchiveLite\standalone\`; it does not place user settings, game data, or exports there.
+
+These paths and all build outputs are excluded from version control.
+
+## Project documents
+
+- [TESTING.md](TESTING.md) - validation matrix and proof boundaries
+- [CONTRIBUTING.md](CONTRIBUTING.md) - development and review expectations
+- [SECURITY.md](SECURITY.md) - supported versions and private reporting
+- [CHANGELOG.md](CHANGELOG.md) - notable version changes
+- [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) - bundled component notices
