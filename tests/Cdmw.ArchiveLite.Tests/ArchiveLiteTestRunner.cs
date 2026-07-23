@@ -3479,9 +3479,44 @@ internal static class ArchiveLiteTestRunner
         var stdoutText = await stdout.ConfigureAwait(false);
         var stderrText = await stderr.ConfigureAwait(false);
         Require(process.ExitCode == 0, $"configured .NET preview renderer failed: {stderrText}{stdoutText}");
-        Require(File.Exists(Path.Combine(outputRoot, "mesh.obj")), "configured .NET preview renderer did not load and export the native manifest");
+        var exportedMeshPath = Path.Combine(outputRoot, "mesh.obj");
+        Require(File.Exists(exportedMeshPath), "configured .NET preview renderer did not load and export the native manifest");
+        await RequireNativeRendererUvConventionAsync(packageRoot, manifestPath, exportedMeshPath).ConfigureAwait(false);
         using var status = JsonDocument.Parse(await File.ReadAllTextAsync(statusPath).ConfigureAwait(false));
         Require(status.RootElement.GetProperty("event").GetString() == "saved", "configured .NET preview renderer did not report a successful smoke result");
+    }
+
+    private static async Task RequireNativeRendererUvConventionAsync(
+        string packageRoot,
+        string manifestPath,
+        string exportedMeshPath)
+    {
+        using var manifest = JsonDocument.Parse(
+            await File.ReadAllTextAsync(manifestPath).ConfigureAwait(false));
+        var relativeGeometryPath = manifest.RootElement
+            .GetProperty("batches")[0]
+            .GetProperty("vertex_file")
+            .GetString()
+            ?? throw new InvalidDataException("native renderer smoke manifest omitted its first geometry path");
+        var geometryPath = Path.GetFullPath(Path.Combine(
+            packageRoot,
+            relativeGeometryPath.Replace('/', Path.DirectorySeparatorChar)));
+        await using var geometry = File.OpenRead(geometryPath);
+        geometry.Position = 9 * sizeof(float);
+        using var reader = new BinaryReader(geometry, Encoding.UTF8, leaveOpen: true);
+        var nativeU = reader.ReadSingle();
+        var nativeV = reader.ReadSingle();
+
+        var firstUv = File.ReadLines(exportedMeshPath)
+            .FirstOrDefault(line => line.StartsWith("vt ", StringComparison.Ordinal))
+            ?.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        Require(firstUv is { Length: >= 3 }, "configured .NET preview renderer exported no native UV coordinates");
+        var exportedU = float.Parse(firstUv![1], CultureInfo.InvariantCulture);
+        var exportedV = float.Parse(firstUv[2], CultureInfo.InvariantCulture);
+        Require(
+            Math.Abs(exportedU - nativeU) < 0.00001f
+            && Math.Abs(exportedV - (1.0f - nativeV)) < 0.00001f,
+            "native renderer import did not enter the Wavefront UV convention before the shared upload restores native V");
     }
 
     private static async Task RunConfiguredResidentRendererSwitchAsync(
