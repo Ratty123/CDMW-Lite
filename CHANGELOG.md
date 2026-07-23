@@ -8,6 +8,10 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 - Initial private GitHub repository publication and collaboration documents.
 
+### Changed
+
+- Reduced large real-archive cache build and refresh time by avoiding repeated path allocations during native index sorting.
+
 ## [0.6.1] - 2026-07-23
 
 ### Added

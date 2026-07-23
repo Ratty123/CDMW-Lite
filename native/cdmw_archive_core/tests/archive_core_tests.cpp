@@ -109,6 +109,20 @@ std::vector<std::uint8_t> make_multi_entry_pamt(const std::vector<std::string>& 
     return data;
 }
 
+void test_case_insensitive_path_compare() {
+    using cdmw::archive::compare_case_insensitive;
+    require(compare_case_insensitive("Character/Model.PAC", "character/model.pac") == 0,
+        "case-insensitive path comparison changed equivalent paths");
+    require(compare_case_insensitive("alpha/file.pac", "Beta/file.pac") < 0,
+        "case-insensitive path comparison changed lexical ordering");
+    require(compare_case_insensitive("beta/file.pac", "Alpha/file.pac") > 0,
+        "case-insensitive path comparison changed reverse lexical ordering");
+    require(compare_case_insensitive("path", "path/file.pac") < 0,
+        "case-insensitive path comparison changed prefix ordering");
+    require(compare_case_insensitive("path/file.pac", "PATH") > 0,
+        "case-insensitive path comparison changed reverse prefix ordering");
+}
+
 void test_index_and_raw_decode(const fs::path& root) {
     const std::vector<std::uint8_t> payload = {'h', 'e', 'l', 'l', 'o'};
     write_bytes(root / "0.paz", payload);
@@ -298,6 +312,7 @@ int main() {
     try {
         fs::create_directories(root);
         require(cdmw_archive_core_abi_version() == CDMW_ARCHIVE_CORE_ABI_VERSION, "ABI version is wrong");
+        test_case_insensitive_path_compare();
         test_index_and_raw_decode(root / "raw");
         test_index_deduplicates_source_paths(root / "deduplicated-source-paths");
         test_lz4_and_chacha(root / "codec");

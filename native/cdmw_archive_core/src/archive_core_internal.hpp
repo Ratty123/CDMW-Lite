@@ -18,6 +18,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -146,6 +147,22 @@ inline std::string lower_copy(std::string value) {
         return static_cast<char>(std::tolower(ch));
     });
     return value;
+}
+
+inline int compare_case_insensitive(std::string_view left, std::string_view right) {
+    const auto common_size = std::min(left.size(), right.size());
+    for (size_t index = 0; index < common_size; ++index) {
+        const auto left_raw = static_cast<unsigned char>(left[index]);
+        const auto right_raw = static_cast<unsigned char>(right[index]);
+        if (left_raw == right_raw) continue;
+        const auto left_lower = static_cast<unsigned char>(std::tolower(left_raw));
+        const auto right_lower = static_cast<unsigned char>(std::tolower(right_raw));
+        if (left_lower < right_lower) return -1;
+        if (left_lower > right_lower) return 1;
+    }
+    if (left.size() < right.size()) return -1;
+    if (left.size() > right.size()) return 1;
+    return 0;
 }
 
 inline std::string slash_copy(std::string value) {

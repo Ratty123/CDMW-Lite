@@ -219,9 +219,8 @@ std::vector<Entry> scan_package_root(const fs::path& package_root, const Progres
     if (progress) progress(pamt_files.size(), pamt_files.size(), "index_parse", "complete");
     if (progress) progress(0, entries.size(), "index_sort", "");
     std::stable_sort(entries.begin(), entries.end(), [](const Entry& left, const Entry& right) {
-        const auto left_path = lower_copy(left.path);
-        const auto right_path = lower_copy(right.path);
-        if (left_path != right_path) return left_path < right_path;
+        const auto path_order = compare_case_insensitive(left.path, right.path);
+        if (path_order != 0) return path_order < 0;
         if (left.pamt_path != right.pamt_path) return left.pamt_path < right.pamt_path;
         return left.archive_offset < right.archive_offset;
     });
