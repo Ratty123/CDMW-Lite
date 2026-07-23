@@ -7,6 +7,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 ### Added
 
 - Initial private GitHub repository publication and collaboration documents.
+- A distinct three-cell CDMW family icon for Lite windows, portable builds, and the standalone launcher.
 
 ### Changed
 

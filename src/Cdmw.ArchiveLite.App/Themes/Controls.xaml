@@ -16,6 +16,7 @@
     <Style TargetType="Window">
         <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}" />
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="Icon" Value="/CdmwArchiveLite;component/Assets/ArchiveLite.ico" />
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
         <Setter Property="TextOptions.TextFormattingMode" Value="Display" />

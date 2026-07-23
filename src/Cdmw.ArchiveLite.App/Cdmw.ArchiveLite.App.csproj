@@ -6,7 +6,7 @@
     <AssemblyName>CdmwArchiveLite</AssemblyName>
     <RootNamespace>Cdmw.ArchiveLite.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon Condition="Exists('Assets/ArchiveLite.ico')">Assets/ArchiveLite.ico</ApplicationIcon>
+    <ApplicationIcon>Assets/ArchiveLite.ico</ApplicationIcon>
     <PublishSingleFile>false</PublishSingleFile>
     <PublishTrimmed>false</PublishTrimmed>
     <PublishReadyToRun>true</PublishReadyToRun>
@@ -16,5 +16,8 @@
   <ItemGroup>
     <ProjectReference Include="../Cdmw.ArchiveLite.Contracts/Cdmw.ArchiveLite.Contracts.csproj" />
     <PackageReference Include="AvalonEdit" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets/ArchiveLite.ico" />
   </ItemGroup>
 </Project>

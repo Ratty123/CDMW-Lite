@@ -34,6 +34,7 @@ internal static class ArchiveLiteTestRunner
             ("portable settings retain filters, window placement, panes, and columns", TestPortableUiSettingsAsync),
             ("preview pane sizing stays inside the live workspace", TestWorkspacePaneSizingAsync),
             ("WPF themes expose the shared palette and safe progress bindings", TestWpfThemesAsync),
+            ("Lite branding is distinct and embedded in both user-facing executables", TestApplicationBrandingAsync),
             ("modern shell exposes cache health, game detection, and Enter search", TestModernShellAsync),
             ("preview drawer and syntax colors stay readable across themes", TestPreviewPresentationAsync),
             ("archive grid exposes configurable sortable columns and categorized extensions", TestArchiveGridFeaturesAsync),
@@ -690,6 +691,96 @@ internal static class ArchiveLiteTestRunner
         Require(
             progressBindings.All(static binding => binding!.Contains("Mode=OneWay", StringComparison.Ordinal)),
             "a read-only progress property uses WPF's default TwoWay binding");
+    }
+
+    private static Task TestApplicationBrandingAsync()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var appRoot = Path.Combine(repositoryRoot, "src", "Cdmw.ArchiveLite.App");
+        var assetRoot = Path.Combine(appRoot, "Assets");
+        var iconPath = Path.Combine(assetRoot, "ArchiveLite.ico");
+        var pngPath = Path.Combine(assetRoot, "ArchiveLite.png");
+        var svgPath = Path.Combine(assetRoot, "ArchiveLite.svg");
+
+        var iconBytes = File.ReadAllBytes(iconPath);
+        Require(
+            iconBytes.Length > 6
+            && BinaryPrimitives.ReadUInt16LittleEndian(iconBytes.AsSpan(0, 2)) == 0
+            && BinaryPrimitives.ReadUInt16LittleEndian(iconBytes.AsSpan(2, 2)) == 1,
+            "Archive Lite application icon is not a valid ICO container");
+        var frameCount = BinaryPrimitives.ReadUInt16LittleEndian(iconBytes.AsSpan(4, 2));
+        Require(frameCount >= 7 && iconBytes.Length >= 6 + (16 * frameCount), "application icon has too few size variants");
+        var frameSizes = new HashSet<int>();
+        for (var index = 0; index < frameCount; index++)
+        {
+            var entryOffset = 6 + (16 * index);
+            var width = iconBytes[entryOffset] == 0 ? 256 : iconBytes[entryOffset];
+            var height = iconBytes[entryOffset + 1] == 0 ? 256 : iconBytes[entryOffset + 1];
+            var payloadLength = BinaryPrimitives.ReadUInt32LittleEndian(iconBytes.AsSpan(entryOffset + 8, 4));
+            var payloadOffset = BinaryPrimitives.ReadUInt32LittleEndian(iconBytes.AsSpan(entryOffset + 12, 4));
+            Require(width == height, "application icon contains a non-square frame");
+            Require(
+                payloadLength > 8
+                && payloadOffset <= (uint)iconBytes.Length
+                && payloadLength <= (uint)iconBytes.Length - payloadOffset
+                && iconBytes.AsSpan((int)payloadOffset, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }),
+                "application icon contains an invalid PNG frame");
+            frameSizes.Add(width);
+        }
+        Require(
+            new[] { 16, 24, 32, 48, 64, 128, 256 }.All(frameSizes.Contains),
+            "application icon does not cover standard Windows shell sizes");
+
+        var pngBytes = File.ReadAllBytes(pngPath);
+        Require(
+            pngBytes.Length > 24
+            && pngBytes.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })
+            && BinaryPrimitives.ReadUInt32BigEndian(pngBytes.AsSpan(16, 4)) == 1024
+            && BinaryPrimitives.ReadUInt32BigEndian(pngBytes.AsSpan(20, 4)) == 1024,
+            "Archive Lite branding preview is not a 1024-pixel PNG");
+
+        var svg = System.Xml.Linq.XDocument.Load(svgPath);
+        var liteMark = svg.Descendants().SingleOrDefault(element =>
+            element.Attributes().Any(attribute => attribute.Name.LocalName == "id" && attribute.Value == "lite-mark"));
+        Require(
+            liteMark?.Elements().Count(element => element.Name.LocalName == "rect") == 3,
+            "Archive Lite vector mark must retain its distinct three-cell L silhouette");
+
+        var appProject = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "Cdmw.ArchiveLite.App.csproj"));
+        var appIcon = appProject.Descendants().Single(element => element.Name.LocalName == "ApplicationIcon");
+        Require(
+            string.Equals(appIcon.Value.Replace('\\', '/'), "Assets/ArchiveLite.ico", StringComparison.Ordinal)
+            && appIcon.Attributes().All(attribute => attribute.Name.LocalName != "Condition"),
+            "WPF application icon is optional or points at the wrong asset");
+        Require(
+            appProject.Descendants().Any(element => element.Name.LocalName == "Resource"
+                && string.Equals(
+                    ((string?)element.Attribute("Include"))?.Replace('\\', '/'),
+                    "Assets/ArchiveLite.ico",
+                    StringComparison.Ordinal)),
+            "WPF window icon is not embedded as an application resource");
+
+        var standaloneProject = System.Xml.Linq.XDocument.Load(Path.Combine(
+            repositoryRoot,
+            "src",
+            "Cdmw.ArchiveLite.Standalone",
+            "Cdmw.ArchiveLite.Standalone.csproj"));
+        Require(
+            standaloneProject.Descendants().Any(element => element.Name.LocalName == "ApplicationIcon"
+                && element.Value.Replace('\\', '/').EndsWith("/Assets/ArchiveLite.ico", StringComparison.Ordinal)),
+            "standalone launcher does not embed the Archive Lite icon");
+
+        var controls = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "Themes", "Controls.xaml"));
+        var windowStyle = controls.Root!.Elements().Single(element =>
+            element.Name.LocalName == "Style"
+            && string.Equals((string?)element.Attribute("TargetType"), "Window", StringComparison.Ordinal));
+        Require(
+            windowStyle.Elements().Any(element => element.Name.LocalName == "Setter"
+                && string.Equals((string?)element.Attribute("Property"), "Icon", StringComparison.Ordinal)
+                && ((string?)element.Attribute("Value"))?.EndsWith("/Assets/ArchiveLite.ico", StringComparison.Ordinal) == true),
+            "WPF windows do not consistently use the Archive Lite icon");
+
+        return Task.CompletedTask;
     }
 
     private static Task TestWorkspacePaneSizingAsync()
