@@ -2560,7 +2560,7 @@ internal static class ArchiveLiteTestRunner
         {
             var root = cacheManifest.RootElement;
             Require(
-                root.GetProperty("version").GetString() == "archive_lite_native_model_v3_pat",
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v4_lazy_prefab",
                 "the default texture-free preview changed its established cache version");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
@@ -2722,6 +2722,27 @@ internal static class ArchiveLiteTestRunner
             "Cdmw.ArchiveLite.App",
             "Controls",
             "DotNetModelPreviewHost.cs"));
+        var nativeProtocolSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "native",
+            "cdmw_preview_core",
+            "src",
+            "owners",
+            "protocol_json.cpp"));
+        var nativeLookupSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "native",
+            "cdmw_preview_core",
+            "src",
+            "owners",
+            "material_archive_lookup.cpp"));
+        var nativeReportSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "native",
+            "cdmw_preview_core",
+            "src",
+            "owners",
+            "preview_report.cpp"));
         var buildSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "scripts",
@@ -2741,11 +2762,19 @@ internal static class ArchiveLiteTestRunner
         Require(
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v3_pat\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v4_textured\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v4_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v5_textured_lazy_prefab\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");
+        Require(
+            modelPreviewSource.Contains("[\"enabled_prefab_component_paths\"] = Array.Empty<string>()", StringComparison.Ordinal)
+            && nativeProtocolSource.Contains("\"enabled_prefab_component_paths\"", StringComparison.Ordinal)
+            && nativeLookupSource.Contains("prefab_component_enabled_for_job(component, job)", StringComparison.Ordinal)
+            && nativeLookupSource.Contains("job.extension == \".pac\" && !job.enabled_prefab_component_paths.empty()", StringComparison.Ordinal)
+            && nativeReportSource.Contains("if (!prefab_component_enabled_for_job(component, job)) continue;", StringComparison.Ordinal)
+            && nativeReportSource.Contains("none loaded until explicitly enabled", StringComparison.Ordinal),
+            "native model jobs still auto-compose optional prefab geometry and material sidecars");
         Require(
             rendererHostSource.Contains("resident.LoadPackageAsync(packagePath, generation", StringComparison.Ordinal)
             && rendererHostSource.Contains("The old scene remains live while a fresh-process fallback starts", StringComparison.Ordinal)

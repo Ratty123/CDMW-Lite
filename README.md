@@ -27,6 +27,8 @@ Archive Lite has no archive-write, replacement, import-mesh, Modify Original, Bu
 
 Unsupported specialized conversions (WAV, HKX JSON/XML, structured JSON, and dependency-set export) fail explicitly instead of silently exporting a different format. PAC/PAM/PAMLOD display, model interchange export, and HKX/HKT metadata remain read-only: editing controls, source replacement, mesh import, and archive mutation are absent.
 
+Optional prefab model components remain discoverable through the compact cross-package index, but Lite no longer auto-composites them into a selected PAC. The versioned geometry and textured caches therefore rebuild once and cannot keep showing companion underwear or gear in a model-only preview.
+
 ## Run from source
 
 Requirements are Windows 11 x64, the .NET 10 SDK, CMake 3.24 or newer, Visual Studio 2022 Build Tools with the Desktop C++ workload, and PowerShell.

@@ -9,8 +9,8 @@ namespace Cdmw.ArchiveLite.Core;
 
 public sealed class NativeModelPreviewService
 {
-    private const string PackageVersion = "archive_lite_native_model_v3_pat";
-    private const string TexturedPackageVersion = "archive_lite_native_model_v4_textured";
+    private const string PackageVersion = "archive_lite_native_model_v4_lazy_prefab";
+    private const string TexturedPackageVersion = "archive_lite_native_model_v5_textured_lazy_prefab";
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan ColdBuildCoalesceDelay = TimeSpan.FromMilliseconds(35);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _buildGates = new(StringComparer.Ordinal);
@@ -220,6 +220,7 @@ public sealed class NativeModelPreviewService
             ["output_root"] = outputRoot,
             ["entry"] = EntryPayload(entry),
             ["companion_entry"] = companion is null ? new Dictionary<string, object?>() : EntryPayload(companion),
+            ["enabled_prefab_component_paths"] = Array.Empty<string>(),
             ["render_settings"] = new Dictionary<string, object?>
             {
                 ["visible_texture_mode"] = "mesh_base_first",
