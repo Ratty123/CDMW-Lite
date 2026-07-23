@@ -34,9 +34,9 @@ public sealed class MainWindowViewModel : ObservableObject
         _themes = BuildThemeOptions();
         _selectedTheme = Themes.FirstOrDefault(option => option.Id.Equals(settings.Theme, StringComparison.OrdinalIgnoreCase)) ?? Themes[0];
         _fontSizes = BuildFontSizeOptions();
-        _selectedFontSize = FontSizes.FirstOrDefault(option => option.Id.Equals(settings.FontSize, StringComparison.OrdinalIgnoreCase)) ?? FontSizes[1];
+        _selectedFontSize = FontSizes.FirstOrDefault(option => option.Id.Equals(settings.FontSize, StringComparison.OrdinalIgnoreCase)) ?? FontSizes[0];
         _layoutDensities = BuildLayoutDensityOptions();
-        _selectedLayoutDensity = LayoutDensities.FirstOrDefault(option => option.Id.Equals(settings.LayoutDensity, StringComparison.OrdinalIgnoreCase)) ?? LayoutDensities[1];
+        _selectedLayoutDensity = LayoutDensities.FirstOrDefault(option => option.Id.Equals(settings.LayoutDensity, StringComparison.OrdinalIgnoreCase)) ?? LayoutDensities[0];
         var cacheChoicePrompt = new ArchiveCacheChoicePrompt(() => Application.Current?.MainWindow);
         var exportSelectionPrompt = new ExportSelectionPrompt(() => Application.Current?.MainWindow);
         ArchiveBrowser = new ArchiveBrowserViewModel(

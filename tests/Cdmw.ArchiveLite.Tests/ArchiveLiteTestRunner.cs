@@ -308,6 +308,11 @@ internal static class ArchiveLiteTestRunner
 
     private static async Task TestPortableUiSettingsAsync()
     {
+        var defaults = new LiteSettings();
+        Require(
+            defaults.FontSize == "small" && defaults.LayoutDensity == "compact",
+            "first-run appearance does not default to Small and Compact");
+
         var expected = new LiteSettings(
             Language: "de",
             ArchiveRoot: "C:\\game",

@@ -4,8 +4,8 @@ namespace Cdmw.ArchiveLite.App.Services;
 
 public static class UiPreferencesManager
 {
-    private const string DefaultFontSizeId = "medium";
-    private const string DefaultLayoutDensityId = "comfortable";
+    private const string DefaultFontSizeId = "small";
+    private const string DefaultLayoutDensityId = "compact";
 
     private static readonly FontSizeDefinition[] FontSizes =
     [
@@ -24,8 +24,8 @@ public static class UiPreferencesManager
 
     public static IReadOnlyList<FontSizeDefinition> AvailableFontSizes => FontSizes;
     public static IReadOnlyList<LayoutDensityDefinition> AvailableLayoutDensities => LayoutDensities;
-    public static FontSizeDefinition CurrentFontSize { get; private set; } = FontSizes[1];
-    public static LayoutDensityDefinition CurrentLayoutDensity { get; private set; } = LayoutDensities[1];
+    public static FontSizeDefinition CurrentFontSize { get; private set; } = FontSizes[0];
+    public static LayoutDensityDefinition CurrentLayoutDensity { get; private set; } = LayoutDensities[0];
 
     public static void Apply(string? fontSizeId, string? layoutDensityId)
     {
