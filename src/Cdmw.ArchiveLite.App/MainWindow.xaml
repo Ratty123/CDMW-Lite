@@ -304,13 +304,15 @@
                         </Grid>
                     </Border>
 
-                    <Grid x:Name="ArchiveWorkspaceGrid" Grid.Row="2">
+                    <Grid x:Name="ArchiveWorkspaceGrid"
+                          Grid.Row="2"
+                          SizeChanged="OnWorkspaceGridSizeChanged">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition x:Name="ArchiveFilterColumn" Width="278" MinWidth="250" />
                             <ColumnDefinition Width="7" />
                             <ColumnDefinition x:Name="ArchiveResultsColumn" Width="1.5*" MinWidth="410" />
                             <ColumnDefinition Width="7" />
-                            <ColumnDefinition x:Name="ArchivePreviewColumn" Width="0.85*" MinWidth="350" />
+                            <ColumnDefinition x:Name="ArchivePreviewColumn" Width="0.85*" MinWidth="350" MaxWidth="1000" />
                         </Grid.ColumnDefinitions>
 
                         <ScrollViewer Grid.Column="0"
@@ -508,7 +510,11 @@
                             </StackPanel>
                         </ScrollViewer>
 
-                        <GridSplitter Grid.Column="1" Width="7" HorizontalAlignment="Stretch" />
+                        <GridSplitter Grid.Column="1"
+                                      Width="7"
+                                      HorizontalAlignment="Stretch"
+                                      DragStarted="OnWorkspaceSplitterDragStarted"
+                                      DragCompleted="OnWorkspaceSplitterDragCompleted" />
 
                         <Border Grid.Column="2" Margin="10,0" Style="{StaticResource CardBorderStyle}" Padding="0">
                             <Grid>
@@ -661,7 +667,11 @@
                             </Grid>
                         </Border>
 
-                        <GridSplitter Grid.Column="3" Width="7" HorizontalAlignment="Stretch" />
+                        <GridSplitter Grid.Column="3"
+                                      Width="7"
+                                      HorizontalAlignment="Stretch"
+                                      DragStarted="OnWorkspaceSplitterDragStarted"
+                                      DragCompleted="OnWorkspaceSplitterDragCompleted" />
 
                         <Border Grid.Column="4" Margin="10,0,0,0" Style="{StaticResource CardBorderStyle}">
                             <Grid x:Name="ArchivePreviewCardLayout">
@@ -1105,13 +1115,15 @@
             </TabItem>
 
             <TabItem Header="{infra:Loc Key=TextSearchTab}">
-                <Grid x:Name="TextSearchWorkspaceGrid" Margin="0">
+                <Grid x:Name="TextSearchWorkspaceGrid"
+                      Margin="0"
+                      SizeChanged="OnWorkspaceGridSizeChanged">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition x:Name="TextSearchFilterColumn" Width="300" MinWidth="270" />
                         <ColumnDefinition Width="7" />
                         <ColumnDefinition x:Name="TextSearchResultsColumn" Width="1.25*" MinWidth="410" />
                         <ColumnDefinition Width="7" />
-                        <ColumnDefinition x:Name="TextSearchPreviewColumn" Width="*" MinWidth="350" />
+                        <ColumnDefinition x:Name="TextSearchPreviewColumn" Width="*" MinWidth="350" MaxWidth="1000" />
                     </Grid.ColumnDefinitions>
 
                     <ScrollViewer Grid.Column="0"
@@ -1183,7 +1195,11 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <GridSplitter Grid.Column="1" Width="7" HorizontalAlignment="Stretch" />
+                    <GridSplitter Grid.Column="1"
+                                  Width="7"
+                                  HorizontalAlignment="Stretch"
+                                  DragStarted="OnWorkspaceSplitterDragStarted"
+                                  DragCompleted="OnWorkspaceSplitterDragCompleted" />
 
                     <Border Grid.Column="2" Margin="10,0" Style="{StaticResource CardBorderStyle}" Padding="0">
                         <DataGrid x:Name="TextSearchResultsGrid"
@@ -1203,7 +1219,11 @@
                         </DataGrid>
                     </Border>
 
-                    <GridSplitter Grid.Column="3" Width="7" HorizontalAlignment="Stretch" />
+                    <GridSplitter Grid.Column="3"
+                                  Width="7"
+                                  HorizontalAlignment="Stretch"
+                                  DragStarted="OnWorkspaceSplitterDragStarted"
+                                  DragCompleted="OnWorkspaceSplitterDragCompleted" />
 
                     <Border Grid.Column="4" Margin="10,0,0,0" Style="{StaticResource CardBorderStyle}">
                         <Grid>

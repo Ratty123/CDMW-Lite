@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using Cdmw.ArchiveLite.App.Infrastructure;
 using Cdmw.ArchiveLite.App.Dialogs;
@@ -146,9 +147,69 @@ public partial class MainWindow : Window
         ApplyArchiveColumnLayout();
         ApplyGridColumnLayout(ArchiveGrid, _viewModel.ArchiveColumnLayout, migrateArchiveRole: true);
         ApplyGridColumnLayout(TextSearchResultsGrid, _viewModel.TextSearchColumnLayout);
+        UpdateWorkspacePreviewLimits();
         ApplyWorkspaceLayout();
+        UpdateWorkspacePreviewLimits();
         UpdateArchiveSortIndicators();
         UpdateWorkspaceNavigationState();
+    }
+
+    private void OnWorkspaceGridSizeChanged(object sender, SizeChangedEventArgs eventArgs) =>
+        UpdateWorkspacePreviewLimits();
+
+    private void OnWorkspaceSplitterDragStarted(object sender, DragStartedEventArgs eventArgs) =>
+        UpdateWorkspacePreviewLimits();
+
+    private void OnWorkspaceSplitterDragCompleted(object sender, DragCompletedEventArgs eventArgs) =>
+        UpdateWorkspacePreviewLimits();
+
+    private void UpdateWorkspacePreviewLimits()
+    {
+        UpdateWorkspacePreviewLimit(
+            ArchiveWorkspaceGrid,
+            ArchiveFilterColumn,
+            ArchiveResultsColumn,
+            ArchivePreviewColumn);
+        UpdateWorkspacePreviewLimit(
+            TextSearchWorkspaceGrid,
+            TextSearchFilterColumn,
+            TextSearchResultsColumn,
+            TextSearchPreviewColumn);
+    }
+
+    private static void UpdateWorkspacePreviewLimit(
+        Grid workspace,
+        ColumnDefinition filter,
+        ColumnDefinition results,
+        ColumnDefinition preview)
+    {
+        if (!double.IsFinite(workspace.ActualWidth) || workspace.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var splitterWidth = workspace.ColumnDefinitions
+            .Where(column => !ReferenceEquals(column, filter)
+                && !ReferenceEquals(column, results)
+                && !ReferenceEquals(column, preview))
+            .Sum(MeasuredGridColumnWidth);
+        preview.MaxWidth = WorkspacePaneSizing.CalculatePreviewMaximum(
+            workspace.ActualWidth,
+            MeasuredGridColumnWidth(filter),
+            results.MinWidth,
+            splitterWidth,
+            preview.MinWidth);
+    }
+
+    private static double MeasuredGridColumnWidth(ColumnDefinition column)
+    {
+        if (double.IsFinite(column.ActualWidth) && column.ActualWidth >= 0)
+        {
+            return column.ActualWidth;
+        }
+        return column.Width.IsAbsolute && double.IsFinite(column.Width.Value)
+            ? Math.Max(0, column.Width.Value)
+            : 0;
     }
 
     private void OnArchiveGridSelectionChanged(object sender, SelectionChangedEventArgs eventArgs) =>
@@ -480,10 +541,18 @@ public partial class MainWindow : Window
 
         ArchiveFilterColumn.Width = PixelGridLength(layout.ArchiveFilterWidth, 250, 720, 278);
         ArchiveResultsColumn.Width = new GridLength(1, GridUnitType.Star);
-        ArchivePreviewColumn.Width = PixelGridLength(layout.ArchivePreviewWidth, 350, 1000, 420);
+        ArchivePreviewColumn.Width = PixelGridLength(
+            layout.ArchivePreviewWidth,
+            350,
+            WorkspacePaneSizing.MaximumPreviewWidth,
+            420);
         TextSearchFilterColumn.Width = PixelGridLength(layout.TextSearchFilterWidth, 270, 720, 300);
         TextSearchResultsColumn.Width = new GridLength(1, GridUnitType.Star);
-        TextSearchPreviewColumn.Width = PixelGridLength(layout.TextSearchPreviewWidth, 350, 1000, 420);
+        TextSearchPreviewColumn.Width = PixelGridLength(
+            layout.TextSearchPreviewWidth,
+            350,
+            WorkspacePaneSizing.MaximumPreviewWidth,
+            420);
     }
 
     private static void ApplyGridColumnLayout(

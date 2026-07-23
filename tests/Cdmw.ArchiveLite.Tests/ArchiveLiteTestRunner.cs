@@ -32,6 +32,7 @@ internal static class ArchiveLiteTestRunner
             ("read-only WPF text bindings are explicitly one-way", TestReadOnlyWpfBindingsAsync),
             ("fatal diagnostics are written to portable log and crash folders", TestFatalDiagnosticsAsync),
             ("portable settings retain filters, window placement, panes, and columns", TestPortableUiSettingsAsync),
+            ("preview pane sizing stays inside the live workspace", TestWorkspacePaneSizingAsync),
             ("WPF themes expose the shared palette and safe progress bindings", TestWpfThemesAsync),
             ("modern shell exposes cache health, game detection, and Enter search", TestModernShellAsync),
             ("preview drawer and syntax colors stay readable across themes", TestPreviewPresentationAsync),
@@ -691,6 +692,20 @@ internal static class ArchiveLiteTestRunner
             "a read-only progress property uses WPF's default TwoWay binding");
     }
 
+    private static Task TestWorkspacePaneSizingAsync()
+    {
+        Require(
+            WorkspacePaneSizing.CalculatePreviewMaximum(1900, 278, 410, 14, 350) == 1000,
+            "wide workspaces do not retain the established preview-width ceiling");
+        Require(
+            WorkspacePaneSizing.CalculatePreviewMaximum(1200, 278, 410, 14, 350) == 498,
+            "preview width is not reduced to the remaining live workspace width");
+        Require(
+            WorkspacePaneSizing.CalculatePreviewMaximum(900, 278, 410, 14, 350) == 350,
+            "preview width can shrink below its usable minimum");
+        return Task.CompletedTask;
+    }
+
     private static Task TestModernShellAsync()
     {
         var appRoot = Path.Combine(
@@ -901,6 +916,23 @@ internal static class ArchiveLiteTestRunner
                 "TextSearchResultsGrid",
             }.All(namedLayoutElements.Contains),
             "user-resizable panes or result columns are not addressable for persistence");
+        var previewColumns = window.Descendants()
+            .Where(element => element.Name.LocalName == "ColumnDefinition"
+                && element.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Name"
+                    && (attribute.Value == "ArchivePreviewColumn"
+                        || attribute.Value == "TextSearchPreviewColumn")))
+            .ToArray();
+        Require(
+            previewColumns.Length == 2
+            && previewColumns.All(element =>
+                double.TryParse(
+                    (string?)element.Attribute("MaxWidth"),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var maximum)
+                && maximum == WorkspacePaneSizing.MaximumPreviewWidth),
+            "preview splitters can grow their panes beyond the live workspace width policy");
         var windowSource = File.ReadAllText(Path.Combine(appRoot, "MainWindow.xaml.cs"));
         Require(
             windowSource.Split("WorkspaceTabs.SelectedIndex = 0;", StringSplitOptions.None).Length >= 3,
