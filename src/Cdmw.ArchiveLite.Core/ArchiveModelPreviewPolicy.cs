@@ -2,7 +2,8 @@ namespace Cdmw.ArchiveLite.Core;
 
 public static class ArchiveModelPreviewPolicy
 {
-    public const float DefaultFitRelativeZoom = 0.9f;
+    public const float NonWeaponFitRelativeZoom = 0.5f;
+    public const float OverheadFitRelativeZoom = 0.9f;
 
     private static readonly HashSet<string> OverheadCameraFamilies = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -32,10 +33,10 @@ public static class ArchiveModelPreviewPolicy
     {
         var overhead = UsesOverheadCamera(sourcePath);
         return new ArchiveModelInitialView(
-            YawDegrees: 0.0f,
+            YawDegrees: overhead ? 0.0f : 180.0f,
             PitchDegrees: overhead ? -89.0f : 0.0f,
             FitToView: true,
-            FitRelativeZoom: DefaultFitRelativeZoom,
+            FitRelativeZoom: overhead ? OverheadFitRelativeZoom : NonWeaponFitRelativeZoom,
             Reason: overhead ? "archive_model_initial_overhead" : "archive_model_initial_front");
     }
 

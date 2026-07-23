@@ -2171,7 +2171,7 @@ internal static class ArchiveLiteTestRunner
             Require(File.Exists(Path.Combine(root, "net_materials.json")), "renderer materials sidecar was not created");
             Require(File.Exists(Path.Combine(root, "dotnet_scene.json")), "renderer scene sidecar was not created");
             Require(File.Exists(Path.Combine(root, "mesh.cdmeta.json")), "renderer metadata sidecar was not created");
-            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v4.json")), "renderer adapter version marker was not created");
+            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v6.json")), "renderer adapter version marker was not created");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
                 Require(!scene.RootElement.GetProperty("grid").GetProperty("visible").GetBoolean(), "read-only preview scene exposed the grid");
@@ -2181,8 +2181,12 @@ internal static class ArchiveLiteTestRunner
                 Require(!archivePreview.GetProperty("textures_enabled").GetBoolean(), "default native preview unexpectedly enables textures");
                 Require(
                     archivePreview.GetProperty("camera").GetProperty("pitch_degrees").GetSingle() == -89.0f
+                    && archivePreview.GetProperty("camera").GetProperty("yaw_degrees").GetSingle() == 0.0f
+                    && Math.Abs(
+                        archivePreview.GetProperty("camera").GetProperty("fit_relative_zoom").GetSingle()
+                        - 0.9f) < 0.0001f
                     && archivePreview.GetProperty("camera").GetProperty("reason").GetString() == "archive_model_initial_overhead",
-                    "weapon preview did not inherit Full's overhead initial camera");
+                    "weapon preview did not preserve its existing overhead camera");
             }
             using (var materials = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "net_materials.json")).ConfigureAwait(false)))
             {
@@ -2292,11 +2296,12 @@ internal static class ArchiveLiteTestRunner
                 ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/weapon/sword/example.pac")
                 && ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/01_sword/example.pac")
                 && !ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/body/example.pac")
+                && ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").YawDegrees == 180.0f
                 && ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").PitchDegrees == 0.0f
                 && Math.Abs(
                     ArchiveModelPreviewPolicy.InitialView("character/model/body/example.pac").FitRelativeZoom
-                    - 0.9f) < 0.0001f,
-                "archive model camera policy no longer matches Full's weapon-overhead and body-front classification");
+                    - 0.5f) < 0.0001f,
+                "archive model camera policy no longer matches the preserved weapon and full-body front framing");
 
             var rendererPath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DOTNET_PREVIEW_PATH");
             if (!string.IsNullOrWhiteSpace(rendererPath))
@@ -2621,7 +2626,7 @@ internal static class ArchiveLiteTestRunner
         Console.WriteLine(
             $"INFO: native model cache cold={coldTimer.Elapsed.TotalMilliseconds:N1}ms cross-session-warm={warmTimer.Elapsed.TotalMilliseconds:N1}ms");
 
-        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v4.json");
+        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v6.json");
         File.Delete(adapterMarker);
         var migrationProgress = new List<ProgressUpdate>();
         var migrated = await previews.BuildAsync(
@@ -2787,10 +2792,13 @@ internal static class ArchiveLiteTestRunner
             && rendererHostSource.Contains("!session.SupportsResidentPackageLoad", StringComparison.Ordinal)
             && rendererHostSource.Contains("session.SupportsResidentHostAttach", StringComparison.Ordinal)
             && rendererHostSource.Contains("AttachToHostAsync(visibleHost", StringComparison.Ordinal)
+            && rendererHostSource.Contains("OnWindowPositionChanged", StringComparison.Ordinal)
+            && rendererHostSource.Contains("TryResizeAttachedRenderer(_hostHandle, width, height)", StringComparison.Ordinal)
+            && rendererHostSource.Contains("Volatile.Read(ref _hostPixelWidth)", StringComparison.Ordinal)
             && rendererHostSource.Contains("WsPopup | WsVisible | WsClipChildren", StringComparison.Ordinal)
             && viewModelSource.Contains("ShouldPrewarmModelRenderer = true", StringComparison.Ordinal)
             && viewModelSource.Contains("NativeModelExtension(entry.Extension)", StringComparison.Ordinal),
-            "Archive Lite does not safely prewarm and attach the resident renderer after first-page readiness");
+            "Archive Lite does not safely prewarm, attach, and resize the resident renderer after first-page readiness");
         Require(
             buildSource.Contains("-p:PublishSingleFile=false", StringComparison.Ordinal)
             && !buildSource.Contains("-p:IncludeNativeLibrariesForSelfExtract=true", StringComparison.Ordinal),

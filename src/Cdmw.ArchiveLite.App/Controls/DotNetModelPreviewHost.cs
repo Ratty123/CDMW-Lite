@@ -37,6 +37,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
     private IntPtr _warmupHostHandle;
     private long _generation;
     private long _cameraInputGeneration;
+    private int _hostPixelWidth = 1;
+    private int _hostPixelHeight = 1;
     private int _prewarmStarted;
     private int _shutdown;
     private bool _hasPresentedPackage;
@@ -233,6 +235,20 @@ public sealed class DotNetModelPreviewHost : HwndHost
             BeginSwitch(PackagePath);
         }
         return new HandleRef(this, _hostHandle);
+    }
+
+    protected override void OnWindowPositionChanged(Rect rcBoundingBox)
+    {
+        base.OnWindowPositionChanged(rcBoundingBox);
+        var width = Math.Max(1, (int)Math.Round(rcBoundingBox.Width));
+        var height = Math.Max(1, (int)Math.Round(rcBoundingBox.Height));
+        Volatile.Write(ref _hostPixelWidth, width);
+        Volatile.Write(ref _hostPixelHeight, height);
+        if (_hostHandle == IntPtr.Zero || Volatile.Read(ref _shutdown) != 0)
+        {
+            return;
+        }
+        GetCurrentSession()?.TryResizeAttachedRenderer(_hostHandle, width, height);
     }
 
     protected override void DestroyWindowCore(HandleRef hwnd)
@@ -467,6 +483,10 @@ public sealed class DotNetModelPreviewHost : HwndHost
                             throw new OperationCanceledException(operation.Token);
                         }
                         await resident.AttachToHostAsync(visibleHost, activate: true, loadTimeout.Token).ConfigureAwait(true);
+                        resident.TryResizeAttachedRenderer(
+                            visibleHost,
+                            Volatile.Read(ref _hostPixelWidth),
+                            Volatile.Read(ref _hostPixelHeight));
                         SetValue(IsReadyPropertyKey, true);
                         SetValue(IsLoadingPropertyKey, false);
                         SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
@@ -518,6 +538,10 @@ public sealed class DotNetModelPreviewHost : HwndHost
                         _currentSession = session;
                         _startingSession = null;
                     }
+                    session.TryResizeAttachedRenderer(
+                        _hostHandle,
+                        Volatile.Read(ref _hostPixelWidth),
+                        Volatile.Read(ref _hostPixelHeight));
                     SetValue(IsReadyPropertyKey, true);
                     SetValue(IsLoadingPropertyKey, false);
                     SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
@@ -852,6 +876,33 @@ public sealed class DotNetModelPreviewHost : HwndHost
             }
             Interlocked.Exchange(ref _attachedHostHandle, parentHandle.ToInt64());
             return true;
+        }
+
+        public bool TryResizeAttachedRenderer(IntPtr parentHandle, int width, int height)
+        {
+            if (parentHandle == IntPtr.Zero
+                || !IsWindow(parentHandle)
+                || Interlocked.Read(ref _attachedHostHandle) != parentHandle.ToInt64())
+            {
+                return false;
+            }
+            var rendererHandle = new IntPtr(Interlocked.Read(ref _rendererWindowHandle));
+            if (rendererHandle == IntPtr.Zero
+                || !IsWindow(rendererHandle)
+                || GetParent(rendererHandle) != parentHandle
+                || width <= 0
+                || height <= 0)
+            {
+                return false;
+            }
+            return SetWindowPos(
+                rendererHandle,
+                IntPtr.Zero,
+                0,
+                0,
+                width,
+                height,
+                SwpNoZOrder | SwpNoActivate | SwpFrameChanged | SwpShowWindow);
         }
 
         public async Task AttachToHostAsync(

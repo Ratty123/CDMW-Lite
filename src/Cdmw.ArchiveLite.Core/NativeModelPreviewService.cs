@@ -486,8 +486,8 @@ public sealed class NativeModelPreviewService
 
 public static class NativePreviewPackageAdapter
 {
-    private const string AdapterMetadataName = "archive_lite_adapter_v4.json";
-    private const int AdapterSchemaVersion = 4;
+    private const string AdapterMetadataName = "archive_lite_adapter_v6.json";
+    private const int AdapterSchemaVersion = 6;
     private const int SupportedSchemaVersion = 8;
     private const int BytesPerVertex = 23 * sizeof(float);
     private const int MaximumVertices = 8_000_000;
@@ -665,7 +665,7 @@ public static class NativePreviewPackageAdapter
                 ["format"] = "cdmw_mesh_dotnet_materials_v1",
                 ["renderer_authority"] = "dotnet_mesh_editor",
                 ["source"] = "manifest.json",
-                ["adapter"] = "archive_lite_native_material_bridge_v4",
+                ["adapter"] = "archive_lite_native_material_bridge_v5",
                 ["texture_channels"] = new[]
                 {
                     "base",
