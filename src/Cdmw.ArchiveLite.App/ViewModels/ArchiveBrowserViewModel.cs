@@ -1057,6 +1057,12 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 scope.DirectCount);
             ApplyActiveExtensionFacets(scope.Extensions ?? []);
             await QueryPageCoreAsync(0, generation, operation.Token).ConfigureAwait(true);
+            if (generation != Volatile.Read(ref _foregroundGeneration)
+                || !string.Equals(SessionId, sessionId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+            SelectedEntry = SelectItemPreviewEntry(Entries);
             _setShellStatus(ItemScopeStatus);
             applied = true;
         }
@@ -1706,6 +1712,25 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     {
         ModelPreviewOrbitSensitivity = 0.22;
         ModelPreviewPanSensitivity = 0.60;
+    }
+
+    private static ArchiveEntryDto? SelectItemPreviewEntry(IEnumerable<ArchiveEntryDto> entries)
+    {
+        ArchiveEntryDto? first = null;
+        ArchiveEntryDto? firstPreviewable = null;
+        foreach (var entry in entries)
+        {
+            first ??= entry;
+            if (entry.IsPreviewable)
+            {
+                firstPreviewable ??= entry;
+            }
+            if (NativeModelExtension(entry.Extension))
+            {
+                return entry;
+            }
+        }
+        return firstPreviewable ?? first;
     }
 
     private static bool NativeModelExtension(string extension) =>

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Cdmw.ArchiveLite.App.Infrastructure;
 using Cdmw.ArchiveLite.App.Services;
@@ -79,7 +80,29 @@ public partial class ItemFinderDialog : Window
 
     private void OnCloseClick(object sender, RoutedEventArgs eventArgs) => Close();
 
-    private void OnCloseRequested(object? sender, EventArgs eventArgs) => Close();
+    private void OnCloseRequested(object? sender, EventArgs eventArgs) => DialogResult = true;
+
+    private void OnItemGridMouseDoubleClick(object sender, MouseButtonEventArgs eventArgs)
+    {
+        if (eventArgs.ChangedButton != MouseButton.Left
+            || eventArgs.OriginalSource is not DependencyObject source
+            || ItemsControl.ContainerFromElement(ItemGrid, source) is not ListBoxItem
+            {
+                DataContext: ItemFinderRowViewModel item,
+            })
+        {
+            return;
+        }
+
+        _viewModel.SelectedItem = item;
+        if (!_viewModel.ShowExactLinksCommand.CanExecute(null))
+        {
+            return;
+        }
+
+        _viewModel.ShowExactLinksCommand.Execute(null);
+        eventArgs.Handled = true;
+    }
 
     private void OnTitleBarMouseLeftButtonDown(object sender, MouseButtonEventArgs eventArgs)
     {

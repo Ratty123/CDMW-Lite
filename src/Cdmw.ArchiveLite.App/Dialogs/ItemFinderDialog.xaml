@@ -126,6 +126,7 @@
                     <ListBox x:Name="ItemGrid"
                              ItemsSource="{Binding Items}"
                              SelectedItem="{Binding SelectedItem}"
+                             MouseDoubleClick="OnItemGridMouseDoubleClick"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto"
                              VirtualizingPanel.IsVirtualizing="False">

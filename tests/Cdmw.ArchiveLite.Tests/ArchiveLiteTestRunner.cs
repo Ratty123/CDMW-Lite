@@ -3232,6 +3232,23 @@ internal static class ArchiveLiteTestRunner
             scopedFacets.Single(facet => facet.Extension == ".dds").Count == 2
             && scopedFacets.Single(facet => facet.Extension == ".pac").Count == 1,
             "an Item Finder scope did not expose extension counts from only its resolved rows");
+        var previewSelector = typeof(ArchiveBrowserViewModel).GetMethod(
+            "SelectItemPreviewEntry",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+            ?? throw new InvalidOperationException("Item Finder preview selection policy was not found");
+        var selectedPreviewEntry = previewSelector.Invoke(
+            null,
+            [
+                new[]
+                {
+                    CreateArchiveEntry("ui/icon/item.dds") with { EntryId = 1 },
+                    CreateArchiveEntry("equipment/item.pac") with { EntryId = 2 },
+                    CreateArchiveEntry("equipment/item.xml") with { EntryId = 3, IsPreviewable = false },
+                },
+            ]) as ArchiveEntryDto;
+        Require(
+            selectedPreviewEntry?.EntryId == 2,
+            "Item Finder activation did not prefer a directly linked model for preview");
 
         var repositoryRoot = FindRepositoryRoot();
         var acceleratorSource = File.ReadAllText(Path.Combine(repositoryRoot, "native", "cdmw_archive_accelerator", "src", "main.cpp"));
@@ -3256,6 +3273,7 @@ internal static class ArchiveLiteTestRunner
 
         var appRoot = Path.Combine(repositoryRoot, "src", "Cdmw.ArchiveLite.App");
         var mainWindow = File.ReadAllText(Path.Combine(appRoot, "MainWindow.xaml"));
+        var mainWindowSource = File.ReadAllText(Path.Combine(appRoot, "MainWindow.xaml.cs"));
         var mainWindowDocument = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "MainWindow.xaml"));
         var itemFinderDialog = File.ReadAllText(Path.Combine(appRoot, "Dialogs", "ItemFinderDialog.xaml"));
         var itemFinderDialogDocument = System.Xml.Linq.XDocument.Load(Path.Combine(appRoot, "Dialogs", "ItemFinderDialog.xaml"));
@@ -3271,6 +3289,13 @@ internal static class ArchiveLiteTestRunner
             mainWindow.Contains("OnItemFinderClick", StringComparison.Ordinal)
             && itemFinderDialog.Contains("ItemsSource=\"{Binding Items}\"", StringComparison.Ordinal),
             "Archive Lite does not expose the Item Finder dialog");
+        Require(
+            itemFinderDialog.Contains("MouseDoubleClick=\"OnItemGridMouseDoubleClick\"", StringComparison.Ordinal)
+            && itemFinderDialogSource.Contains("ShowExactLinksCommand.Execute(null)", StringComparison.Ordinal)
+            && archiveBrowserViewModel.Contains("SelectedEntry = SelectItemPreviewEntry(Entries)", StringComparison.Ordinal)
+            && mainWindowSource.Contains("dialog.ShowDialog() == true", StringComparison.Ordinal)
+            && mainWindowSource.Contains("WorkspaceTabs.SelectedIndex = 0", StringComparison.Ordinal),
+            "Item Finder double-click does not load the exact item into the Archive Browser preview");
         var itemFinderLauncher = mainWindowDocument.Descendants()
             .Single(element => element.Name.LocalName == "Button"
                 && element.Attributes().Any(attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ItemFinderNavigationButton"));
@@ -3332,11 +3357,18 @@ internal static class ArchiveLiteTestRunner
                     IconDelay = TimeSpan.FromMilliseconds(120),
                 };
                 var sessionId = "session-a";
+                var scopes = new List<(int ItemId, bool IncludeRelated)>();
                 var viewModel = new ItemFinderViewModel(
                     fakeWorker,
                     () => sessionId,
                     _ => { },
-                    static (_, _, _, _) => Task.FromResult(true));
+                    (itemId, _, includeRelated, _) =>
+                    {
+                        scopes.Add((itemId, includeRelated));
+                        return Task.FromResult(true);
+                    });
+                var closeRequests = 0;
+                viewModel.CloseRequested += (_, _) => closeRequests++;
                 var collectionChanges = 0;
                 viewModel.Items.CollectionChanged += (_, _) => collectionChanges++;
 
@@ -3353,6 +3385,11 @@ internal static class ArchiveLiteTestRunner
                 };
                 await WaitUntilAsync(() => initialRow.Icon is not null, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
                 Require(iconChanges == 1 && fakeWorker.IconCount == 1, "an Item Finder tile did not transition to its icon exactly once");
+                viewModel.ShowExactLinksCommand.Execute(null);
+                await WaitUntilAsync(() => scopes.Count == 1 && !viewModel.IsBusy, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
+                Require(
+                    scopes.Single() == (initialRow.ItemId, false) && closeRequests == 1,
+                    "Item Finder exact activation did not apply the selected item and close the dialog");
 
                 var changesBeforeCategory = collectionChanges;
                 viewModel.SelectedCategory = viewModel.CategoryOptions.Single(option => option.Category == "Weapon");

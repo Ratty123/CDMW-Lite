@@ -206,7 +206,10 @@ public partial class MainWindow : Window
         {
             Owner = this,
         };
-        _ = dialog.ShowDialog();
+        if (dialog.ShowDialog() == true)
+        {
+            WorkspaceTabs.SelectedIndex = 0;
+        }
     }
 
     private void OnArchivePreviewFindNextClick(object sender, RoutedEventArgs eventArgs) =>
