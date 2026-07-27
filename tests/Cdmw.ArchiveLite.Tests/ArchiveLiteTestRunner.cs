@@ -3458,8 +3458,8 @@ internal static class ArchiveLiteTestRunner
             && archiveBrowserViewModel.Contains("MostCommonExtensionChoices", StringComparison.Ordinal)
             && iconService.Contains("WaitForVisibleRequestsAsync", StringComparison.Ordinal)
             && iconService.Contains("WaitForForegroundAsync", StringComparison.Ordinal)
-            && iconService.Contains("BuildThumbnailAsync", StringComparison.Ordinal),
-            "Item Finder icon loading is not memory-bounded, persistent, and visible-first");
+            && iconService.Contains("BuildThumbnailBatchAsync", StringComparison.Ordinal),
+            "Item Finder icon loading is not memory-bounded, persistent, visible-first, and batched");
 
         var workPriority = new ArchiveWorkPriority();
         var lease = workPriority.EnterForeground();
@@ -4426,6 +4426,11 @@ internal static class ArchiveLiteTestRunner
                 Path.GetFullPath(thumbnail).Equals(Path.GetFullPath(warmThumbnail), StringComparison.OrdinalIgnoreCase)
                 && texturePreviews.TryGetCachedThumbnail(sessions.GetRequired(opened.SessionId), imageEntry, 120) == thumbnail,
                 "a warm Item Finder icon reran input work instead of reusing the persistent thumbnail");
+
+            await RequireCachedThumbnailIntegrityAsync(texturePreviews, sessions.GetRequired(opened.SessionId), imageEntry, thumbnail)
+                .ConfigureAwait(false);
+            await RequireMixedTextureBatchAsync(texturePreviews, sessions.GetRequired(opened.SessionId), imageEntry, native)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -5201,6 +5206,92 @@ internal static class ArchiveLiteTestRunner
                 return (TResult)(object)new WarmItemIconsResult(warmup.SessionId, 1, 1, 0, 0);
             }
             throw new InvalidOperationException($"Unexpected fake Item Finder request: {kind}");
+        }
+    }
+
+    /// <summary>
+    /// A cached preview that is not a structurally complete PNG must never be served warm. A
+    /// signature-only check accepts truncated and half-published files, which then fail at display
+    /// time and stay cached.
+    /// </summary>
+    private static async Task RequireCachedThumbnailIntegrityAsync(
+        NativeTexturePreviewService textures,
+        ArchiveSession session,
+        ArchiveEntryDto entry,
+        string thumbnail)
+    {
+        var original = await File.ReadAllBytesAsync(thumbnail).ConfigureAwait(false);
+        var stamp = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // Write timestamps are set explicitly so the validation memo cannot collide across rewrites
+        // that land inside one system clock tick.
+        async Task RewriteAsync(byte[] bytes, int minute)
+        {
+            await File.WriteAllBytesAsync(thumbnail, bytes).ConfigureAwait(false);
+            File.SetLastWriteTimeUtc(thumbnail, stamp.AddMinutes(minute));
+        }
+
+        await RewriteAsync(original[..(original.Length / 2)], 1).ConfigureAwait(false);
+        Require(
+            textures.TryGetCachedThumbnail(session, entry, 120) is null,
+            "a truncated cached thumbnail was served as a warm hit");
+
+        var corrupted = original.ToArray();
+        corrupted[^1] ^= 0xFF;
+        await RewriteAsync(corrupted, 2).ConfigureAwait(false);
+        Require(
+            textures.TryGetCachedThumbnail(session, entry, 120) is null,
+            "a checksum-corrupt cached thumbnail was served as a warm hit");
+
+        await RewriteAsync([.. original, 0x00], 3).ConfigureAwait(false);
+        Require(
+            textures.TryGetCachedThumbnail(session, entry, 120) is null,
+            "a cached thumbnail with trailing bytes after IEND was served as a warm hit");
+
+        await RewriteAsync(original, 4).ConfigureAwait(false);
+        Require(
+            textures.TryGetCachedThumbnail(session, entry, 120) == thumbnail,
+            "a structurally valid cached thumbnail was rejected");
+    }
+
+    /// <summary>
+    /// cd-texture-dx exits with code 2 when a job fails but its report stays complete. The batch
+    /// must publish every job that decoded and attribute the failure to its own request only.
+    /// </summary>
+    private static async Task RequireMixedTextureBatchAsync(
+        NativeTexturePreviewService textures,
+        ArchiveSession session,
+        ArchiveEntryDto entry,
+        NativeArchiveCore native)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-texture-batch-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var goodDds = Path.Combine(root, "good.dds");
+            await File.WriteAllBytesAsync(goodDds, native.Decode(entry).Bytes).ConfigureAwait(false);
+            var badDds = Path.Combine(root, "bad.dds");
+            await File.WriteAllBytesAsync(badDds, "DDS this is not a decodable texture"u8.ToArray()).ConfigureAwait(false);
+            // A distinct identity keeps the failing row out of the healthy row's cache slot.
+            var badEntry = entry with { EntryId = entry.EntryId + 4096, Path = entry.Path + ".broken" };
+
+            var results = await textures.BuildThumbnailBatchAsync(
+                session,
+                [new TexturePreviewRequest(entry, goodDds), new TexturePreviewRequest(badEntry, badDds)],
+                96,
+                CancellationToken.None).ConfigureAwait(false);
+
+            Require(results.Count == 2, "a two-job texture batch did not return one result per request");
+            Require(
+                results[0].PngPath is not null && File.Exists(results[0].PngPath!),
+                "a decodable texture was discarded because another job in the same batch failed");
+            Require(
+                results[1].PngPath is null && !string.IsNullOrWhiteSpace(results[1].Error),
+                "an undecodable texture did not report a per-request decode error");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 

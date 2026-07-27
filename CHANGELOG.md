@@ -12,6 +12,12 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 ### Changed
 
 - Reduced large real-archive cache build and refresh time by avoiding repeated path allocations during native index sorting.
+- Item Finder icon pages now decode through a single shared texture-helper invocation per page instead of one helper process per icon.
+
+### Fixed
+
+- A texture batch in which one job fails is no longer discarded in full; the decode report is now authoritative and each request reports its own outcome.
+- Truncated, checksum-corrupt, and over-long cached texture previews are no longer served as warm cache hits.
 
 ## [0.6.1] - 2026-07-23
 
