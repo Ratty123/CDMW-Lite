@@ -76,6 +76,11 @@ static bool placeholder_visible_base_path(const std::string& raw_path) {
     if (stem.find("nonetexture") != std::string::npos || stem.find("nulltexture") != std::string::npos || stem.find("dummytexture") != std::string::npos) return true;
     if (stem == "cd_common_default_overlay" || stem == "cd_common_default_overlay_old") return true;
     if (stem.find("common_default") != std::string::npos && stem.find("overlay") != std::string::npos) return true;
+    // cd_temp_* is unfinished authoring left in the shipped archive. The layer
+    // mask guard below already rejects it; a visible base has at least as much
+    // reason to. cd_phm_00_bag_0068 showed cd_temp_black.dds as the albedo of
+    // ten of its parts.
+    if (stem == "cd_temp" || stem.rfind("cd_temp_", 0) == 0) return true;
     return false;
 }
 
@@ -121,6 +126,18 @@ static bool technical_for_visible_base(const std::string& parameter_name, const 
     // shared wrinkle material points at cd_common_00_ub_0001_wrinkle0_opacity.dds,
     // and the parameter name alone does not say so.
     if (path_has_suffix_stem(raw_path, "_opacity")) return true;
+    // Placeholders and unfinished authoring: the visible-base guard knew about
+    // these but only the layer paths consulted it, so the primary selector let a
+    // default overlay or a cd_temp_* texture become a part's albedo.
+    if (placeholder_visible_base_path(raw_path)) return true;
+    // The shared damage library paints wear over a surface that already has a
+    // colour. Same contract as a decal, without the `_dec` suffix that catches
+    // the rest of them.
+    const std::string stem = lower_copy(stem_from_path(raw_path));
+    if (stem.rfind("cd_texturelayer_damaged", 0) == 0) return true;
+    // Screen-space and condition FX noise is a modulation source, never albedo.
+    if (compact_hint.find("noise") != std::string::npos) return true;
+    if (stem.rfind("cdfx_", 0) == 0 && stem.find("noise") != std::string::npos) return true;
     if (path_has_suffix_stem(raw_path, "_orm") || path_has_suffix_stem(raw_path, "_rma") || path_has_suffix_stem(raw_path, "_mra")) return true;
     return false;
 }
