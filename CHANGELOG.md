@@ -24,6 +24,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- DDS previews and Item Finder icons no longer green-invert normal-map rows. Rows classified as normal maps were decoded through the texture helper's `normal` slot, which flips the green channel, so the preview showed a tangent-space convention the file does not contain and diverged from Full's archive browser. Every row now decodes as `base` and reports the channels it stores. Previews cached by the previous behaviour are retired.
 - A texture batch in which one job fails is no longer discarded in full; the decode report is now authoritative and each request reports its own outcome.
 - Truncated, checksum-corrupt, and over-long cached texture previews are no longer served as warm cache hits.
 - A DDS that cannot decode inside the preview resource limits is now rejected from its header instead of starting a helper process that would fail or exhaust memory.

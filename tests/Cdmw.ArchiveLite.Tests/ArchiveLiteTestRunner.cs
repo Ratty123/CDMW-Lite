@@ -1845,6 +1845,7 @@ internal static class ArchiveLiteTestRunner
             && bc1.Family == DdsCompressedFamily.Bc1,
             "a legacy DXT1 four-CC header was not classified");
         Require(!DdsTextureHeader.TryRead("NOT A DDS AT ALL"u8.ToArray(), out _), "a non-DDS payload was accepted");
+        RequireTexturePreviewsReportStoredChannels();
 
         var root = Path.Combine(Path.GetTempPath(), $"cdmw-dds-limits-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
@@ -3982,6 +3983,174 @@ internal static class ArchiveLiteTestRunner
             ?? throw new InvalidDataException("legacy ItemCatalogScopeResult did not deserialize");
         Require(legacyScope.Extensions is null, "defaulted scoped extension facets broke an older protocol payload");
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// An archive browser reports the channels a DDS stores. The texture helper inverts green for
+    /// decode slot "normal", so this proves both that the helper still behaves that way and that the
+    /// preview service stays on "base" — Full's archive browser and item finder decode every DDS as
+    /// "base", and a normal-role row that silently arrived green-inverted would diverge from it.
+    /// </summary>
+    private static void RequireTexturePreviewsReportStoredChannels()
+    {
+        const byte storedGreen = 0x40;
+        var helper = ResolveTextureHelperForTests();
+        Require(helper is not null, "cd-texture-dx was not found; build it before running the focused gate");
+
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-normal-slot-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var source = Path.Combine(root, "probe.dds");
+            File.WriteAllBytes(source, SyntheticBgraDds(blue: 0x10, green: storedGreen, red: 0x80));
+            var asBase = DecodeProbeGreen(helper!, root, source, "base");
+            var asNormal = DecodeProbeGreen(helper!, root, source, "normal");
+            Require(
+                asBase == storedGreen,
+                $"decode slot \"base\" altered the stored green channel ({asBase} from {storedGreen})");
+            Require(
+                asNormal == 255 - storedGreen,
+                "decode slot \"normal\" no longer inverts green; the preview service's slot choice needs rechecking");
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+                // A later temp sweep can remove the probe.
+            }
+        }
+
+        var previewSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Cdmw.ArchiveLite.Core",
+            "NativeTexturePreviewService.cs"));
+        Require(
+            previewSource.Contains("slot = \"base\",", StringComparison.Ordinal)
+            && !previewSource.Contains("ArchiveEntryRole.Normal", StringComparison.Ordinal),
+            "texture previews route rows to a decode slot that reinterprets the stored channels");
+        Require(
+            !previewSource.Contains("directxtex_preview_v3", StringComparison.Ordinal),
+            "the preview artifact version still serves green-inverted v3 cache entries");
+    }
+
+    private static byte DecodeProbeGreen(string helper, string root, string source, string slot)
+    {
+        var output = Path.Combine(root, $"{slot}.png");
+        var jobPath = Path.Combine(root, $"{slot}.job.json");
+        var reportPath = Path.Combine(root, $"{slot}.report.json");
+        File.WriteAllText(
+            jobPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    version = 2,
+                    backend = "directxtex_native_0.2",
+                    jobs = new object[]
+                    {
+                        new
+                        {
+                            input = source,
+                            output,
+                            slot,
+                            normal_space = "auto",
+                            max_dimension = 4096,
+                            requested_mip = 0,
+                            output_pixel_type = "rgba8",
+                        },
+                    },
+                },
+                WorkerProtocol.JsonOptions));
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = helper,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        startInfo.ArgumentList.Add("batch-preview-json");
+        startInfo.ArgumentList.Add(jobPath);
+        startInfo.ArgumentList.Add(reportPath);
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("cd-texture-dx could not be started.");
+        process.StandardOutput.ReadToEnd();
+        process.StandardError.ReadToEnd();
+        Require(process.WaitForExit(60_000), $"cd-texture-dx did not finish decoding the {slot} probe");
+        Require(File.Exists(output), $"cd-texture-dx produced no PNG for decode slot {slot}");
+
+        using var stream = File.OpenRead(output);
+        var decoder = new System.Windows.Media.Imaging.PngBitmapDecoder(
+            stream,
+            System.Windows.Media.Imaging.BitmapCreateOptions.PreservePixelFormat,
+            System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+        var frame = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+            decoder.Frames[0],
+            System.Windows.Media.PixelFormats.Bgra32,
+            null,
+            0.0);
+        var pixels = new byte[4];
+        frame.CopyPixels(new System.Windows.Int32Rect(1, 1, 1, 1), pixels, 4, 0);
+        return pixels[1];
+    }
+
+    /// <summary>A 4x4 uncompressed BGRA surface, so the probe reads back exactly what it stored.</summary>
+    private static byte[] SyntheticBgraDds(byte blue, byte green, byte red)
+    {
+        var image = new byte[0x80 + (4 * 4 * 4)];
+        "DDS "u8.CopyTo(image);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(4), 124);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(8), 0x0000100F);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(12), 4);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(16), 4);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(20), 16);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(28), 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(76), 32);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(80), 0x41);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(88), 32);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(92), 0x00FF0000);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(96), 0x0000FF00);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(100), 0x000000FF);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(104), 0xFF000000);
+        BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(108), 0x00001000);
+        for (var pixel = 0; pixel < 16; pixel++)
+        {
+            var offset = 0x80 + (pixel * 4);
+            image[offset] = blue;
+            image[offset + 1] = green;
+            image[offset + 2] = red;
+            image[offset + 3] = 0xFF;
+        }
+        return image;
+    }
+
+    private static string? ResolveTextureHelperForTests()
+    {
+        var overridePath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_TEXTURE_HELPER_PATH");
+        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
+        {
+            return Path.GetFullPath(overridePath);
+        }
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var candidate = Path.Combine(
+                FindRepositoryRoot(),
+                "native",
+                "cd_texture_dx",
+                "build",
+                configuration,
+                "cd-texture-dx.exe");
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private static ArchiveEntryDto CreateArchiveEntry(string path) => new(

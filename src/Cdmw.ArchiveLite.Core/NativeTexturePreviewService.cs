@@ -18,7 +18,9 @@ public sealed class NativeTexturePreviewService
 {
     public const string DecodePhase = "texture_preview_decode";
 
-    private const string ArtifactVersion = "directxtex_preview_v3";
+    // v4 retires v3 previews, which green-inverted normal-role rows. The cache key does not carry
+    // the decode slot, so without this bump those inverted PNGs would stay valid warm hits.
+    private const string ArtifactVersion = "directxtex_preview_v4";
     private const string BackendId = "directxtex_native_0.2";
     private const string SidecarSuffix = ".cdmw_texture.json";
 
@@ -319,7 +321,14 @@ public sealed class NativeTexturePreviewService
                 {
                     input = Path.GetFullPath(plan.Request.DdsPath),
                     output = stagedOutputs[index],
-                    slot = plan.Request.Entry.Role == ArchiveEntryRole.Normal ? "normal" : "base",
+                    // Always "base". The helper inverts the green channel for slot "normal", so
+                    // routing normal-role rows there would show a channel the DDS does not contain.
+                    // An archive browser reports what is stored; reinterpreting a tangent-space
+                    // convention is a decision only a material consumer can make, and the model
+                    // renderer already makes it per material.
+                    slot = "base",
+                    // "auto" and "green_up" are the same value to the helper; neither has an effect
+                    // while the slot is "base".
                     normal_space = "auto",
                     max_dimension = maximumDimension,
                     requested_mip = 0,
