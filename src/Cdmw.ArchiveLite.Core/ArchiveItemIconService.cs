@@ -12,6 +12,9 @@ public sealed class ArchiveItemIconService(
 {
     private const int MaximumVisibleBatch = 64;
     private const long MaximumIconBytes = 256L * 1024L * 1024L;
+    private const int MaximumIconCandidates = 8;
+    private const int MaximumArchiveDecodeConcurrency = 3;
+    private const string NoArchiveDdsWarning = "No archive DDS could be resolved for the recovered inventory icon paths.";
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _itemGates = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, NegativeIconCacheEntry> _negativeCache = new(StringComparer.Ordinal);
     private int _visibleRequestCount;
@@ -35,20 +38,7 @@ public sealed class ArchiveItemIconService(
         Interlocked.Increment(ref _visibleRequestCount);
         try
         {
-            using var concurrency = new SemaphoreSlim(3, 3);
-            var tasks = itemIds.Select(async itemId =>
-            {
-                await concurrency.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try
-                {
-                    return await LoadOneSafeAsync(session, catalog, itemId, request.ThumbnailSize, cancellationToken).ConfigureAwait(false);
-                }
-                finally
-                {
-                    concurrency.Release();
-                }
-            });
-            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            var results = await LoadBatchAsync(session, catalog, itemIds, request.ThumbnailSize, cancellationToken).ConfigureAwait(false);
             return new ItemIconBatchResult(request.SessionId, results);
         }
         finally
@@ -135,9 +125,185 @@ public sealed class ArchiveItemIconService(
         int thumbnailSize,
         CancellationToken cancellationToken)
     {
+        var results = await LoadBatchAsync(session, catalog, [itemId], thumbnailSize, cancellationToken).ConfigureAwait(false);
+        return results[0];
+    }
+
+    /// <summary>
+    /// Resolves a whole visible page of icons together so the shared texture helper is started once
+    /// per decode round instead of once per icon.
+    /// </summary>
+    private async Task<ItemIconResult[]> LoadBatchAsync(
+        ArchiveSession session,
+        ArchiveItemCatalog catalog,
+        IReadOnlyList<int> itemIds,
+        int thumbnailSize,
+        CancellationToken cancellationToken)
+    {
+        var results = new Dictionary<int, ItemIconResult>();
+        var plans = new List<IconPlan>(itemIds.Count);
+        foreach (var itemId in itemIds)
+        {
+            if (!catalog.TryGet(itemId, out var item) || item is null)
+            {
+                results[itemId] = new ItemIconResult(itemId, null, null, "The item is not present in the active catalog.");
+                continue;
+            }
+            if (item.IconPaths.Count == 0)
+            {
+                results[itemId] = new ItemIconResult(itemId, null, null, "No inventory icon was recovered for this item.");
+                continue;
+            }
+            var negativeKey = NegativeKey(session, itemId, thumbnailSize);
+            if (_negativeCache.TryGetValue(negativeKey, out var negative))
+            {
+                if (negative.ExpiresUtc > DateTimeOffset.UtcNow)
+                {
+                    results[itemId] = new ItemIconResult(itemId, null, null, negative.Warning);
+                    continue;
+                }
+                _negativeCache.TryRemove(negativeKey, out _);
+            }
+            plans.Add(new IconPlan(itemId, negativeKey, ResolveIconEntry(session, item)));
+        }
+
+        if (plans.Count > 0)
+        {
+            // Gates are taken in one global order so overlapping icon batches cannot deadlock.
+            plans.Sort(static (left, right) => string.CompareOrdinal(left.GateKey, right.GateKey));
+            var gates = new List<SemaphoreSlim>(plans.Count);
+            try
+            {
+                foreach (var plan in plans)
+                {
+                    var gate = _itemGates.GetOrAdd(plan.GateKey, static _ => new SemaphoreSlim(1, 1));
+                    await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    gates.Add(gate);
+                }
+                await ResolvePlansAsync(session, plans, thumbnailSize, results, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                for (var index = gates.Count - 1; index >= 0; index--)
+                {
+                    gates[index].Release();
+                }
+            }
+        }
+
+        return itemIds
+            .Select(itemId => results.TryGetValue(itemId, out var result)
+                ? result
+                : new ItemIconResult(itemId, null, null, NoArchiveDdsWarning))
+            .ToArray();
+    }
+
+    private async Task ResolvePlansAsync(
+        ArchiveSession session,
+        List<IconPlan> plans,
+        int thumbnailSize,
+        Dictionary<int, ItemIconResult> results,
+        CancellationToken cancellationToken)
+    {
+        var pending = new List<IconPlan>(plans.Count);
+        foreach (var plan in plans)
+        {
+            if (plan.Candidate is null)
+            {
+                _negativeCache[plan.NegativeKey] = new NegativeIconCacheEntry(DateTimeOffset.UtcNow.AddMinutes(10), NoArchiveDdsWarning);
+                results[plan.ItemId] = new ItemIconResult(plan.ItemId, null, null, NoArchiveDdsWarning);
+                continue;
+            }
+            if (textures.TryGetCachedThumbnail(session, plan.Candidate, thumbnailSize) is { } cached)
+            {
+                _negativeCache.TryRemove(plan.NegativeKey, out _);
+                results[plan.ItemId] = new ItemIconResult(plan.ItemId, cached, plan.Candidate.Path);
+                continue;
+            }
+            pending.Add(plan);
+        }
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        var stagingRoot = Path.Combine(
+            ArchiveLiteDataPaths.PreviewCache,
+            "item-icon-staging",
+            $"{Environment.ProcessId}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(stagingRoot);
         try
         {
-            return await LoadOneAsync(session, catalog, itemId, thumbnailSize, cancellationToken).ConfigureAwait(false);
+            await DecodeArchiveSourcesAsync(pending, stagingRoot, cancellationToken).ConfigureAwait(false);
+            var ready = pending.Where(static plan => plan.DdsPath is not null).ToArray();
+            if (ready.Length > 0)
+            {
+                await BuildThumbnailsAsync(session, ready, thumbnailSize, results, cancellationToken).ConfigureAwait(false);
+            }
+            foreach (var plan in pending)
+            {
+                if (results.ContainsKey(plan.ItemId))
+                {
+                    continue;
+                }
+                var warning = plan.LastError ?? "The inventory icon could not be decoded.";
+                _negativeCache[plan.NegativeKey] = new NegativeIconCacheEntry(DateTimeOffset.UtcNow.AddMinutes(2), warning);
+                results[plan.ItemId] = new ItemIconResult(plan.ItemId, null, null, warning);
+            }
+        }
+        finally
+        {
+            DeleteOwnedStaging(stagingRoot);
+        }
+    }
+
+    private async Task DecodeArchiveSourcesAsync(
+        List<IconPlan> targets,
+        string stagingRoot,
+        CancellationToken cancellationToken)
+    {
+        using var concurrency = new SemaphoreSlim(MaximumArchiveDecodeConcurrency, MaximumArchiveDecodeConcurrency);
+        var extractions = targets.Select(async plan =>
+        {
+            await concurrency.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var decoded = await Task.Run(() => native.Decode(plan.Candidate!), cancellationToken).ConfigureAwait(false);
+                var ddsPath = Path.Combine(stagingRoot, $"{plan.ItemId}.dds");
+                await File.WriteAllBytesAsync(ddsPath, decoded.Bytes, cancellationToken).ConfigureAwait(false);
+                plan.DdsPath = ddsPath;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                plan.LastError = BoundedMessage(exception.Message);
+            }
+            finally
+            {
+                concurrency.Release();
+            }
+        });
+        await Task.WhenAll(extractions).ConfigureAwait(false);
+    }
+
+    private async Task BuildThumbnailsAsync(
+        ArchiveSession session,
+        IReadOnlyList<IconPlan> targets,
+        int thumbnailSize,
+        Dictionary<int, ItemIconResult> results,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<TexturePreviewResult> decoded;
+        try
+        {
+            decoded = await textures.BuildThumbnailBatchAsync(
+                session,
+                targets.Select(plan => new TexturePreviewRequest(plan.Candidate!, plan.DdsPath!)).ToArray(),
+                thumbnailSize,
+                cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -145,90 +311,43 @@ public sealed class ArchiveItemIconService(
         }
         catch (Exception exception)
         {
+            // A whole-batch failure (missing helper, timeout) applies to every job it carried.
             var warning = BoundedMessage(exception.Message);
-            _negativeCache[NegativeKey(session, itemId, thumbnailSize)] = new NegativeIconCacheEntry(
-                DateTimeOffset.UtcNow.AddMinutes(2),
-                warning);
-            return new ItemIconResult(itemId, null, null, warning);
+            foreach (var plan in targets)
+            {
+                plan.LastError = warning;
+            }
+            return;
+        }
+
+        for (var index = 0; index < targets.Count; index++)
+        {
+            var plan = targets[index];
+            var result = decoded[index];
+            if (result.PngPath is { } pngPath)
+            {
+                _negativeCache.TryRemove(plan.NegativeKey, out _);
+                results[plan.ItemId] = new ItemIconResult(plan.ItemId, pngPath, plan.Candidate!.Path);
+            }
+            else
+            {
+                plan.LastError = BoundedMessage(result.Error ?? "The inventory icon could not be decoded.");
+            }
         }
     }
 
-    private async Task<ItemIconResult> LoadOneAsync(
-        ArchiveSession session,
-        ArchiveItemCatalog catalog,
-        int itemId,
-        int thumbnailSize,
-        CancellationToken cancellationToken)
+    /// <summary>Picks the first icon path that resolves to an archive DDS inside the size bound.</summary>
+    private static ArchiveEntryDto? ResolveIconEntry(ArchiveSession session, ArchiveItemCatalogRecord item)
     {
-        if (!catalog.TryGet(itemId, out var item) || item is null)
+        foreach (var iconPath in item.IconPaths.Take(MaximumIconCandidates))
         {
-            return new ItemIconResult(itemId, null, null, "The item is not present in the active catalog.");
-        }
-        if (item.IconPaths.Count == 0)
-        {
-            return new ItemIconResult(itemId, null, null, "No inventory icon was recovered for this item.");
-        }
-
-        var gateKey = $"{session.Fingerprint}:{itemId}:{thumbnailSize}";
-        var negativeKey = NegativeKey(session, itemId, thumbnailSize);
-        if (_negativeCache.TryGetValue(negativeKey, out var negative))
-        {
-            if (negative.ExpiresUtc > DateTimeOffset.UtcNow)
+            var entry = ResolveIconEntry(session, iconPath);
+            if (entry is not null && entry.OriginalSize <= MaximumIconBytes)
             {
-                return new ItemIconResult(itemId, null, null, negative.Warning);
+                return entry;
             }
-            _negativeCache.TryRemove(negativeKey, out _);
         }
-        var gate = _itemGates.GetOrAdd(gateKey, static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            foreach (var iconPath in item.IconPaths.Take(8))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var iconEntry = ResolveIconEntry(session, iconPath);
-                if (iconEntry is null || iconEntry.OriginalSize > MaximumIconBytes)
-                {
-                    continue;
-                }
-                if (textures.TryGetCachedThumbnail(session, iconEntry, thumbnailSize) is { } cached)
-                {
-                    _negativeCache.TryRemove(negativeKey, out _);
-                    return new ItemIconResult(itemId, cached, iconEntry.Path);
-                }
-
-                var stagingRoot = Path.Combine(
-                    ArchiveLiteDataPaths.PreviewCache,
-                    "item-icon-staging",
-                    $"{Environment.ProcessId}-{Guid.NewGuid():N}");
-                Directory.CreateDirectory(stagingRoot);
-                try
-                {
-                    var decoded = await Task.Run(() => native.Decode(iconEntry), cancellationToken).ConfigureAwait(false);
-                    var ddsPath = Path.Combine(stagingRoot, "icon.dds");
-                    await File.WriteAllBytesAsync(ddsPath, decoded.Bytes, cancellationToken).ConfigureAwait(false);
-                    var pngPath = await textures.BuildThumbnailAsync(
-                        session,
-                        iconEntry,
-                        ddsPath,
-                        thumbnailSize,
-                        cancellationToken).ConfigureAwait(false);
-                    _negativeCache.TryRemove(negativeKey, out _);
-                    return new ItemIconResult(itemId, pngPath, iconEntry.Path);
-                }
-                finally
-                {
-                    DeleteOwnedStaging(stagingRoot);
-                }
-            }
-            const string warning = "No archive DDS could be resolved for the recovered inventory icon paths.";
-            _negativeCache[negativeKey] = new NegativeIconCacheEntry(DateTimeOffset.UtcNow.AddMinutes(10), warning);
-            return new ItemIconResult(itemId, null, null, warning);
-        }
-        finally
-        {
-            gate.Release();
-        }
+        return null;
     }
 
     private static ArchiveEntryDto? ResolveIconEntry(ArchiveSession session, string iconPath)
@@ -297,6 +416,21 @@ public sealed class ArchiveItemIconService(
         {
             // Preview cache maintenance can remove a staging folder that is briefly locked.
         }
+    }
+
+    private sealed class IconPlan(int itemId, string negativeKey, ArchiveEntryDto? candidate)
+    {
+        public int ItemId { get; } = itemId;
+
+        public string NegativeKey { get; } = negativeKey;
+
+        public string GateKey { get; } = negativeKey;
+
+        public ArchiveEntryDto? Candidate { get; } = candidate;
+
+        public string? DdsPath { get; set; }
+
+        public string? LastError { get; set; }
     }
 
     private sealed record NegativeIconCacheEntry(DateTimeOffset ExpiresUtc, string Warning);
