@@ -7,8 +7,11 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 ### Changed
 
 - The standalone launcher now extracts its verified runtime beneath `%LocalAppData%\CDMW\CDMWArchiveLite\standalone\` instead of a vendor folder named after the author. An existing install re-extracts once on the next launch; the runtime left under the previous path is no longer read and can be deleted.
+- Archive indexes are no longer counted against, or evicted by, the size-bounded cache prune. An index is older than every preview it serves, so an oldest-first eviction reached the live index first; index lifetime now belongs to fingerprint supersession instead.
 
 ### Fixed
+
+- Superseded archive indexes and name caches are now reclaimed instead of kept forever. Both are keyed by content fingerprint, so every game update published a new key and left the previous set on disk with nothing referencing it. Reclamation runs at worker startup and after a rebuild, skips any fingerprint a cached root or an open session still uses, and is abandoned entirely if a root manifest cannot be read.
 
 - An embedded model preview renderer now closes when it reaches the end of its host's standard input, which is what happens when the hosting application ends. The renderer's kill-on-close job object is armed just after launch, so a host that ended inside that window previously left a renderer process running with no host to display it.
 - The standalone launcher now places the application it starts in a kill-on-close job object, so force-closing the launcher stops the whole Archive Lite tree instead of leaving it running with no launcher attached.

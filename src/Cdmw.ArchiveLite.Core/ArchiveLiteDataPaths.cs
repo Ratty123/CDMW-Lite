@@ -7,8 +7,10 @@ public static class ArchiveLiteDataPaths
 
     public static string Root { get; } = ResolveRoot();
 
+    public const string IndexDirectoryName = "index";
+
     public static string Cache { get; } = ResolveCache();
-    public static string IndexCache { get; } = Path.Combine(Cache, "index");
+    public static string IndexCache { get; } = Path.Combine(Cache, IndexDirectoryName);
     public static string IndexRootManifests { get; } = Path.Combine(IndexCache, "roots");
     public static string PreviewCache { get; } = Path.Combine(Cache, "preview");
     public static string ContentAnalysisCache { get; } = Path.Combine(PreviewCache, "content-analysis");
