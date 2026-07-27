@@ -102,6 +102,42 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         return fixture;
     }
 
+    /// <summary>
+    /// An archive whose only texture clears the preview resource guard and then fails inside the
+    /// texture helper, so a real worker records and forwards a decode failure.
+    /// </summary>
+    public static async Task<SyntheticArchiveFixture> CreateBrokenTextureAsync()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-broken-texture-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var fixture = new SyntheticArchiveFixture(root);
+        await BuildPackageAsync(root, "0001", [("texture/broken.dds", BuildUndecodableDds())]).ConfigureAwait(false);
+        return fixture;
+    }
+
+    /// <summary>
+    /// A well-formed 64x64 BC7 header carrying no pixel payload. The header reads cleanly, so the
+    /// resource limits accept it, and DirectXTex then fails to load the surface.
+    /// </summary>
+    public static byte[] BuildUndecodableDds()
+    {
+        var bytes = new byte[148];
+        "DDS "u8.CopyTo(bytes);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4), 124);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), 0x00081007);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 64);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(16), 64);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(28), 1);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(76), 32);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(80), 4);
+        "DX10"u8.CopyTo(bytes.AsSpan(84));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(108), 0x00001000);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(128), 98); // DXGI_FORMAT_BC7_UNORM
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(132), 3);  // DDS_DIMENSION_TEXTURE2D
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(140), 1);
+        return bytes;
+    }
+
     public static async Task<SyntheticArchiveFixture> CreateNameIndexAsync()
     {
         const uint exactModelHash = 0x1D586E71;
