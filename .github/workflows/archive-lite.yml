@@ -32,15 +32,6 @@ jobs:
           key: nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
           restore-keys: nuget-
 
-      # ensure_vgmstream.ps1 re-verifies every restored file against the SHA-256
-      # manifest and re-downloads when anything mismatches, so a stale or partial
-      # entry cannot reach a build.
-      - name: Cache pinned vgmstream runtime
-        uses: actions/cache@v4
-        with:
-          path: .tools/vgmstream
-          key: vgmstream-${{ hashFiles('scripts/ensure_vgmstream.ps1') }}
-
       # Keyed per component so a change to one native library still restores the
       # other four. Debug and Release keep separate entries because both
       # configurations build into the same tree.
@@ -102,6 +93,10 @@ jobs:
           key: nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
           restore-keys: nuget-
 
+      # Only this job bootstraps vgmstream; the Debug gate never creates
+      # .tools/vgmstream. ensure_vgmstream.ps1 re-verifies every restored file
+      # against the SHA-256 manifest and re-downloads on any mismatch, so a
+      # stale or partial entry cannot reach a build.
       - name: Cache pinned vgmstream runtime
         uses: actions/cache@v4
         with:
