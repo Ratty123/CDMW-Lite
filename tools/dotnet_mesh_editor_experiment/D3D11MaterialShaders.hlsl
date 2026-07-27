@@ -46,6 +46,9 @@ cbuffer CameraConstants : register(b0)
     // x: the base tint was authored by the user rather than inferred from a
     // sidecar, so the metal-category damping below must not apply. y/z/w spare.
     float4 MaterialBaseTintAuthored;
+    // x: a strand-direction (flow) map is bound. y: shift of the secondary
+    // highlight along the strand. z/w spare.
+    float4 MaterialHairAnisotropy;
 };
 
 Texture2D BaseTexture : register(t0);
@@ -58,6 +61,7 @@ Texture2D EmissiveTexture : register(t6);
 Texture2D LayerMaskTexture : register(t7);
 Texture2D OpacityTexture : register(t8);
 Texture2D OcclusionTexture : register(t9);
+Texture2D FlowTexture : register(t10);
 SamplerState MaterialSampler : register(s0);
 
 cbuffer OverlayConstants : register(b1)
@@ -914,12 +918,56 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         float nonmetalDirectSpecularScale = hasSourceRoughnessMap
             ? 0.32f
             : (glossyNonmetal ? 0.18f : (conservativeNonmetal ? 0.025f : 0.08f));
-        spec = SourceStableFresnel(
-            nonmetalCameraShape,
-            resolvedSurfaceF0)
-            * nonmetalDirectLobe
-            * saturate(PresentationMaterialTuning.y)
-            * nonmetalDirectSpecularScale;
+        // Hair is not a smooth surface: its highlight runs as a band across the
+        // strands, not as a round blob on the surface normal. Crimson ships the
+        // strand direction as a two-channel BC5 `_f` map in UV space, so where one
+        // is bound the isotropic lobe above is replaced with a Kajiya-Kay pair of
+        // shifted anisotropic highlights along that direction. Two lobes, because
+        // hair has a sharp near-white primary reflection at the cuticle and a
+        // broader coloured secondary scattered back through the strand; a single
+        // lobe reads as wet plastic.
+        if (MaterialHairAnisotropy.x > 0.5f)
+        {
+            float2 flow = FlowTexture.Sample(MaterialSampler, uv).xy * 2.0f - 1.0f;
+            // A flat or unauthored region leaves the strand running along the
+            // bitangent, which is how these sheets are laid out.
+            float2 flowDirection = dot(flow, flow) > 0.0004f ? normalize(flow) : float2(0.0f, 1.0f);
+            float3 strandTangent = SafeNormalize(
+                normalize(input.Tangent) * flowDirection.x
+                    + normalize(input.Bitangent) * flowDirection.y,
+                normalize(input.Bitangent));
+            float primaryExponent = lerp(24.0f, 96.0f, nonmetalSmoothness);
+            float secondaryExponent = max(primaryExponent * 0.35f, 8.0f);
+            float3 primaryTangent = SafeNormalize(
+                strandTangent + normal * -MaterialHairAnisotropy.y,
+                strandTangent);
+            float3 secondaryTangent = SafeNormalize(
+                strandTangent + normal * MaterialHairAnisotropy.y * 1.75f,
+                strandTangent);
+            float primaryBand = pow(
+                sqrt(saturate(1.0f - dot(primaryTangent, halfVector) * dot(primaryTangent, halfVector))),
+                primaryExponent);
+            float secondaryBand = pow(
+                sqrt(saturate(1.0f - dot(secondaryTangent, halfVector) * dot(secondaryTangent, halfVector))),
+                secondaryExponent);
+            float3 fresnel = SourceStableFresnel(nonmetalCameraShape, resolvedSurfaceF0);
+            spec = saturate(ndotl * 1.25f)
+                * saturate(PresentationMaterialTuning.y)
+                * nonmetalDirectSpecularScale
+                * (fresnel * primaryBand
+                    // The secondary lobe carries the strand's own colour, which is
+                    // what separates hair from a plastic sheen.
+                    + materialReferenceAlbedo * secondaryBand * 0.55f);
+        }
+        else
+        {
+            spec = SourceStableFresnel(
+                nonmetalCameraShape,
+                resolvedSurfaceF0)
+                * nonmetalDirectLobe
+                * saturate(PresentationMaterialTuning.y)
+                * nonmetalDirectSpecularScale;
+        }
     }
     float3 emissive = float3(0.0f, 0.0f, 0.0f);
     // The divisor normalises a declared intensity whose scale runs above 1.0.

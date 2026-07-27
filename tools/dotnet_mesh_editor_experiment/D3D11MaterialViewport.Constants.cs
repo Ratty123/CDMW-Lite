@@ -123,4 +123,8 @@ internal struct D3D11CameraConstants
     // previews only ever infer a tint from the source sidecar, so it stays zero
     // here; the field exists so the shader stays shared with the workbench.
     public Vector4 MaterialBaseTintAuthored;
+    // x: a strand-direction (flow) map is bound, so the hair highlight is
+    // anisotropic along the strand rather than an isotropic blob. y: shift of the
+    // secondary highlight. z/w spare. Mirrors MaterialHairAnisotropy in the HLSL.
+    public Vector4 MaterialHairAnisotropy;
 }

@@ -694,6 +694,7 @@ public static class NativePreviewPackageAdapter
                     "material",
                     "occlusion",
                     "opacity",
+                    "flow",
                 },
                 ["material_signature"] = signature,
                 ["material_slots"] = slots,
@@ -1311,6 +1312,9 @@ public static class NativePreviewPackageAdapter
             "emissive" or "emission" => "emissive",
             "opacity" or "alpha" => "opacity",
             "layermask" or "mask" => "layer_mask",
+            // Strand direction for hair, stored as a two-channel BC5 map exactly
+            // like a normal: the renderer needs it to orient the hair highlight.
+            "flow" or "direction" or "flowmap" => "flow",
             _ => string.Empty,
         };
     }

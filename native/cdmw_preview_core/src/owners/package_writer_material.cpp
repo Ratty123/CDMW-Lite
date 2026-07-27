@@ -44,9 +44,18 @@ static void prepare_package_batch_runtime(PackageWriteState& state, PackageBatch
             || rule.find("alphacutout") != std::string::npos
             || rule.find("cutout") != std::string::npos) batch.has_alpha_test = true;
     }
-    batch.uses_alpha_cutout = batch.is_hair || batch.is_eye_surface || batch.has_alpha_test;
+    // A tear shell is coverage-driven: without a cutout its whole card draws.
+    batch.is_tear_shell = std::any_of(
+        batch.bindings.begin(),
+        batch.bindings.end(),
+        [](const TextureBinding* binding) {
+            return binding != nullptr && binding->shader_rule == "tear";
+        });
+    batch.uses_alpha_cutout = batch.is_hair || batch.is_eye_surface || batch.has_alpha_test
+        || batch.is_tear_shell;
     batch.alpha_threshold = batch.is_hair ? 0.18f
-        : (batch.is_eye_surface ? 0.05f : (batch.has_alpha_test ? 0.08f : 0.0f));
+        : (batch.is_eye_surface ? 0.05f
+            : (batch.is_tear_shell ? 0.35f : (batch.has_alpha_test ? 0.08f : 0.0f)));
     batch.material_hints = material_hints_for_bindings(batch.bindings);
     if (batch.base != nullptr) return;
     for (const TextureBinding* binding : batch.bindings) {

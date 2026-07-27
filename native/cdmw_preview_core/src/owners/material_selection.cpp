@@ -312,6 +312,10 @@ static std::string shader_rule_for_family(const std::string& family) {
     if (lower.find("skinnedmeshstandard_ver2") != std::string::npos) return "standard_v2";
     if (lower.find("skinnedmeshstandard") != std::string::npos) return "standard";
     if (lower.find("skinnedmeshhair") != std::string::npos || lower.find("skinnedmeshfur") != std::string::npos || lower.find("animalhair") != std::string::npos) return "hair";
+    // SkinnedMeshTear is a decal shell laid over a head. It declares a normal, a
+    // surface map and an `_m` atlas whose R, G and B are three selectable tear
+    // shapes; it has no colour of its own -- the tears take the skin beneath.
+    if (lower.find("skinnedmeshtear") != std::string::npos) return "tear";
     if (lower.find("emissive") != std::string::npos) return "emissive";
     if (lower.find("multitextured") != std::string::npos) return "static_multitextured";
     if (lower.find("standard") != std::string::npos) return "static_standard";
@@ -525,6 +529,13 @@ static std::string packed_channels_for_role(
     }
     if (role == "height") return "height";
     if (role == "normal") return "normal_xy";
+    if (role == "opacity") {
+        // R, G and B are three alternative tear shapes and the game picks one per
+        // character. A preview has no such choice, so it shows the first, which is
+        // the primary channel everywhere else in this format. Alpha is a broad
+        // unrelated field covering 42% of the sheet and is not coverage.
+        return lower.find("_m") != std::string::npos ? "r=opacity" : "";
+    }
     return "";
 }
 
@@ -549,6 +560,11 @@ static int layer_channel_index(const std::string& channel) {
 
 static std::string layer_role_from_parameter(const std::string& parameter_name, const std::string& role) {
     const std::string key = normalized_key(parameter_name);
+    // Coverage is never a colour layer. The tear shell's mask arrives on
+    // `_baseColorTexture`, whose name matches the "colortexture" layer rule
+    // below, and a consumer that filters layer-only roles then discarded the
+    // one input that says which part of the shell is a tear.
+    if (role == "opacity") return "opacity";
     if (key.find("grime") != std::string::npos) return "grime";
     if (key.find("detail") != std::string::npos || key.find("dyeing") != std::string::npos) return "detail";
     if (key.find("damage") != std::string::npos) return "damage";
@@ -660,6 +676,18 @@ static std::string role_from_parameter_shader_and_name(
     if (shader_rule == "hair" && (p == "_flowtexture" || p.find("flowtexture") != std::string::npos || t.find("_f.dds") != std::string::npos)) return "flow";
     if (p.find("ssdm") != std::string::npos || p.find("direction") != std::string::npos || t.find("_dr.dds") != std::string::npos) return "flow";
     if ((p.find("alpha") != std::string::npos || p.find("opacity") != std::string::npos) && p.find("base") == std::string::npos) return "opacity";
+    // The tear shell's `_m` atlas arrives on a colour parameter, and the technique
+    // declares that parameter, so this has to precede the declared-parameter block
+    // below. Its three colour channels are tear-shape coverage, not albedo:
+    // routing it to opacity clips the shell to the tear itself, where leaving it
+    // rejected as a technical base drew the whole card as a grey sheet.
+    if (shader_rule == "tear"
+        && t.find("_m.dds") != std::string::npos
+        && (p.find("basecolor") != std::string::npos
+            || p.find("diffuse") != std::string::npos
+            || p.find("albedo") != std::string::npos)) {
+        return "opacity";
+    }
     if (technique_parameter != nullptr && technique_parameter->declared) {
         const std::string declared_type = lower_copy(technique_parameter->type);
         const std::string declared_default = lower_copy(technique_parameter->default_value);
