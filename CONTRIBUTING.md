@@ -26,3 +26,5 @@ The focused gate verifies repository independence, managed behavior, and the syn
 Describe what changed, why it changed, and how it was verified. Call out any validation that requires a visible application, licensed game data, or a Release package rather than presenting synthetic checks as visual proof.
 
 Before requesting review, inspect the scoped diff and confirm that only intended files are included.
+
+Merge with squash only; the branch is deleted on merge. Branch rulesets are unavailable on this repository's plan, so the Archive Lite workflow is not enforced as a required check — confirm it is green on the pull request before merging, and do not force-push or delete `main`.
