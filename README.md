@@ -91,7 +91,7 @@ The UI owns presentation. Long-running work remains cancellable in the worker or
 - `tests/` — managed regression coverage and synthetic fixtures
 - `scripts/` — focused validation and packaging entry points
 - `schemas/` — versioned repository-owned data contracts
-- `.github/` — GitHub Actions and collaboration templates
+- `.github/` — GitHub Actions, dependency update configuration, and collaboration templates
 
 ## Local data
 
