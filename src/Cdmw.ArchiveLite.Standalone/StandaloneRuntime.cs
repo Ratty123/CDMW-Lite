@@ -9,6 +9,10 @@ namespace Cdmw.ArchiveLite.Standalone;
 internal static class StandaloneRuntime
 {
     internal const string ReadyMarkerName = ".standalone-ready";
+    internal const string UsedMarkerName = ".standalone-used";
+    internal const int RetainedPayloadCount = 3;
+    private const string StagingPrefix = ".extracting-";
+    private const string QuarantineMarker = ".invalid-";
     private const long MaximumExpandedPayloadBytes = 2L * 1024 * 1024 * 1024;
     private const int MaximumPayloadEntries = 20_000;
     private static readonly UTF8Encoding Utf8WithoutBom = new(false);
@@ -70,6 +74,7 @@ internal static class StandaloneRuntime
             cancellationToken).ConfigureAwait(false);
         if (IsReady(destination, payloadHash))
         {
+            MarkPayloadUsed(destination);
             return destination;
         }
 
@@ -96,7 +101,170 @@ internal static class StandaloneRuntime
             throw;
         }
 
+        // Recorded after publication so a fresh extraction and a cache hit both count as a use.
+        MarkPayloadUsed(destination);
         return destination;
+    }
+
+    /// <summary>
+    /// Removes extracted runtimes this launcher supersedes. Every build extracts its own copy keyed
+    /// by payload hash and nothing ever collected them, so the runtime root grew without bound.
+    /// The active runtime and the most recently used others are kept so switching back to a recent
+    /// build does not pay for a fresh extraction.
+    /// </summary>
+    internal static PayloadCleanupResult PrunePayloads(
+        string runtimeRoot,
+        string activePayloadDirectory,
+        int retainedPayloads = RetainedPayloadCount)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(activePayloadDirectory);
+        ArgumentOutOfRangeException.ThrowIfLessThan(retainedPayloads, 1);
+        var payloadRoot = Path.Combine(ResolveSafeRoot(runtimeRoot), "payloads");
+        if (!Directory.Exists(payloadRoot))
+        {
+            return new PayloadCleanupResult(0, 0, 0, 0);
+        }
+
+        var active = Path.GetFullPath(activePayloadDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        try
+        {
+            EnsureContainedDirectory(payloadRoot, active);
+        }
+        catch (InvalidOperationException)
+        {
+            // The running runtime was not extracted here; retaining everything is the safe answer.
+            return new PayloadCleanupResult(0, 0, 0, 0);
+        }
+
+        List<DirectoryInfo> candidates;
+        try
+        {
+            candidates = new DirectoryInfo(payloadRoot).GetDirectories().ToList();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return new PayloadCleanupResult(0, 0, 0, 0);
+        }
+
+        var removable = new List<DirectoryInfo>();
+        var completed = new List<DirectoryInfo>();
+        var retained = 0;
+        foreach (var candidate in candidates)
+        {
+            if (candidate.FullName.TrimEnd(Path.DirectorySeparatorChar).Equals(active, StringComparison.OrdinalIgnoreCase))
+            {
+                retained++;
+                continue;
+            }
+            if (candidate.Name.StartsWith(StagingPrefix, StringComparison.Ordinal))
+            {
+                // A concurrent launch may own this; only its own extraction may remove it.
+                retained++;
+                continue;
+            }
+            if (candidate.Name.Contains(QuarantineMarker, StringComparison.Ordinal))
+            {
+                // Quarantined runtimes failed validation and are never reused.
+                removable.Add(candidate);
+                continue;
+            }
+            completed.Add(candidate);
+        }
+
+        foreach (var (payload, index) in completed
+            .OrderByDescending(LastUsedUtc)
+            .ThenBy(static payload => payload.Name, StringComparer.OrdinalIgnoreCase)
+            .Select((payload, index) => (payload, index)))
+        {
+            // The active runtime already occupies one retention slot.
+            if (index < retainedPayloads - 1)
+            {
+                retained++;
+            }
+            else
+            {
+                removable.Add(payload);
+            }
+        }
+
+        var removed = 0;
+        var failed = 0;
+        foreach (var payload in removable)
+        {
+            try
+            {
+                EnsureContainedDirectory(payloadRoot, payload.FullName);
+                payload.Delete(recursive: true);
+                removed++;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // Another instance is still running this runtime; a later launch can reclaim it.
+                failed++;
+            }
+        }
+        return new PayloadCleanupResult(candidates.Count, removed, retained, failed);
+    }
+
+    /// <summary>Best-effort pruning for startup, where reclaiming space must never block a launch.</summary>
+    internal static PayloadCleanupResult PrunePayloadsSafely(string runtimeRoot, string activePayloadDirectory)
+    {
+        try
+        {
+            return PrunePayloads(runtimeRoot, activePayloadDirectory);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or InvalidOperationException)
+        {
+            return new PayloadCleanupResult(0, 0, 0, 0);
+        }
+    }
+
+    /// <summary>
+    /// Records that a runtime was launched, so retention follows what is actually used rather than
+    /// what was extracted most recently. This is a separate file because the ready marker is the
+    /// evidence that a runtime was validated, and reuse must leave that evidence untouched.
+    /// </summary>
+    private static void MarkPayloadUsed(string destination)
+    {
+        try
+        {
+            var usedMarker = Path.Combine(destination, UsedMarkerName);
+            if (File.Exists(usedMarker))
+            {
+                File.SetLastWriteTimeUtc(usedMarker, DateTime.UtcNow);
+            }
+            else
+            {
+                File.WriteAllText(usedMarker, string.Empty, Utf8WithoutBom);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Retention ordering is an optimization, never a correctness requirement.
+        }
+    }
+
+    private static DateTime LastUsedUtc(DirectoryInfo payload)
+    {
+        try
+        {
+            var used = new FileInfo(Path.Combine(payload.FullName, UsedMarkerName));
+            if (used.Exists)
+            {
+                return used.LastWriteTimeUtc;
+            }
+            // A runtime that has never been reused falls back to when it was extracted.
+            var ready = new FileInfo(Path.Combine(payload.FullName, ReadyMarkerName));
+            return ready.Exists ? ready.LastWriteTimeUtc : payload.LastWriteTimeUtc;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return DateTime.MinValue;
+        }
     }
 
     private static async Task<FileStream> AcquireExtractionLockAsync(
@@ -405,4 +573,6 @@ internal static class StandaloneRuntime
     }
 
     private sealed record EntryDescriptor(ZipArchiveEntry Entry, string[] Segments, bool IsDirectory);
+
+    internal sealed record PayloadCleanupResult(int Inspected, int Removed, int Retained, int Failed);
 }

@@ -35,7 +35,8 @@ internal static class Program
                 applicationDirectory,
                 applicationArguments,
                 portableRoot,
-                cacheRoot).ConfigureAwait(false);
+                cacheRoot,
+                runtimeRoot).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -57,7 +58,8 @@ internal static class Program
         string applicationDirectory,
         IReadOnlyList<string> arguments,
         string portableRoot,
-        string cacheRoot)
+        string cacheRoot,
+        string runtimeRoot)
     {
         var applicationPath = Path.Combine(applicationDirectory, "CdmwArchiveLite.exe");
         var startInfo = new ProcessStartInfo
@@ -76,6 +78,9 @@ internal static class Program
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Windows did not start the extracted Archive Lite application.");
+        // Reclaim superseded runtimes only once the application is already up, so cleanup can never
+        // sit between the user and a launch.
+        StandaloneRuntime.PrunePayloadsSafely(runtimeRoot, applicationDirectory);
         await process.WaitForExitAsync().ConfigureAwait(false);
         return process.ExitCode;
     }

@@ -1943,11 +1943,67 @@ internal static class ArchiveLiteTestRunner
                 root,
                 CancellationToken.None)).ConfigureAwait(false);
             Require(!File.Exists(Path.Combine(root, "escape.txt")), "standalone payload escaped its runtime root");
+
+            Require(
+                File.Exists(Path.Combine(extracted, StandaloneRuntime.UsedMarkerName)),
+                "reusing a standalone runtime did not record that it was launched");
+            RequirePayloadRetention(root, extracted);
         }
         finally
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// Every build extracts its own runtime, so without collection the runtime root grows without
+    /// bound. Retention must keep the running runtime and the most recently used others, never
+    /// touch a staging directory another launch may own, and always drop quarantined runtimes.
+    /// </summary>
+    private static void RequirePayloadRetention(string root, string activePayload)
+    {
+        var payloadRoot = Path.Combine(root, "payloads");
+        foreach (var quarantined in Directory.GetDirectories(payloadRoot, "*.invalid-*"))
+        {
+            Directory.Delete(quarantined, recursive: true);
+        }
+
+        // Six superseded runtimes, oldest first, plus cruft that retention has to classify.
+        var superseded = new List<string>();
+        for (var index = 0; index < 6; index++)
+        {
+            var payload = Path.Combine(payloadRoot, $"superseded{index:D2}");
+            Directory.CreateDirectory(payload);
+            var used = Path.Combine(payload, StandaloneRuntime.UsedMarkerName);
+            File.WriteAllText(used, string.Empty);
+            File.SetLastWriteTimeUtc(used, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddHours(index));
+            superseded.Add(payload);
+        }
+        var staging = Path.Combine(payloadRoot, ".extracting-abcdef0123456789-4242-deadbeef");
+        Directory.CreateDirectory(staging);
+        var quarantine = Path.Combine(payloadRoot, "aabbcc.invalid-20260101000000-cafebabe");
+        Directory.CreateDirectory(quarantine);
+
+        var result = StandaloneRuntime.PrunePayloads(root, activePayload, retainedPayloads: 3);
+
+        Require(Directory.Exists(activePayload), "payload retention removed the runtime that is running");
+        Require(
+            Directory.Exists(superseded[5]) && Directory.Exists(superseded[4]),
+            "payload retention did not keep the most recently used superseded runtimes");
+        Require(
+            superseded.Take(4).All(payload => !Directory.Exists(payload)),
+            "payload retention kept runtimes beyond its retention count");
+        Require(Directory.Exists(staging), "payload retention removed a staging directory another launch may own");
+        Require(!Directory.Exists(quarantine), "payload retention kept a quarantined runtime that is never reused");
+        Require(
+            result.Removed == 5 && result.Failed == 0,
+            $"payload retention removed {result.Removed} of the 5 collectable runtimes ({result.Failed} failed)");
+
+        // An unrecognized active runtime must not license deleting the rest.
+        var untouched = StandaloneRuntime.PrunePayloads(root, Path.Combine(root, "not-a-payload"), retainedPayloads: 1);
+        Require(
+            untouched.Removed == 0 && Directory.Exists(activePayload) && Directory.Exists(superseded[5]),
+            "payload retention pruned against a runtime it does not own");
     }
 
     private static byte[] CreateStandaloneTestPayload()
