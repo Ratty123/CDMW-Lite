@@ -14,8 +14,10 @@ public sealed record TexturePreviewRequest(ArchiveEntryDto Entry, string DdsPath
 /// <summary>The published preview for one request, or the reason the decode failed.</summary>
 public sealed record TexturePreviewResult(ArchiveEntryDto Entry, string? PngPath, string? Error);
 
-public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = null)
+public sealed class NativeTexturePreviewService
 {
+    public const string DecodePhase = "texture_preview_decode";
+
     private const string ArtifactVersion = "directxtex_preview_v3";
     private const string BackendId = "directxtex_native_0.2";
     private const string SidecarSuffix = ".cdmw_texture.json";
@@ -26,7 +28,8 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
 
     private static readonly TimeSpan MinimumDecodeTimeout = TimeSpan.FromSeconds(120);
     private static readonly TimeSpan MaximumDecodeTimeout = TimeSpan.FromMinutes(60);
-    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
+    /// <summary>Test seam; a scenario cannot afford to wait out the production interval.</summary>
+    internal static TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(30);
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     private const int MaximumMemoizedValidations = 8192;
     private static readonly ConcurrentDictionary<PngIdentity, bool> PngValidations = new();
@@ -38,8 +41,9 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         ArchiveSession session,
         ArchiveEntryDto entry,
         string ddsPath,
-        CancellationToken cancellationToken)
-        => await BuildOneAsync(session, entry, ddsPath, 4096, "textures", cancellationToken).ConfigureAwait(false);
+        CancellationToken cancellationToken,
+        Func<ProgressUpdate, Task>? publishProgress = null)
+        => await BuildOneAsync(session, entry, ddsPath, 4096, "textures", publishProgress, cancellationToken).ConfigureAwait(false);
 
     public async Task<string> BuildThumbnailAsync(
         ArchiveSession session,
@@ -47,7 +51,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         string ddsPath,
         int maximumDimension,
         CancellationToken cancellationToken)
-        => await BuildOneAsync(session, entry, ddsPath, maximumDimension, "item-icons", cancellationToken).ConfigureAwait(false);
+        => await BuildOneAsync(session, entry, ddsPath, maximumDimension, "item-icons", null, cancellationToken).ConfigureAwait(false);
 
     /// <summary>
     /// Decodes many DDS sources through a single cd-texture-dx invocation. Per-request failures are
@@ -58,7 +62,8 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         IReadOnlyList<TexturePreviewRequest> requests,
         int maximumDimension,
         CancellationToken cancellationToken)
-        => await BuildBatchCoreAsync(session, requests, maximumDimension, "item-icons", cancellationToken).ConfigureAwait(false);
+        => await BuildBatchCoreAsync(session, requests, maximumDimension, "item-icons", null, cancellationToken)
+            .ConfigureAwait(false);
 
     public string? TryGetCachedThumbnail(
         ArchiveSession session,
@@ -83,6 +88,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         string ddsPath,
         int maximumDimension,
         string cacheNamespace,
+        Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -92,6 +98,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
             [new TexturePreviewRequest(entry, ddsPath)],
             maximumDimension,
             cacheNamespace,
+            publishProgress,
             cancellationToken).ConfigureAwait(false);
         var result = results[0];
         return result.PngPath
@@ -103,6 +110,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         IReadOnlyList<TexturePreviewRequest> requests,
         int maximumDimension,
         string cacheNamespace,
+        Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -162,8 +170,14 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
 
             if (pending.Count > 0)
             {
-                await DecodePendingAsync(pending, textureRoot, maximumDimension, published, failed, cancellationToken)
-                    .ConfigureAwait(false);
+                await DecodePendingAsync(
+                    pending,
+                    textureRoot,
+                    maximumDimension,
+                    published,
+                    failed,
+                    publishProgress,
+                    cancellationToken).ConfigureAwait(false);
             }
         }
         finally
@@ -203,6 +217,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         int maximumDimension,
         Dictionary<string, string> published,
         Dictionary<string, string> failed,
+        Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
         // Reject sources the helper cannot survive before paying for a process launch.
@@ -259,6 +274,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
                     maximumDimension,
                     published,
                     failed,
+                    publishProgress,
                     cancellationToken).ConfigureAwait(false);
             }
         }
@@ -286,6 +302,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         int maximumDimension,
         Dictionary<string, string> published,
         Dictionary<string, string> failed,
+        Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
         var staging = Path.Combine(textureRoot, $".batch.{Guid.NewGuid():N}.staging");
@@ -327,7 +344,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
                 cancellationToken).ConfigureAwait(false);
 
             var timeout = ResolveDecodeTimeout(pending, maximumDimension);
-            await RunDecoderAsync(jobPath, reportPath, timeout, cancellationToken).ConfigureAwait(false);
+            await RunDecoderAsync(jobPath, reportPath, timeout, publishProgress, cancellationToken).ConfigureAwait(false);
             var reported = ReadReport(reportPath);
 
             for (var index = 0; index < pending.Count; index++)
@@ -532,10 +549,11 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         return width * height / 1_000_000.0;
     }
 
-    private async Task RunDecoderAsync(
+    private static async Task RunDecoderAsync(
         string jobPath,
         string reportPath,
         TimeSpan decodeTimeout,
+        Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
         var executable = ResolveDecoderPath();
@@ -560,7 +578,7 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         var started = Stopwatch.GetTimestamp();
         try
         {
-            await WaitWithHeartbeatAsync(process, decodeTimeout, started, timeout.Token).ConfigureAwait(false);
+            await WaitWithHeartbeatAsync(process, decodeTimeout, started, publishProgress, timeout.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -594,15 +612,19 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
         }
     }
 
-    /// <summary>Reports progress on a long decode so a slow batch is distinguishable from a wedged one.</summary>
-    private async Task WaitWithHeartbeatAsync(
+    /// <summary>
+    /// Reports elapsed and allowed seconds while a decode runs, so a slow texture is
+    /// distinguishable from a wedged helper instead of showing an unchanging busy state.
+    /// </summary>
+    private static async Task WaitWithHeartbeatAsync(
         Process process,
         TimeSpan decodeTimeout,
         long started,
+        Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken timeoutToken)
     {
         var exit = process.WaitForExitAsync(timeoutToken);
-        if (onDiagnostic is null)
+        if (publishProgress is null)
         {
             await exit.ConfigureAwait(false);
             return;
@@ -615,9 +637,10 @@ public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = n
                 await exit.ConfigureAwait(false);
                 return;
             }
-            onDiagnostic(
-                $"cd-texture-dx is still decoding after {Stopwatch.GetElapsedTime(started).TotalSeconds:N0}s "
-                + $"(timeout {decodeTimeout.TotalSeconds:N0}s).");
+            await publishProgress(new ProgressUpdate(
+                (long)Stopwatch.GetElapsedTime(started).TotalSeconds,
+                (long)decodeTimeout.TotalSeconds,
+                DecodePhase)).ConfigureAwait(false);
         }
     }
 

@@ -1621,6 +1621,10 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             "model_preview_native" => LocalizationManager.Get("PreviewProgressNative"),
             "model_preview_adapt" => LocalizationManager.Get("PreviewProgressAdapting"),
+            // Kept in step with NativeTexturePreviewService.DecodePhase by a focused test; the
+            // worker protocol crosses a project boundary, so phases are literals on both sides.
+            "texture_preview_decode" =>
+                LocalizationManager.Format("PreviewProgressDecodingTexture", update.Completed, update.Total),
             _ => string.IsNullOrWhiteSpace(update.CurrentItem) ? update.Phase : update.CurrentItem,
         };
     }

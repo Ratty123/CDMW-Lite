@@ -3641,6 +3641,11 @@ internal static class ArchiveLiteTestRunner
             && archiveBrowserViewModel.Contains("ClearItemScopeCommand", StringComparison.Ordinal)
             && archiveBrowserViewModel.Contains("scope.Extensions ?? []", StringComparison.Ordinal)
             && archiveBrowserViewModel.Contains("MostCommonExtensionChoices", StringComparison.Ordinal)
+            // The worker protocol crosses a project boundary, so the phase is a literal on both
+            // sides; keep the UI switch tied to the value the texture service actually publishes.
+            && archiveBrowserViewModel.Contains(
+                $"\"{NativeTexturePreviewService.DecodePhase}\"",
+                StringComparison.Ordinal)
             && iconService.Contains("WaitForVisibleRequestsAsync", StringComparison.Ordinal)
             && iconService.Contains("WaitForForegroundAsync", StringComparison.Ordinal)
             && iconService.Contains("BuildThumbnailBatchAsync", StringComparison.Ordinal)
@@ -4618,6 +4623,7 @@ internal static class ArchiveLiteTestRunner
                 .ConfigureAwait(false);
             await RequireMixedTextureBatchAsync(texturePreviews, sessions.GetRequired(opened.SessionId), imageEntry, native)
                 .ConfigureAwait(false);
+            await RequireDecodeHeartbeatAsync(sessions, opened.SessionId, imageEntry, native).ConfigureAwait(false);
         }
         finally
         {
@@ -5519,6 +5525,68 @@ internal static class ArchiveLiteTestRunner
         }
         finally
         {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// A decode that outlives the heartbeat interval must report elapsed and allowed seconds on the
+    /// same progress channel the preview request already carries, so the UI can distinguish a slow
+    /// texture from a wedged helper.
+    /// </summary>
+    private static async Task RequireDecodeHeartbeatAsync(
+        ArchiveSessionManager sessions,
+        string sessionId,
+        ArchiveEntryDto entry,
+        NativeArchiveCore native)
+    {
+        var session = sessions.GetRequired(sessionId);
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-texture-heartbeat-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var previousInterval = NativeTexturePreviewService.HeartbeatInterval;
+        try
+        {
+            var ddsPath = Path.Combine(root, "source.dds");
+            await File.WriteAllBytesAsync(ddsPath, native.Decode(entry).Bytes).ConfigureAwait(false);
+            var textures = new NativeTexturePreviewService();
+
+            // Publish a preview, then drop it so the next request has to start the helper again.
+            var published = await textures.BuildAsync(session, entry, ddsPath, CancellationToken.None).ConfigureAwait(false);
+            File.Delete(published);
+            File.Delete(published + ".cdmw_texture.json");
+
+            // Any helper launch outlives a one-millisecond interval by a wide margin.
+            NativeTexturePreviewService.HeartbeatInterval = TimeSpan.FromMilliseconds(1);
+            var updates = new List<ProgressUpdate>();
+            // Driven through the preview service so the progress channel the worker already passes
+            // is the one under test, not a direct call into the texture service.
+            var previews = new ArchivePreviewService(sessions, native, texturePreviews: textures);
+            var result = await previews.BuildAsync(
+                new PreviewRequest(sessionId, entry.EntryId),
+                CancellationToken.None,
+                update =>
+                {
+                    lock (updates)
+                    {
+                        updates.Add(update);
+                    }
+                    return Task.CompletedTask;
+                }).ConfigureAwait(false);
+
+            Require(result.Kind == PreviewKind.Image, "a cold texture preview did not republish its image");
+            var heartbeats = updates
+                .Where(static update => update.Phase == NativeTexturePreviewService.DecodePhase)
+                .ToArray();
+            Require(
+                heartbeats.Length > 0,
+                "a texture decode published no heartbeat on the preview progress channel");
+            Require(
+                heartbeats.All(static update => update.Completed >= 0 && update.Total > 0),
+                "a texture decode heartbeat did not carry elapsed and allowed seconds");
+        }
+        finally
+        {
+            NativeTexturePreviewService.HeartbeatInterval = previousInterval;
             Directory.Delete(root, recursive: true);
         }
     }

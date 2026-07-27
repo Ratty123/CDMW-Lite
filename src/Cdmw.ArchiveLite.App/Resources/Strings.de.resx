@@ -212,6 +212,7 @@
   <data name="PreviewProgressPreparing" xml:space="preserve"><value>Vorschau wird vorbereitet...</value></data>
   <data name="PreviewProgressNative" xml:space="preserve"><value>Native PAC-Geometrie wird vorbereitet...</value></data>
   <data name="PreviewProgressAdapting" xml:space="preserve"><value>Schreibgeschützte .NET-Szene wird vorbereitet...</value></data>
+  <data name="PreviewProgressDecodingTexture" xml:space="preserve"><value>Textur wird dekodiert... {0}s von {1}s</value></data>
   <data name="RendererStarting" xml:space="preserve"><value>.NET/Vortice-Vorschau wird gestartet...</value></data>
   <data name="RendererLoading" xml:space="preserve"><value>Mesh wird geladen und das erste Bild wird gezeichnet...</value></data>
   <data name="RendererReady" xml:space="preserve"><value>.NET/Vortice-Vorschau ist bereit.</value></data>
