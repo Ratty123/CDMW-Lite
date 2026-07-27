@@ -716,7 +716,7 @@
                                             Style="{StaticResource CompactButtonStyle}"
                                             Content="{infra:Loc Key=PreviewSettings}"
                                             Click="OnModelPreviewSettingsClick"
-                                            Visibility="{Binding ArchiveBrowser.IsModelSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                            Visibility="{Binding ArchiveBrowser.CanOpenPreviewSettings, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                     <Border Grid.Column="4" Style="{StaticResource BadgeBorderStyle}" Margin="8,0,0,0">
                                          <TextBlock FontSize="{DynamicResource BadgeFontSize}"
                                                    FontWeight="Bold"
@@ -810,10 +810,12 @@
                                                                           InvertOrbitY="{Binding ArchiveBrowser.ModelPreviewInvertOrbitY, Mode=OneWay}"
                                                                           InvertPanX="{Binding ArchiveBrowser.ModelPreviewInvertPanX, Mode=OneWay}"
                                                                           InvertPanY="{Binding ArchiveBrowser.ModelPreviewInvertPanY, Mode=OneWay}"
+                                                                          PreviewBackgroundColor="{Binding ArchiveBrowser.PreviewBackgroundColorHex, Mode=OneWay}"
                                                                           Visibility="{Binding ArchiveBrowser.IsModelPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         <Grid Grid.Row="0"
                                               Grid.RowSpan="3"
                                               ClipToBounds="True"
+                                              Background="{Binding ArchiveBrowser.PreviewBackgroundBrush, Mode=OneWay}"
                                               Visibility="{Binding ArchiveBrowser.IsImagePreview, Converter={StaticResource BooleanToVisibilityConverter}}">
                                             <Image Margin="12"
                                                    Source="{Binding ArchiveBrowser.PreviewImage}"

@@ -164,6 +164,66 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
+                <TabItem Header="{infra:Loc Key=PreviewAppearance}">
+                    <ScrollViewer Padding="4,14,4,4"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Foreground="{DynamicResource TextMutedBrush}"
+                                       Text="{infra:Loc Key=PreviewBackgroundInstructions}"
+                                       TextWrapping="Wrap" />
+
+                            <Grid Margin="0,20,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="48" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{infra:Loc Key=PreviewBackground}" />
+                                <ComboBox x:Name="PreviewBackgroundSelector"
+                                          Grid.Column="1"
+                                          Margin="10,0"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Value"
+                                          ItemsSource="{Binding PreviewBackgrounds}"
+                                          SelectedValue="{Binding PreviewBackgroundChoice, Mode=TwoWay}" />
+                                <Border Grid.Column="2"
+                                        Height="24"
+                                        BorderBrush="{DynamicResource BorderStrongBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Background="{DynamicResource InputBackgroundBrush}">
+                                    <Border Background="{Binding PreviewBackgroundBrush, Mode=OneWay}"
+                                            CornerRadius="3" />
+                                </Border>
+                            </Grid>
+
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="48" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{infra:Loc Key=PreviewBackgroundCustomColor}" />
+                                <TextBox x:Name="PreviewBackgroundCustomColorBox"
+                                         Grid.Column="1"
+                                         Margin="10,0"
+                                         Padding="8,4"
+                                         VerticalContentAlignment="Center"
+                                         IsEnabled="{Binding IsCustomPreviewBackground, Mode=OneWay}"
+                                         ToolTip="{infra:Loc Key=PreviewBackgroundCustomColorHint}"
+                                         Text="{Binding PreviewBackgroundCustomColor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+
+                            <TextBlock Margin="0,14,0,0"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       Text="{infra:Loc Key=PreviewBackgroundHint}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
             </TabControl>
 
             <Border Grid.Row="2"

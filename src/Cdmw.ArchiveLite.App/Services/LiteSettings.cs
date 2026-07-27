@@ -38,7 +38,29 @@ public sealed record ArchiveBrowserSettings(
     string? FolderPath = null,
     ExportCollisionPolicy CollisionPolicy = ExportCollisionPolicy.Skip,
     ExportManifestFormat ManifestFormat = ExportManifestFormat.Json,
-    ModelPreviewCameraInputSettings? ModelPreviewCameraInput = null);
+    ModelPreviewCameraInputSettings? ModelPreviewCameraInput = null,
+    PreviewBackgroundSettings? PreviewBackground = null);
+
+/// <summary>
+/// The colour drawn behind a preview. <see cref="PreviewBackgroundChoice.Theme"/> keeps the surface
+/// the active theme paints; every other choice is a fixed sRGB colour so a texture's own tone cannot
+/// be mistaken for the surface it sits on.
+/// </summary>
+public sealed record PreviewBackgroundSettings(
+    PreviewBackgroundChoice Choice = PreviewBackgroundChoice.Theme,
+    string CustomColor = "#202020");
+
+public enum PreviewBackgroundChoice
+{
+    Theme,
+    Black,
+    Charcoal,
+    MidGray,
+    LightGray,
+    White,
+    Magenta,
+    Custom,
+}
 
 public sealed record ModelPreviewCameraInputSettings(
     double OrbitSensitivity = 0.22,

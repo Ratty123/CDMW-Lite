@@ -115,6 +115,13 @@ public sealed class DotNetModelPreviewHost : HwndHost
         typeof(DotNetModelPreviewHost),
         new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
 
+    /// <summary>An empty value keeps the renderer's own viewport background.</summary>
+    public static readonly DependencyProperty PreviewBackgroundColorProperty = DependencyProperty.Register(
+        nameof(PreviewBackgroundColor),
+        typeof(string),
+        typeof(DotNetModelPreviewHost),
+        new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.None, OnCameraInputChanged));
+
     public string? PackagePath
     {
         get => (string?)GetValue(PackagePathProperty);
@@ -165,6 +172,13 @@ public sealed class DotNetModelPreviewHost : HwndHost
         get => (bool)GetValue(InvertPanYProperty);
         set => SetValue(InvertPanYProperty, value);
     }
+
+    public string PreviewBackgroundColor
+    {
+        get => (string)GetValue(PreviewBackgroundColorProperty);
+        set => SetValue(PreviewBackgroundColorProperty, value);
+    }
+
     public async Task ShutdownAsync()
     {
         if (Interlocked.Exchange(ref _shutdown, 1) != 0)
@@ -344,7 +358,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
         InvertOrbitX,
         InvertOrbitY,
         InvertPanX,
-        InvertPanY);
+        InvertPanY,
+        PreviewBackgroundColor ?? string.Empty);
 
     private void BeginPrewarm()
     {
@@ -787,7 +802,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
         bool InvertOrbitX,
         bool InvertOrbitY,
         bool InvertPanX,
-        bool InvertPanY);
+        bool InvertPanY,
+        string BackgroundColor);
 
     private sealed class ModelRendererSession : IDisposable
     {
@@ -1050,6 +1066,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
                             invert_orbit_y = input.InvertOrbitY,
                             invert_pan_x = input.InvertPanX,
                             invert_pan_y = input.InvertPanY,
+                            // An empty string leaves the renderer's own viewport background in place.
+                            d3d11_background_color = input.BackgroundColor,
                         },
                     },
                 });

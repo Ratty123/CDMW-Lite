@@ -54,6 +54,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private bool _modelPreviewInvertOrbitY;
     private bool _modelPreviewInvertPanX;
     private bool _modelPreviewInvertPanY;
+    private PreviewBackgroundChoice _previewBackgroundChoice = PreviewBackgroundChoice.Theme;
+    private string _previewBackgroundCustomColor = PreviewBackgroundPalette.DefaultCustomColor;
     private PreviewKind _previewKind = PreviewKind.Metadata;
     private bool _isPreviewBusy;
     private bool _shouldPrewarmModelRenderer;
@@ -86,6 +88,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private IReadOnlyList<ArchiveRoleFilter> _roleFilters = [];
     private IReadOnlyList<LocalizedOption<ExportCollisionPolicy>> _collisionPolicies = [];
     private IReadOnlyList<LocalizedOption<ExportManifestFormat>> _manifestFormats = [];
+    private IReadOnlyList<LocalizedOption<PreviewBackgroundChoice>> _previewBackgrounds = [];
 
     public ArchiveBrowserViewModel(
         WorkerProcessHost worker,
@@ -129,6 +132,11 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _modelPreviewInvertOrbitY = cameraInput.InvertOrbitY;
         _modelPreviewInvertPanX = cameraInput.InvertPanX;
         _modelPreviewInvertPanY = cameraInput.InvertPanY;
+        var previewBackground = browserSettings.PreviewBackground ?? new PreviewBackgroundSettings();
+        _previewBackgroundChoice = Enum.IsDefined(previewBackground.Choice)
+            ? previewBackground.Choice
+            : PreviewBackgroundChoice.Theme;
+        _previewBackgroundCustomColor = PreviewBackgroundPalette.NormalizeCustomColor(previewBackground.CustomColor);
         AssociatedAssets = new AssociatedAssetsViewModel(
             worker,
             ShowAssociatedAssetInBrowserAsync,
@@ -493,6 +501,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 }
                 AssociatedAssets.SelectSource(SessionId, value);
                 OnPropertyChanged(nameof(IsModelSelection));
+                OnPropertyChanged(nameof(CanOpenPreviewSettings));
                 ExportSelectedCommand.RaiseCanExecuteChanged();
                 ExportFamilyCommand.RaiseCanExecuteChanged();
                 if (!_suppressPreviewSelection)
@@ -556,6 +565,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsMediaPreview));
                 OnPropertyChanged(nameof(IsModelPreview));
                 OnPropertyChanged(nameof(IsTextPreview));
+                OnPropertyChanged(nameof(CanOpenPreviewSettings));
             }
         }
     }
@@ -630,6 +640,69 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         set => SetProperty(ref _modelPreviewInvertPanY, value);
     }
 
+    public PreviewBackgroundChoice PreviewBackgroundChoice
+    {
+        get => _previewBackgroundChoice;
+        set
+        {
+            if (SetProperty(ref _previewBackgroundChoice, Enum.IsDefined(value) ? value : PreviewBackgroundChoice.Theme))
+            {
+                OnPreviewBackgroundChanged();
+            }
+        }
+    }
+
+    /// <summary>The #RRGGBB used when <see cref="PreviewBackgroundChoice.Custom"/> is selected.</summary>
+    public string PreviewBackgroundCustomColor
+    {
+        get => _previewBackgroundCustomColor;
+        set
+        {
+            // Keep the raw text so a half-typed colour is still editable; only a complete
+            // #RRGGBB reaches the preview surface.
+            if (SetProperty(ref _previewBackgroundCustomColor, value ?? string.Empty))
+            {
+                OnPreviewBackgroundChanged();
+            }
+        }
+    }
+
+    public bool IsCustomPreviewBackground => PreviewBackgroundChoice == PreviewBackgroundChoice.Custom;
+
+    /// <summary>Null when the theme owns the surface, so the themed brush behind it stays visible.</summary>
+    public System.Windows.Media.Brush? PreviewBackgroundBrush
+    {
+        get
+        {
+            if (!PreviewBackgroundPalette.TryResolve(PreviewBackgroundChoice, PreviewBackgroundCustomColor, out var color))
+            {
+                return null;
+            }
+            var brush = new System.Windows.Media.SolidColorBrush(color);
+            brush.Freeze();
+            return brush;
+        }
+    }
+
+    /// <summary>The renderer's clear colour, or empty to keep the renderer's own default.</summary>
+    public string PreviewBackgroundColorHex =>
+        PreviewBackgroundPalette.TryResolve(PreviewBackgroundChoice, PreviewBackgroundCustomColor, out var color)
+            ? $"#{color.R:X2}{color.G:X2}{color.B:X2}"
+            : string.Empty;
+
+    public IReadOnlyList<LocalizedOption<PreviewBackgroundChoice>> PreviewBackgrounds => _previewBackgrounds;
+
+    public PreviewBackgroundSettings CapturePreviewBackgroundSettings() => new(
+        PreviewBackgroundChoice,
+        PreviewBackgroundPalette.NormalizeCustomColor(PreviewBackgroundCustomColor));
+
+    private void OnPreviewBackgroundChanged()
+    {
+        OnPropertyChanged(nameof(IsCustomPreviewBackground));
+        OnPropertyChanged(nameof(PreviewBackgroundBrush));
+        OnPropertyChanged(nameof(PreviewBackgroundColorHex));
+    }
+
     public bool ShouldPrewarmModelRenderer
     {
         get => _shouldPrewarmModelRenderer;
@@ -648,6 +721,12 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     public bool IsModelSelection => SelectedEntry is { Extension: var extension }
         && NativeModelExtension(extension);
     public bool IsTextPreview => !IsImagePreview && !IsMediaPreview && !IsModelPreview;
+
+    /// <summary>
+    /// Preview Settings carries both the model camera input and the preview background, so it is
+    /// reachable from a decoded texture as well as from a model selection.
+    /// </summary>
+    public bool CanOpenPreviewSettings => IsModelSelection || IsImagePreview;
 
     public ModelPreviewCameraInputSettings CaptureModelPreviewCameraInputSettings() => new(
         ModelPreviewOrbitSensitivity,
@@ -1384,6 +1463,9 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _manifestFormats = Enum.GetValues<ExportManifestFormat>()
             .Select(format => new LocalizedOption<ExportManifestFormat>(format, LocalizationManager.Get($"Manifest{format}")))
             .ToArray();
+        _previewBackgrounds = Enum.GetValues<PreviewBackgroundChoice>()
+            .Select(choice => new LocalizedOption<PreviewBackgroundChoice>(choice, LocalizationManager.Get($"PreviewBackground{choice}")))
+            .ToArray();
         _roleFilters =
         [
             new ArchiveRoleFilter(null, LocalizationManager.Get("All")),
@@ -1396,6 +1478,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         OnPropertyChanged(nameof(SortFields));
         OnPropertyChanged(nameof(CollisionPolicies));
         OnPropertyChanged(nameof(ManifestFormats));
+        OnPropertyChanged(nameof(PreviewBackgrounds));
         OnPropertyChanged(nameof(RoleFilters));
         // Replacing a ComboBox ItemsSource can temporarily clear its selection.
         // Reassert the stable enum values after the localized options are visible
@@ -1404,6 +1487,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         OnPropertyChanged(nameof(SortField));
         OnPropertyChanged(nameof(CollisionPolicy));
         OnPropertyChanged(nameof(ManifestFormat));
+        OnPropertyChanged(nameof(PreviewBackgroundChoice));
         OnPropertyChanged(nameof(SelectedRole));
     }
 
@@ -1683,6 +1767,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         OnPropertyChanged(nameof(IsMediaPreview));
         OnPropertyChanged(nameof(IsModelPreview));
         OnPropertyChanged(nameof(IsTextPreview));
+        OnPropertyChanged(nameof(CanOpenPreviewSettings));
     }
 
     private void ClearPreview()
@@ -1702,6 +1787,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         OnPropertyChanged(nameof(IsMediaPreview));
         OnPropertyChanged(nameof(IsModelPreview));
         OnPropertyChanged(nameof(IsTextPreview));
+        OnPropertyChanged(nameof(CanOpenPreviewSettings));
     }
 
     private void CancelPreviewAndClear()

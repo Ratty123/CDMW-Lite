@@ -367,7 +367,10 @@ internal static class ArchiveLiteTestRunner
                     InvertOrbitX: true,
                     InvertOrbitY: false,
                     InvertPanX: false,
-                    InvertPanY: true)),
+                    InvertPanY: true),
+                PreviewBackground: new PreviewBackgroundSettings(
+                    Choice: PreviewBackgroundChoice.Custom,
+                    CustomColor: "#204060")),
             TextSearch: new TextSearchSettings(
                 TextSearchSourceKind.LooseFolder,
                 "C:\\loose",
@@ -462,6 +465,38 @@ internal static class ArchiveLiteTestRunner
                 && browser.ModelPreviewInvertPanY,
                 "model-preview camera input settings were not restored");
             Require(!browser.ShowModelTextures, "model textures must stay session-only and opt-in after startup");
+            Require(
+                browser.PreviewBackgroundChoice == PreviewBackgroundChoice.Custom
+                && browser.PreviewBackgroundCustomColor == "#204060"
+                && browser.PreviewBackgroundColorHex == "#204060"
+                && browser.IsCustomPreviewBackground
+                && browser.PreviewBackgroundBrush is System.Windows.Media.SolidColorBrush
+                {
+                    Color: { R: 0x20, G: 0x40, B: 0x60 },
+                },
+                "the preview background choice was not restored");
+            Require(
+                browser.CapturePreviewBackgroundSettings()
+                    == new PreviewBackgroundSettings(PreviewBackgroundChoice.Custom, "#204060"),
+                "the preview background choice does not round-trip back to settings");
+            browser.PreviewBackgroundChoice = PreviewBackgroundChoice.Theme;
+            Require(
+                browser.PreviewBackgroundBrush is null
+                && browser.PreviewBackgroundColorHex.Length == 0
+                && !browser.IsCustomPreviewBackground,
+                "the theme preview background does not defer to the themed surface");
+            browser.PreviewBackgroundChoice = PreviewBackgroundChoice.Custom;
+            browser.PreviewBackgroundCustomColor = "#20";
+            Require(
+                browser.PreviewBackgroundBrush is null
+                && browser.PreviewBackgroundColorHex.Length == 0
+                && browser.PreviewBackgroundCustomColor == "#20"
+                && browser.CapturePreviewBackgroundSettings().CustomColor == "#202020",
+                "a half-typed custom colour is not held as editable text behind the themed surface");
+            browser.PreviewBackgroundChoice = PreviewBackgroundChoice.Magenta;
+            Require(
+                browser.PreviewBackgroundColorHex == "#FF00FF",
+                "the magenta preset does not reach the renderer as an sRGB colour");
             browser.ResetModelPreviewCameraInputCommand.Execute(null);
             Require(
                 browser.ModelPreviewOrbitSensitivity == 0.22
@@ -1158,8 +1193,8 @@ internal static class ArchiveLiteTestRunner
         Require(
             window.Descendants().Any(element =>
                 string.Equals((string?)element.Attribute("Click"), "OnModelPreviewSettingsClick", StringComparison.Ordinal)
-                && ((string?)element.Attribute("Visibility"))?.Contains("IsModelSelection", StringComparison.Ordinal) == true),
-            "model previews do not expose the Preview Settings window");
+                && ((string?)element.Attribute("Visibility"))?.Contains("CanOpenPreviewSettings", StringComparison.Ordinal) == true),
+            "model and texture previews do not expose the Preview Settings window");
         var modelPreviewHost = window.Descendants().Single(element =>
             element.Attributes().Any(attribute =>
                 attribute.Name.LocalName == "Name" && attribute.Value == "ModelPreviewHost"));
@@ -1229,6 +1264,39 @@ internal static class ArchiveLiteTestRunner
             && string.Equals((string?)imagePreview.Parent?.Attribute("ClipToBounds"), "True", StringComparison.Ordinal)
             && !imagePreview.Ancestors().Any(element => element.Name.LocalName == "ScrollViewer"),
             "image previews are not constrained to an aspect-preserving, scrollbar-free viewport");
+        Require(
+            ((string?)imagePreview.Parent?.Attribute("Background"))?.Contains(
+                "ArchiveBrowser.PreviewBackgroundBrush",
+                StringComparison.Ordinal) == true
+            && modelPreviewHost.Attributes().Any(attribute =>
+                attribute.Name.LocalName == "PreviewBackgroundColor"
+                && attribute.Value.Contains("ArchiveBrowser.PreviewBackgroundColorHex", StringComparison.Ordinal)),
+            "the chosen preview background does not reach both the texture surface and the model renderer");
+        Require(
+            settingsDialog.Descendants().Any(element =>
+                element.Name.LocalName == "TabItem"
+                && ((string?)element.Attribute("Header"))?.Contains("PreviewAppearance", StringComparison.Ordinal) == true)
+            && settingsDialog.Descendants().Any(element =>
+                element.Name.LocalName == "ComboBox"
+                && ((string?)element.Attribute("SelectedValue"))?.Contains("PreviewBackgroundChoice", StringComparison.Ordinal) == true)
+            && settingsDialog.Descendants().Any(element =>
+                element.Name.LocalName == "TextBox"
+                && ((string?)element.Attribute("Text"))?.Contains("PreviewBackgroundCustomColor", StringComparison.Ordinal) == true
+                && ((string?)element.Attribute("IsEnabled"))?.Contains("IsCustomPreviewBackground", StringComparison.Ordinal) == true),
+            "Preview Settings does not offer the background colour choice with a custom colour");
+
+        // The renderer clears to the requested colour rather than the hard-coded workbench tone, and
+        // converts it out of sRGB because the render target is sRGB.
+        var rendererRoot = Path.Combine(FindRepositoryRoot(), "tools", "dotnet_mesh_editor_experiment");
+        var viewportSource = File.ReadAllText(Path.Combine(rendererRoot, "D3D11MaterialViewport.cs"));
+        var rendererSettingsSource = File.ReadAllText(Path.Combine(rendererRoot, "MeshViewport.PresentationSettings.cs"));
+        Require(
+            viewportSource.Contains(
+                "new Color4(background.X, background.Y, background.Z, 1.0f)",
+                StringComparison.Ordinal)
+            && rendererSettingsSource.Contains("\"d3d11_background_color\"", StringComparison.Ordinal)
+            && rendererSettingsSource.Contains("SrgbToLinear", StringComparison.Ordinal),
+            "the renderer still clears to a fixed background instead of the requested sRGB colour");
 
         var previewEditors = window.Descendants()
             .Where(element => element.Name.LocalName == "TextEditor")
@@ -1478,8 +1546,9 @@ internal static class ArchiveLiteTestRunner
             && hostSource.Contains("presentation_state_update", StringComparison.Ordinal)
             && hostSource.Contains("resident_presentation_state_v1", StringComparison.Ordinal)
             && hostSource.Contains("orbit_sensitivity = input.OrbitSensitivity", StringComparison.Ordinal)
-            && hostSource.Contains("pan_sensitivity = input.PanSensitivity", StringComparison.Ordinal),
-            "Archive Lite does not request the simple renderer surface with live Orbit/Pan input updates");
+            && hostSource.Contains("pan_sensitivity = input.PanSensitivity", StringComparison.Ordinal)
+            && hostSource.Contains("d3d11_background_color = input.BackgroundColor", StringComparison.Ordinal),
+            "Archive Lite does not request the simple renderer surface with live Orbit/Pan and background updates");
         var previewSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
