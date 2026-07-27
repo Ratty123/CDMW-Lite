@@ -149,6 +149,10 @@ public sealed class ArchiveSessionManager : IDisposable
                 {
                     warnings.Add($"Archive cache freshness metadata could not be updated: {exception.Message}");
                 }
+
+                // This rebuild just superseded whatever fingerprint the root pointed at, so the set
+                // it replaced is reclaimed now rather than carried until the next launch.
+                ArchiveIndexCacheReclamation.ReclaimSuperseded(FingerprintsInUse());
             }
             await PublishProgressAsync(progress, new ProgressUpdate(1, 1, "complete", root)).ConfigureAwait(false);
 
@@ -202,6 +206,13 @@ public sealed class ArchiveSessionManager : IDisposable
         ArchiveLiteDataPaths.EnsureCreated();
         return Path.Combine(ArchiveLiteDataPaths.IndexCache, $"{fingerprint}.ali");
     }
+
+    /// <summary>
+    /// Fingerprints an open session still reads. A rebuild supersedes a root's fingerprint while a
+    /// session opened against the previous one may still be serving queries from it.
+    /// </summary>
+    private IReadOnlyCollection<string> FingerprintsInUse() =>
+        _sessions.Values.Select(static session => session.Fingerprint).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     private static string ResolvePersistentBasenameIndexPath(string fingerprint)
     {

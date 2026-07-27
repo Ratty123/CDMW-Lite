@@ -29,12 +29,21 @@ public static class ArchiveLiteCacheMaintenance
         };
         var files = new List<FileInfo>();
         long totalBytes = 0;
+        // Archive indexes are large, expensive to rebuild, and older than the previews they serve,
+        // so a size-ordered eviction would reach the live index first. Their lifetime belongs to
+        // fingerprint supersession instead, which is why they are neither counted nor evicted here.
+        var indexSubtree = Path.Combine(cacheRoot, ArchiveLiteDataPaths.IndexDirectoryName)
+            + Path.DirectorySeparatorChar;
         try
         {
             foreach (var path in Directory.EnumerateFiles(cacheRoot, "*", options))
             {
                 try
                 {
+                    if (path.StartsWith(indexSubtree, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
                     var info = new FileInfo(path);
                     if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
                     {

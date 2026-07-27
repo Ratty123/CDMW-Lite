@@ -44,6 +44,9 @@ internal sealed class WorkerRuntime : IDisposable
             }
         };
         ArchiveLiteCacheMaintenance.Prune(ArchiveLiteDataPaths.Cache, ArchiveLiteCacheMaintenance.DefaultCacheMaximumBytes);
+        // No session holds an index yet, so startup is where a set abandoned by an earlier crash or
+        // by a root the user no longer opens can be reclaimed without contending with a reader.
+        ArchiveIndexCacheReclamation.ReclaimSuperseded();
         _native.EnsureCompatible();
         _sessions = new ArchiveSessionManager(_native);
         _queries = new ArchiveQueryService(_sessions);

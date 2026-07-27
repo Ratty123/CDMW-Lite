@@ -67,6 +67,8 @@ internal static class ArchiveLiteTestRunner
             ("an unclaimed worker stops instead of outliving its client", TestUnclaimedWorkerExitAsync),
             ("closing the standalone launcher job stops the application tree", TestStandaloneLauncherJobAsync),
             ("the embedded renderer stops when it loses its host's input", TestEmbeddedRendererHostDisconnectAsync),
+            ("archive indexes survive the size-bounded cache eviction", TestIndexSurvivesCacheEvictionAsync),
+            ("superseded archive indexes are reclaimed, live and in-use ones are not", TestSupersededIndexReclamationAsync),
         };
         var failures = new List<string>();
         foreach (var test in tests)
@@ -5412,6 +5414,119 @@ internal static class ArchiveLiteTestRunner
             }
             Require(response.Status == WorkerMessageStatus.Result, $"unexpected worker terminal status: {response.Status}");
             return response;
+        }
+    }
+
+    /// <summary>
+    /// Index sets are keyed by content fingerprint, so a game update publishes a new key and the
+    /// previous one is referenced by nothing. Reclaiming it must never reach a live or in-use set,
+    /// and must abandon the pass entirely when the keep-set cannot be established.
+    /// </summary>
+    private static async Task TestSupersededIndexReclamationAsync()
+    {
+        const string live = "1111111111111111111111111111111111111111111111111111111111111111";
+        const string inUse = "2222222222222222222222222222222222222222222222222222222222222222";
+        const string dead = "3333333333333333333333333333333333333333333333333333333333333333";
+        var indexDir = ArchiveLiteDataPaths.IndexCache;
+        var manifestDir = ArchiveLiteDataPaths.IndexRootManifests;
+        var namesDir = ArchiveLiteDataPaths.NameIndexCache;
+        var manifestPath = Path.Combine(manifestDir, "reclaim-root.json");
+        var unreadableManifest = Path.Combine(manifestDir, "reclaim-unreadable.json");
+        var staging = Path.Combine(indexDir, $".{dead}.abcdef.tmp");
+        try
+        {
+            ArchiveLiteDataPaths.EnsureCreated();
+            foreach (var fingerprint in new[] { live, inUse, dead })
+            {
+                foreach (var extension in new[] { ".ali", ".abi", ".aex" })
+                {
+                    await File.WriteAllBytesAsync(Path.Combine(indexDir, fingerprint + extension), new byte[64]).ConfigureAwait(false);
+                }
+                await File.WriteAllBytesAsync(Path.Combine(namesDir, fingerprint + ".json"), new byte[32]).ConfigureAwait(false);
+            }
+            // Only a bare fingerprint stem is owned here; staging output must be left alone.
+            await File.WriteAllBytesAsync(staging, new byte[16]).ConfigureAwait(false);
+            await File.WriteAllTextAsync(
+                manifestPath,
+                $"{{\"schema_version\":1,\"fingerprint\":\"{live}\"}}").ConfigureAwait(false);
+
+            // A manifest that cannot be parsed hides the fingerprint it protects, so the whole pass
+            // must be abandoned rather than treating every set as superseded.
+            await File.WriteAllTextAsync(unreadableManifest, "{ this is not json").ConfigureAwait(false);
+            var refused = ArchiveIndexCacheReclamation.ReclaimSuperseded([inUse]);
+            Require(refused.FilesRemoved == 0, "reclamation deleted indexes while a root manifest was unreadable");
+            Require(File.Exists(Path.Combine(indexDir, dead + ".ali")), "an unreadable manifest still allowed a deletion");
+            File.Delete(unreadableManifest);
+
+            var result = ArchiveIndexCacheReclamation.ReclaimSuperseded([inUse]);
+            foreach (var extension in new[] { ".ali", ".abi", ".aex" })
+            {
+                Require(File.Exists(Path.Combine(indexDir, live + extension)), $"a live index {extension} was reclaimed");
+                Require(File.Exists(Path.Combine(indexDir, inUse + extension)), $"an in-use index {extension} was reclaimed");
+                Require(!File.Exists(Path.Combine(indexDir, dead + extension)), $"a superseded index {extension} was kept");
+            }
+            Require(File.Exists(Path.Combine(namesDir, live + ".json")), "a live name cache was reclaimed");
+            Require(File.Exists(Path.Combine(namesDir, inUse + ".json")), "an in-use name cache was reclaimed");
+            Require(!File.Exists(Path.Combine(namesDir, dead + ".json")), "a superseded name cache was kept");
+            Require(File.Exists(staging), "reclamation deleted a staging file it does not own");
+            Require(result.FilesRemoved == 4, $"reclamation removed {result.FilesRemoved} files, expected the 4 superseded ones");
+            Require(result.BytesRemoved == (3 * 64) + 32, "reclaimed byte accounting is wrong");
+        }
+        finally
+        {
+            foreach (var fingerprint in new[] { live, inUse, dead })
+            {
+                foreach (var extension in new[] { ".ali", ".abi", ".aex" })
+                {
+                    var path = Path.Combine(indexDir, fingerprint + extension);
+                    if (File.Exists(path)) File.Delete(path);
+                }
+                var namePath = Path.Combine(namesDir, fingerprint + ".json");
+                if (File.Exists(namePath)) File.Delete(namePath);
+            }
+            foreach (var path in new[] { staging, manifestPath, unreadableManifest })
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Archive indexes are older than the previews they serve, so an oldest-first eviction would
+    /// delete the live index before any preview. They are outside the size budget entirely.
+    /// </summary>
+    private static async Task TestIndexSurvivesCacheEvictionAsync()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-evict-{Guid.NewGuid():N}");
+        try
+        {
+            var indexDir = Path.Combine(root, ArchiveLiteDataPaths.IndexDirectoryName);
+            var previewDir = Path.Combine(root, "preview");
+            Directory.CreateDirectory(indexDir);
+            Directory.CreateDirectory(previewDir);
+            // The index is by far the oldest and largest entry, which is exactly what an
+            // oldest-first eviction would reach for first.
+            var indexPath = Path.Combine(indexDir, "aaaa.ali");
+            await File.WriteAllBytesAsync(indexPath, new byte[8_000]).ConfigureAwait(false);
+            File.SetLastWriteTimeUtc(indexPath, DateTime.UtcNow.AddDays(-30));
+            for (var i = 0; i < 3; i++)
+            {
+                var previewPath = Path.Combine(previewDir, $"preview-{i}.png");
+                await File.WriteAllBytesAsync(previewPath, new byte[1_000]).ConfigureAwait(false);
+                File.SetLastWriteTimeUtc(previewPath, DateTime.UtcNow.AddHours(i - 3));
+            }
+
+            var result = ArchiveLiteCacheMaintenance.Prune(root, 1_500);
+            Require(File.Exists(indexPath), "the archive index was evicted by the size-bounded cache prune");
+            Require(result.BytesBefore == 3_000, "index bytes are still counted against the preview cache budget");
+            Require(result.FilesRemoved == 2, "the prune stopped evicting previews once indexes were exempt");
+            Require(File.Exists(Path.Combine(previewDir, "preview-2.png")), "the prune did not retain the newest preview");
+        }
+        finally
+        {
+            PreviewCacheLeases.Reset();
+            ArchiveLiteCacheMaintenance.ResetPruneThrottle();
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 
