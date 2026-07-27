@@ -133,7 +133,7 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
             [
                 ("character/model/cd_test_01_sword.pac", new byte[] { 0x50, 0x41, 0x43, 0x00 }),
                 ("character/model/cd_marni_laser_hel_0001_index01.pac", new byte[] { 0x50, 0x41, 0x43, 0x01 }),
-                ("ui/itemicon/itemicon_prefab_cd_marni_laser_hel_0001_n.dds", new byte[] { 0x44, 0x44, 0x53, 0x20 }),
+                ("ui/itemicon/itemicon_prefab_cd_marni_laser_hel_0001_n.dds", BuildDecodableDds()),
             ]).ConfigureAwait(false);
         await BuildPackageAsync(
             root,
@@ -409,7 +409,18 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         return output.ToArray();
     }
 
-    private static (byte[] Payload, byte[] Pathc) BuildPartialDds()
+    /// <summary>A complete, decodable 4x4 DXT1 surface.</summary>
+    public static byte[] BuildDecodableDds()
+    {
+        using var payload = new MemoryStream();
+        payload.Write(BuildDdsHeader());
+        payload.Write(Bc1Block);
+        return payload.ToArray();
+    }
+
+    private static readonly byte[] Bc1Block = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    private static byte[] BuildDdsHeader()
     {
         var header = new byte[0x80];
         "DDS "u8.CopyTo(header);
@@ -425,11 +436,17 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(80), 4);
         "DXT1"u8.CopyTo(header.AsSpan(84));
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(108), 0x00001000);
+        return header;
+    }
+
+    private static (byte[] Payload, byte[] Pathc) BuildPartialDds()
+    {
+        var header = BuildDdsHeader();
 
         using var payload = new MemoryStream();
         payload.Write(header);
         payload.WriteByte(0x80);
-        payload.Write([1, 2, 3, 4, 5, 6, 7, 8]);
+        payload.Write(Bc1Block);
 
         using var pathc = new MemoryStream();
         WriteUInt32(pathc, 0);
