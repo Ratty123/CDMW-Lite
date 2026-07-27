@@ -19,6 +19,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 - Cached texture previews now record the decoding helper build, so rebuilding the helper retires the previews it produced.
 - The preview cache is now pruned periodically rather than only at worker startup, and eviction skips entries a reader is holding or was just handed.
 
+- The standalone launcher now removes runtimes it supersedes, keeping the running one and the two most recently used. Every build previously extracted its own copy and none were ever collected.
+
 ### Fixed
 
 - A texture batch in which one job fails is no longer discarded in full; the decode report is now authoritative and each request reports its own outcome.
