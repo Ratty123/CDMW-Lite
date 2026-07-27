@@ -1871,6 +1871,15 @@ internal static class ArchiveLiteTestRunner
                 "Invoke-CheckedPowerShellScript -Path (Join-Path $PSScriptRoot \"verify_archive_lite_standalone.ps1\")",
                 StringComparison.Ordinal),
             "the release builder can misattribute a child PowerShell script's retained native exit code");
+        // The launcher is double-clicked from Explorer, which supplies no developer environment, so
+        // the NativeAOT standalone publish can only find the MSVC linker if the build locates
+        // vswhere itself. It must also tolerate a developer prompt, where vswhere is not needed.
+        Require(
+            buildSource.Contains("function Initialize-NativeLinkerPath", StringComparison.Ordinal)
+            && buildSource.Contains("Initialize-NativeLinkerPath", StringComparison.Ordinal)
+            && buildSource.Contains("Microsoft Visual Studio\\Installer", StringComparison.Ordinal)
+            && buildSource.Contains("$env:VCINSTALLDIR", StringComparison.Ordinal),
+            "the release builder does not make the NativeAOT linker reachable without a developer prompt");
         Require(
             dependencyBootstrapSource.Contains("$probeExitCode = $LASTEXITCODE", StringComparison.Ordinal)
             && dependencyBootstrapSource.Contains("if ($probeExitCode -ne 1)", StringComparison.Ordinal)
