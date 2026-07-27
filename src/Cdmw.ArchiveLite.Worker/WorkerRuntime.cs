@@ -23,7 +23,7 @@ internal sealed class WorkerRuntime : IDisposable
 
     public WorkerRuntime()
     {
-        ArchiveLiteCacheMaintenance.Prune(ArchiveLiteDataPaths.Cache, 5L * 1024L * 1024L * 1024L);
+        ArchiveLiteCacheMaintenance.Prune(ArchiveLiteDataPaths.Cache, ArchiveLiteCacheMaintenance.DefaultCacheMaximumBytes);
         _native.EnsureCompatible();
         _sessions = new ArchiveSessionManager(_native);
         _queries = new ArchiveQueryService(_sessions);
