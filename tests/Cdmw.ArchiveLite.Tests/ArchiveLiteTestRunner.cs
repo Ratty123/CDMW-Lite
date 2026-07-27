@@ -64,6 +64,8 @@ internal static class ArchiveLiteTestRunner
             ("archive query, preview, and text search are read-only", TestArchiveServicesAsync),
             ("archive export is contained, atomic, and manifested", TestArchiveExportAsync),
             ("named-pipe worker opens and queries an archive", TestWorkerBoundaryAsync),
+            ("an unclaimed worker stops instead of outliving its client", TestUnclaimedWorkerExitAsync),
+            ("closing the standalone launcher job stops the application tree", TestStandaloneLauncherJobAsync),
         };
         var failures = new List<string>();
         foreach (var test in tests)
@@ -5409,6 +5411,119 @@ internal static class ArchiveLiteTestRunner
             }
             Require(response.Status == WorkerMessageStatus.Result, $"unexpected worker terminal status: {response.Status}");
             return response;
+        }
+    }
+
+    /// <summary>
+    /// A worker whose client dies between launch and job assignment has no pipe to notice and no
+    /// window to close, so it must stop on its own rather than wait for a connection forever.
+    /// </summary>
+    private static async Task TestUnclaimedWorkerExitAsync()
+    {
+        var workerPath = FindWorkerOutputPath();
+        Require(File.Exists(workerPath), $"worker output was not found: {workerPath}");
+
+        var startInfo = CreateUnconnectedWorkerStartInfo(workerPath, connectTimeoutSeconds: "2");
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("the unclaimed worker test process could not be started");
+        var diagnosticsTask = process.StandardError.ReadToEndAsync();
+        _ = process.StandardOutput.ReadToEndAsync();
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            StopTestProcess(process);
+            throw new TimeoutException("an unclaimed worker kept running instead of exiting on its own");
+        }
+
+        var diagnostics = await diagnosticsTask.ConfigureAwait(false);
+        Require(process.ExitCode == 4, $"unclaimed worker exited with {process.ExitCode}, expected the unclaimed code 4");
+        Require(
+            diagnostics.Contains("No Archive Lite client connected", StringComparison.Ordinal),
+            "the unclaimed worker did not report why it stopped");
+    }
+
+    /// <summary>
+    /// Force-closing the standalone launcher must not leave the application - or anything it
+    /// started - running, which the kill-on-close job object is what actually guarantees.
+    /// </summary>
+    private static async Task TestStandaloneLauncherJobAsync()
+    {
+        var launcherSource = await File.ReadAllTextAsync(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Cdmw.ArchiveLite.Standalone",
+            "Program.cs")).ConfigureAwait(false);
+        Require(
+            launcherSource.Contains("StandaloneJob.TryCreate", StringComparison.Ordinal)
+            && launcherSource.Contains("job.TryAdd(process", StringComparison.Ordinal),
+            "the standalone launcher no longer places the application it starts in a job object");
+
+        var workerPath = FindWorkerOutputPath();
+        Require(File.Exists(workerPath), $"worker output was not found: {workerPath}");
+
+        // A worker with a long connect deadline is an in-repo process that stays alive until
+        // something else stops it, which is exactly the fence under test.
+        var startInfo = CreateUnconnectedWorkerStartInfo(workerPath, connectTimeoutSeconds: "300");
+        var job = StandaloneJob.TryCreate(out var jobFailure);
+        Require(job is not null, $"the launcher job object could not be created: {jobFailure?.Message}");
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("the job-fence test process could not be started");
+        _ = process.StandardError.ReadToEndAsync();
+        _ = process.StandardOutput.ReadToEndAsync();
+        try
+        {
+            Require(
+                job!.TryAdd(process, out var assignFailure),
+                $"the launcher job object rejected the application process: {assignFailure?.Message}");
+            Require(!process.HasExited, "the job-assigned process stopped before the fence could be tested");
+
+            job.Dispose();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw new TimeoutException("closing the launcher job did not stop the application process");
+        }
+        finally
+        {
+            job?.Dispose();
+            StopTestProcess(process);
+        }
+    }
+
+    private static ProcessStartInfo CreateUnconnectedWorkerStartInfo(string workerPath, string connectTimeoutSeconds)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = workerPath,
+            Arguments = $"--pipe \"cdmw-archive-lite-test-{Environment.ProcessId}-{Guid.NewGuid():N}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            WorkingDirectory = Path.GetDirectoryName(workerPath)!,
+        };
+        startInfo.Environment["CDMW_ARCHIVE_LITE_WORKER_CONNECT_TIMEOUT_SECONDS"] = connectTimeoutSeconds;
+        return startInfo;
+    }
+
+    private static void StopTestProcess(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // The owning assertion reports the real failure.
         }
     }
 
