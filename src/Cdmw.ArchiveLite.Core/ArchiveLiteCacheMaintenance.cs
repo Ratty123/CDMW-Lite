@@ -1,7 +1,14 @@
+using System.Diagnostics;
+
 namespace Cdmw.ArchiveLite.Core;
 
 public static class ArchiveLiteCacheMaintenance
 {
+    public const long DefaultCacheMaximumBytes = 5L * 1024L * 1024L * 1024L;
+    public static readonly TimeSpan DefaultPruneInterval = TimeSpan.FromSeconds(60);
+    private static readonly SemaphoreSlim PruneGate = new(1, 1);
+    private static long _lastPruneTimestamp = long.MinValue;
+
     public static CachePruneResult Prune(string cacheRoot, long maximumBytes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cacheRoot);
@@ -64,6 +71,11 @@ public static class ArchiveLiteCacheMaintenance
                 {
                     break;
                 }
+                // A caller may be holding this entry or may have just been handed it.
+                if (PreviewCacheLeases.IsProtected(file.FullName))
+                {
+                    continue;
+                }
                 try
                 {
                     var length = file.Length;
@@ -79,6 +91,48 @@ public static class ArchiveLiteCacheMaintenance
         }
         return new CachePruneResult(before, totalBytes, removed);
     }
+
+    /// <summary>
+    /// Runs a prune on a background thread at most once per interval. Startup-only pruning lets the
+    /// cache grow unbounded through a long browsing session.
+    /// </summary>
+    public static bool RequestPrune(
+        string cacheRoot,
+        long maximumBytes,
+        TimeSpan? minimumInterval = null)
+    {
+        var interval = minimumInterval ?? DefaultPruneInterval;
+        var now = Stopwatch.GetTimestamp();
+        var last = Interlocked.Read(ref _lastPruneTimestamp);
+        if (last != long.MinValue && Stopwatch.GetElapsedTime(last, now) < interval)
+        {
+            return false;
+        }
+        if (!PruneGate.Wait(0))
+        {
+            return false;
+        }
+        Interlocked.Exchange(ref _lastPruneTimestamp, now);
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                Prune(cacheRoot, maximumBytes);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // Background maintenance never surfaces over the operation that triggered it.
+            }
+            finally
+            {
+                PruneGate.Release();
+            }
+        });
+        return true;
+    }
+
+    /// <summary>Test seam so a scenario is not throttled by an earlier scenario's prune.</summary>
+    public static void ResetPruneThrottle() => _lastPruneTimestamp = long.MinValue;
 }
 
 public sealed record CachePruneResult(long BytesBefore, long BytesAfter, int FilesRemoved);

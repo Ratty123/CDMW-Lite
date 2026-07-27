@@ -14,21 +14,24 @@ public sealed record TexturePreviewRequest(ArchiveEntryDto Entry, string DdsPath
 /// <summary>The published preview for one request, or the reason the decode failed.</summary>
 public sealed record TexturePreviewResult(ArchiveEntryDto Entry, string? PngPath, string? Error);
 
-public sealed class NativeTexturePreviewService
+public sealed class NativeTexturePreviewService(Action<string>? onDiagnostic = null)
 {
-    private const string ArtifactVersion = "directxtex_preview_v2";
+    private const string ArtifactVersion = "directxtex_preview_v3";
+    private const string BackendId = "directxtex_native_0.2";
+    private const string SidecarSuffix = ".cdmw_texture.json";
 
     // cd-texture-dx returns 2 when at least one job failed but the report is still complete
     // and authoritative. Only codes outside {0, 2} mean the report cannot be trusted.
     private const int PartialFailureExitCode = 2;
 
-    private static readonly TimeSpan BaseDecodeTimeout = TimeSpan.FromSeconds(45);
-    private static readonly TimeSpan AdditionalJobDecodeTimeout = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan MaximumDecodeTimeout = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan MinimumDecodeTimeout = TimeSpan.FromSeconds(120);
+    private static readonly TimeSpan MaximumDecodeTimeout = TimeSpan.FromMinutes(60);
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
     private const int MaximumMemoizedValidations = 8192;
     private static readonly ConcurrentDictionary<PngIdentity, bool> PngValidations = new();
     private static readonly uint[] Crc32Table = CreateCrc32Table();
+    private static string? _cachedDecoderPath;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _decodeGates = new(StringComparer.Ordinal);
 
     public async Task<string> BuildAsync(
@@ -66,7 +69,12 @@ public sealed class NativeTexturePreviewService
         ArgumentNullException.ThrowIfNull(entry);
         ValidateMaximumDimension(maximumDimension);
         var destination = ResolveDestination(session, entry, maximumDimension, "item-icons");
-        return IsPng(destination) ? destination : null;
+        if (!IsCachedPreviewValid(destination))
+        {
+            return null;
+        }
+        PreviewCacheLeases.MarkRecent(destination);
+        return destination;
     }
 
     private async Task<string> BuildOneAsync(
@@ -127,66 +135,42 @@ public sealed class NativeTexturePreviewService
 
         var published = new Dictionary<string, string>(StringComparer.Ordinal);
         var failed = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        // A warm cache entry needs no gate and no helper process.
-        var pending = new List<PreviewPlan>(plans.Count);
-        var claimed = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var plan in plans)
+        var leases = new List<PreviewCacheLease>(plans.Count);
+        try
         {
-            if (IsPng(plan.Destination))
+            // Pin every destination so a concurrent prune cannot evict what this batch is about to
+            // read or publish.
+            foreach (var plan in plans)
             {
-                published[plan.Key] = plan.Destination;
+                leases.Add(PreviewCacheLeases.Acquire(plan.Destination));
             }
-            else if (claimed.Add(plan.Key))
+
+            var pending = new List<PreviewPlan>(plans.Count);
+            var claimed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var plan in plans)
             {
-                // Two rows in one batch can share a cache key; decode it once.
-                pending.Add(plan);
+                if (IsCachedPreviewValid(plan.Destination))
+                {
+                    published[plan.Key] = plan.Destination;
+                }
+                else if (claimed.Add(plan.Key))
+                {
+                    // Two rows in one batch can share a cache key; decode it once.
+                    pending.Add(plan);
+                }
+            }
+
+            if (pending.Count > 0)
+            {
+                await DecodePendingAsync(pending, textureRoot, maximumDimension, published, failed, cancellationToken)
+                    .ConfigureAwait(false);
             }
         }
-
-        if (pending.Count > 0)
+        finally
         {
-            // Gates are taken in a single global order so overlapping batches cannot deadlock.
-            pending.Sort(static (left, right) => string.CompareOrdinal(left.Key, right.Key));
-            var gates = new List<SemaphoreSlim>(pending.Count);
-            try
+            foreach (var lease in leases)
             {
-                foreach (var plan in pending)
-                {
-                    var gate = _decodeGates.GetOrAdd(plan.Key, static _ => new SemaphoreSlim(1, 1));
-                    await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    gates.Add(gate);
-                }
-
-                var stillPending = new List<PreviewPlan>(pending.Count);
-                foreach (var plan in pending)
-                {
-                    if (IsPng(plan.Destination))
-                    {
-                        published[plan.Key] = plan.Destination;
-                    }
-                    else
-                    {
-                        stillPending.Add(plan);
-                    }
-                }
-                if (stillPending.Count > 0)
-                {
-                    await DecodeBatchAsync(
-                        stillPending,
-                        textureRoot,
-                        maximumDimension,
-                        published,
-                        failed,
-                        cancellationToken).ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                for (var index = gates.Count - 1; index >= 0; index--)
-                {
-                    gates[index].Release();
-                }
+                lease.Dispose();
             }
         }
 
@@ -195,6 +179,7 @@ public sealed class NativeTexturePreviewService
         {
             if (published.TryGetValue(plan.Key, out var pngPath))
             {
+                PreviewCacheLeases.MarkRecent(pngPath);
                 results.Add(new TexturePreviewResult(plan.Request.Entry, pngPath, null));
                 continue;
             }
@@ -203,10 +188,99 @@ public sealed class NativeTexturePreviewService
                 : "DirectXTex could not decode the selected DDS.";
             results.Add(new TexturePreviewResult(plan.Request.Entry, null, error));
         }
+        if (published.Count > 0)
+        {
+            ArchiveLiteCacheMaintenance.RequestPrune(
+                ArchiveLiteDataPaths.Cache,
+                ArchiveLiteCacheMaintenance.DefaultCacheMaximumBytes);
+        }
         return results;
     }
 
-    private static async Task DecodeBatchAsync(
+    private async Task DecodePendingAsync(
+        List<PreviewPlan> pending,
+        string textureRoot,
+        int maximumDimension,
+        Dictionary<string, string> published,
+        Dictionary<string, string> failed,
+        CancellationToken cancellationToken)
+    {
+        // Reject sources the helper cannot survive before paying for a process launch.
+        var decodable = new List<PreviewPlan>(pending.Count);
+        foreach (var plan in pending)
+        {
+            var rejection = DdsResourceLimits.DescribeRejection(plan.Request.DdsPath);
+            if (rejection is null)
+            {
+                decodable.Add(plan);
+                continue;
+            }
+            failed[plan.Key] = rejection;
+            TexturePreviewDiagnostics.RecordFailure(
+                "batch-preview-json",
+                "unsafe_dds_input",
+                plan.Request.Entry.Path,
+                rejection);
+        }
+        if (decodable.Count == 0)
+        {
+            return;
+        }
+
+        // Gates are taken in a single global order so overlapping batches cannot deadlock.
+        decodable.Sort(static (left, right) => string.CompareOrdinal(left.Key, right.Key));
+        var gates = new List<(string Key, SemaphoreSlim Gate)>(decodable.Count);
+        try
+        {
+            foreach (var plan in decodable)
+            {
+                var gate = _decodeGates.GetOrAdd(plan.Key, static _ => new SemaphoreSlim(1, 1));
+                await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                gates.Add((plan.Key, gate));
+            }
+
+            var stillPending = new List<PreviewPlan>(decodable.Count);
+            foreach (var plan in decodable)
+            {
+                if (IsCachedPreviewValid(plan.Destination))
+                {
+                    published[plan.Key] = plan.Destination;
+                }
+                else
+                {
+                    stillPending.Add(plan);
+                }
+            }
+            if (stillPending.Count > 0)
+            {
+                await DecodeBatchAsync(
+                    stillPending,
+                    textureRoot,
+                    maximumDimension,
+                    published,
+                    failed,
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            for (var index = gates.Count - 1; index >= 0; index--)
+            {
+                var (key, gate) = gates[index];
+                gate.Release();
+                // Drop the gate once nobody holds or waits on it, so browsing a large archive does
+                // not retain one semaphore per cache key for the life of the process. A racing
+                // caller may still hold this instance and decode alongside a replacement; that
+                // costs duplicated work, and publication already tolerates the race.
+                if (gate.CurrentCount == 1)
+                {
+                    _decodeGates.TryRemove(new KeyValuePair<string, SemaphoreSlim>(key, gate));
+                }
+            }
+        }
+    }
+
+    private async Task DecodeBatchAsync(
         List<PreviewPlan> pending,
         string textureRoot,
         int maximumDimension,
@@ -245,14 +319,15 @@ public sealed class NativeTexturePreviewService
                     new
                     {
                         version = 2,
-                        backend = "directxtex_native_0.2",
+                        backend = BackendId,
                         jobs,
                     },
                     WorkerProtocol.JsonOptions,
                     token).ConfigureAwait(false),
                 cancellationToken).ConfigureAwait(false);
 
-            await RunDecoderAsync(jobPath, reportPath, pending.Count, cancellationToken).ConfigureAwait(false);
+            var timeout = ResolveDecodeTimeout(pending, maximumDimension);
+            await RunDecoderAsync(jobPath, reportPath, timeout, cancellationToken).ConfigureAwait(false);
             var reported = ReadReport(reportPath);
 
             for (var index = 0; index < pending.Count; index++)
@@ -262,33 +337,46 @@ public sealed class NativeTexturePreviewService
                 if (!reported.TryGetValue(Path.GetFullPath(stagedOutput), out var item))
                 {
                     failed[plan.Key] = "cd-texture-dx omitted this job from its decode report.";
+                    TexturePreviewDiagnostics.RecordFailure(
+                        "batch-preview-json",
+                        "missing_job_result",
+                        plan.Request.Entry.Path,
+                        $"report carried {reported.Count} of {pending.Count} requested job(s)");
                     continue;
                 }
                 if (!string.Equals(item.Status, "decoded", StringComparison.OrdinalIgnoreCase))
                 {
-                    failed[plan.Key] = item.Message ?? "DirectXTex could not decode the selected DDS.";
+                    var message = item.Message ?? "DirectXTex could not decode the selected DDS.";
+                    failed[plan.Key] = message;
+                    TexturePreviewDiagnostics.RecordFailure(
+                        "batch-preview-json",
+                        "helper_reported_error",
+                        plan.Request.Entry.Path,
+                        message);
                     continue;
                 }
-                if (!IsPng(stagedOutput))
+                if (!IsValidPng(stagedOutput))
                 {
                     failed[plan.Key] = "DirectXTex did not produce a valid PNG preview.";
+                    TexturePreviewDiagnostics.RecordFailure(
+                        "batch-preview-json",
+                        "invalid_helper_output",
+                        plan.Request.Entry.Path,
+                        stagedOutput);
                     continue;
                 }
-                try
-                {
-                    File.Move(stagedOutput, plan.Destination, overwrite: true);
-                }
-                catch (IOException) when (IsPng(plan.Destination))
-                {
-                    // Another immutable decode won the publication race.
-                }
-                if (IsPng(plan.Destination))
+                if (TryPublish(plan, stagedOutput, item))
                 {
                     published[plan.Key] = plan.Destination;
                 }
                 else
                 {
                     failed[plan.Key] = "DirectXTex did not publish a valid PNG preview.";
+                    TexturePreviewDiagnostics.RecordFailure(
+                        "batch-preview-json",
+                        "publication_failed",
+                        plan.Request.Entry.Path,
+                        plan.Destination);
                 }
             }
         }
@@ -308,6 +396,41 @@ public sealed class NativeTexturePreviewService
         }
     }
 
+    /// <summary>
+    /// Publishes the sidecar first, then the PNG. A cache hit requires both, so an interrupted
+    /// publication leaves a miss rather than a preview with no provenance.
+    /// </summary>
+    private static bool TryPublish(PreviewPlan plan, string stagedOutput, ReportItem item)
+    {
+        try
+        {
+            var stagedSidecar = stagedOutput + SidecarSuffix;
+            File.WriteAllText(
+                stagedSidecar,
+                JsonSerializer.Serialize(
+                    new TexturePreviewSidecar(
+                        item.Status ?? "decoded",
+                        BackendId,
+                        ArtifactVersion,
+                        plan.Request.Entry.Path,
+                        item.Format,
+                        item.Width,
+                        item.Height,
+                        DateTimeOffset.UtcNow),
+                    WorkerProtocol.JsonOptions),
+                new UTF8Encoding(false));
+            File.Move(stagedSidecar, SidecarPath(plan.Destination), overwrite: true);
+            File.Move(stagedOutput, plan.Destination, overwrite: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Another immutable decode may have won the publication race.
+        }
+        return IsCachedPreviewValid(plan.Destination);
+    }
+
+    private static string SidecarPath(string pngPath) => pngPath + SidecarSuffix;
+
     private static string ResolveDestination(
         ArchiveSession session,
         ArchiveEntryDto entry,
@@ -317,6 +440,7 @@ public sealed class NativeTexturePreviewService
         var identity = Encoding.UTF8.GetBytes(string.Join(
             '|',
             ArtifactVersion,
+            HelperIdentity(),
             maximumDimension,
             session.Fingerprint,
             entry.EntryId,
@@ -328,6 +452,30 @@ public sealed class NativeTexturePreviewService
         return Path.Combine(ArchiveLiteDataPaths.PreviewCache, cacheNamespace, key + ".png");
     }
 
+    /// <summary>
+    /// Folds the helper build into the cache key so rebuilding cd-texture-dx retires previews it
+    /// produced, instead of waiting for someone to remember to bump a version constant.
+    /// </summary>
+    private static string HelperIdentity()
+    {
+        var path = TryResolveDecoderPath();
+        if (path is null)
+        {
+            return "helper=missing";
+        }
+        try
+        {
+            var info = new FileInfo(path);
+            return info.Exists
+                ? $"helper={path.ToLowerInvariant()}:{info.Length}:{info.LastWriteTimeUtc.Ticks}"
+                : "helper=missing";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return "helper=unreadable";
+        }
+    }
+
     private static void ValidateMaximumDimension(int maximumDimension)
     {
         if (maximumDimension is < 32 or > 4096)
@@ -336,16 +484,58 @@ public sealed class NativeTexturePreviewService
         }
     }
 
-    private static TimeSpan ResolveDecodeTimeout(int jobCount)
+    /// <summary>
+    /// Scales the timeout with the real cost of the batch. A flat allowance either aborts a large
+    /// BC7 decode that was progressing or leaves a wedged helper running far too long.
+    /// </summary>
+    private static TimeSpan ResolveDecodeTimeout(IReadOnlyList<PreviewPlan> pending, int maximumDimension)
     {
-        var scaled = BaseDecodeTimeout + AdditionalJobDecodeTimeout * Math.Max(0, jobCount - 1);
-        return scaled > MaximumDecodeTimeout ? MaximumDecodeTimeout : scaled;
+        var baseSeconds = 30.0;
+        var variableSeconds = 0.0;
+        foreach (var plan in pending)
+        {
+            if (!DdsTextureHeader.TryRead(plan.Request.DdsPath, out var header))
+            {
+                continue;
+            }
+            var (jobBase, perMegapixel) = DecodeCost(header.Family);
+            baseSeconds = Math.Max(baseSeconds, jobBase);
+            variableSeconds += perMegapixel * OutputMegapixels(header, maximumDimension);
+        }
+        var total = TimeSpan.FromSeconds(baseSeconds + variableSeconds);
+        if (total < MinimumDecodeTimeout) return MinimumDecodeTimeout;
+        return total > MaximumDecodeTimeout ? MaximumDecodeTimeout : total;
     }
 
-    private static async Task RunDecoderAsync(
+    private static (double BaseSeconds, double PerMegapixel) DecodeCost(DdsCompressedFamily family) => family switch
+    {
+        DdsCompressedFamily.Bc6h or DdsCompressedFamily.Bc7 => (60.0, 45.0),
+        DdsCompressedFamily.Bc1
+            or DdsCompressedFamily.Bc2
+            or DdsCompressedFamily.Bc3
+            or DdsCompressedFamily.Bc4
+            or DdsCompressedFamily.Bc5 => (30.0, 10.0),
+        _ => (30.0, 3.0),
+    };
+
+    private static double OutputMegapixels(DdsTextureHeader header, int maximumDimension)
+    {
+        double width = header.Width;
+        double height = header.Height;
+        var longest = Math.Max(width, height);
+        if (maximumDimension > 0 && longest > maximumDimension)
+        {
+            var scale = maximumDimension / longest;
+            width = Math.Max(1, width * scale);
+            height = Math.Max(1, height * scale);
+        }
+        return width * height / 1_000_000.0;
+    }
+
+    private async Task RunDecoderAsync(
         string jobPath,
         string reportPath,
-        int jobCount,
+        TimeSpan decodeTimeout,
         CancellationToken cancellationToken)
     {
         var executable = ResolveDecoderPath();
@@ -365,17 +555,22 @@ public sealed class NativeTexturePreviewService
             ?? throw new InvalidOperationException("cd-texture-dx could not be started.");
         var stdout = ReadBoundedAsync(process.StandardOutput, cancellationToken);
         var stderr = ReadBoundedAsync(process.StandardError, cancellationToken);
-        var decodeTimeout = ResolveDecodeTimeout(jobCount);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(decodeTimeout);
+        var started = Stopwatch.GetTimestamp();
         try
         {
-            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            await WaitWithHeartbeatAsync(process, decodeTimeout, started, timeout.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             StopProcess(process);
             await ObserveAsync(stdout, stderr).ConfigureAwait(false);
+            TexturePreviewDiagnostics.RecordFailure(
+                "batch-preview-json",
+                "timeout",
+                string.Empty,
+                $"no exit within {decodeTimeout.TotalSeconds:N0}s");
             throw new TimeoutException($"cd-texture-dx did not finish within {decodeTimeout.TotalSeconds:N0} seconds.");
         }
         catch (OperationCanceledException)
@@ -390,7 +585,39 @@ public sealed class NativeTexturePreviewService
         if (process.ExitCode is not (0 or PartialFailureExitCode))
         {
             var detail = string.IsNullOrWhiteSpace(stderrText) ? stdoutText : stderrText;
+            TexturePreviewDiagnostics.RecordFailure(
+                "batch-preview-json",
+                "nonzero_exit_code",
+                string.Empty,
+                $"exit {process.ExitCode}: {detail}");
             throw new InvalidDataException($"cd-texture-dx exited with code {process.ExitCode}: {detail.Trim()}");
+        }
+    }
+
+    /// <summary>Reports progress on a long decode so a slow batch is distinguishable from a wedged one.</summary>
+    private async Task WaitWithHeartbeatAsync(
+        Process process,
+        TimeSpan decodeTimeout,
+        long started,
+        CancellationToken timeoutToken)
+    {
+        var exit = process.WaitForExitAsync(timeoutToken);
+        if (onDiagnostic is null)
+        {
+            await exit.ConfigureAwait(false);
+            return;
+        }
+        while (true)
+        {
+            var heartbeat = Task.Delay(HeartbeatInterval, timeoutToken);
+            if (await Task.WhenAny(exit, heartbeat).ConfigureAwait(false) == exit)
+            {
+                await exit.ConfigureAwait(false);
+                return;
+            }
+            onDiagnostic(
+                $"cd-texture-dx is still decoding after {Stopwatch.GetElapsedTime(started).TotalSeconds:N0}s "
+                + $"(timeout {decodeTimeout.TotalSeconds:N0}s).");
         }
     }
 
@@ -398,61 +625,84 @@ public sealed class NativeTexturePreviewService
     {
         if (!File.Exists(reportPath))
         {
+            TexturePreviewDiagnostics.RecordFailure("batch-preview-json", "missing_report", string.Empty, reportPath);
             throw new InvalidDataException("cd-texture-dx did not produce a decode report.");
         }
-        using var document = JsonDocument.Parse(File.ReadAllText(reportPath));
-        var root = document.RootElement;
-        if (!root.TryGetProperty("status", out var status)
-            || !string.Equals(status.GetString(), "ok", StringComparison.OrdinalIgnoreCase)
-            || !root.TryGetProperty("items", out var items)
-            || items.ValueKind != JsonValueKind.Array)
+        JsonDocument document;
+        try
         {
-            throw new InvalidDataException("cd-texture-dx returned an invalid decode report.");
+            document = JsonDocument.Parse(File.ReadAllText(reportPath));
         }
+        catch (JsonException exception)
+        {
+            TexturePreviewDiagnostics.RecordFailure("batch-preview-json", "invalid_report_json", string.Empty, exception.Message);
+            throw new InvalidDataException("cd-texture-dx returned an unreadable decode report.");
+        }
+        using (document)
+        {
+            var root = document.RootElement;
+            if (!root.TryGetProperty("status", out var status)
+                || !string.Equals(status.GetString(), "ok", StringComparison.OrdinalIgnoreCase)
+                || !root.TryGetProperty("items", out var items)
+                || items.ValueKind != JsonValueKind.Array)
+            {
+                TexturePreviewDiagnostics.RecordFailure("batch-preview-json", "missing_report_items", string.Empty, reportPath);
+                throw new InvalidDataException("cd-texture-dx returned an invalid decode report.");
+            }
 
-        var reported = new Dictionary<string, ReportItem>(StringComparer.OrdinalIgnoreCase);
-        foreach (var item in items.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object)
+            var reported = new Dictionary<string, ReportItem>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items.EnumerateArray())
             {
-                continue;
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+                var output = item.TryGetProperty("output_path", out var outputValue)
+                    ? outputValue.GetString()
+                    : null;
+                if (string.IsNullOrWhiteSpace(output))
+                {
+                    continue;
+                }
+                try
+                {
+                    reported[Path.GetFullPath(output)] = new ReportItem(
+                        item.TryGetProperty("status", out var itemStatus) ? itemStatus.GetString() : null,
+                        item.TryGetProperty("message", out var message) ? message.GetString() : null,
+                        item.TryGetProperty("format", out var format) ? format.GetString() : null,
+                        item.TryGetProperty("prepared_width", out var width) && width.TryGetInt32(out var w) ? w : 0,
+                        item.TryGetProperty("prepared_height", out var height) && height.TryGetInt32(out var h) ? h : 0);
+                }
+                catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+                {
+                    // A report row with an unusable path cannot match a staged output.
+                }
             }
-            var output = item.TryGetProperty("output_path", out var outputValue)
-                ? outputValue.GetString()
-                : null;
-            if (string.IsNullOrWhiteSpace(output))
-            {
-                continue;
-            }
-            var itemStatus = item.TryGetProperty("status", out var itemStatusValue)
-                ? itemStatusValue.GetString()
-                : null;
-            var message = item.TryGetProperty("message", out var messageValue)
-                ? messageValue.GetString()
-                : null;
-            try
-            {
-                reported[Path.GetFullPath(output)] = new ReportItem(itemStatus, message);
-            }
-            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
-            {
-                // A report row with an unusable path cannot match a staged output.
-            }
+            return reported;
         }
-        return reported;
     }
 
-    private static string ResolveDecoderPath()
+    private static string ResolveDecoderPath() =>
+        TryResolveDecoderPath()
+        ?? throw new FileNotFoundException(
+            "cd-texture-dx.exe was not found. Rebuild Archive Lite or set CDMW_ARCHIVE_LITE_TEXTURE_HELPER_PATH.");
+
+    private static string? TryResolveDecoderPath()
     {
         var overridePath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_TEXTURE_HELPER_PATH");
         if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
         {
             return Path.GetFullPath(overridePath);
         }
+        // Probing the tree is far more expensive than the stat that reads the helper identity.
+        if (_cachedDecoderPath is { } cached && File.Exists(cached))
+        {
+            return cached;
+        }
         var packaged = Path.Combine(AppContext.BaseDirectory, "texture", "cd-texture-dx.exe");
         if (File.Exists(packaged))
         {
-            return packaged;
+            return _cachedDecoderPath = packaged;
         }
         for (var current = new DirectoryInfo(AppContext.BaseDirectory); current is not null; current = current.Parent)
         {
@@ -461,19 +711,46 @@ public sealed class NativeTexturePreviewService
                 var candidate = Path.Combine(current.FullName, "native", "cd_texture_dx", "build", configuration, "cd-texture-dx.exe");
                 if (File.Exists(candidate))
                 {
-                    return candidate;
+                    return _cachedDecoderPath = candidate;
                 }
             }
         }
-        throw new FileNotFoundException(
-            "cd-texture-dx.exe was not found. Rebuild Archive Lite or set CDMW_ARCHIVE_LITE_TEXTURE_HELPER_PATH.");
+        return null;
+    }
+
+    /// <summary>A cache entry counts only when both the PNG and its provenance sidecar are intact.</summary>
+    private static bool IsCachedPreviewValid(string pngPath) =>
+        IsValidPng(pngPath) && IsValidSidecar(SidecarPath(pngPath));
+
+    private static bool IsValidSidecar(string sidecarPath)
+    {
+        try
+        {
+            if (!File.Exists(sidecarPath))
+            {
+                return false;
+            }
+            using var document = JsonDocument.Parse(File.ReadAllText(sidecarPath));
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("status", out var status))
+            {
+                return false;
+            }
+            var text = status.GetString();
+            return !string.IsNullOrWhiteSpace(text)
+                && text is not ("error" or "failed" or "cancelled");
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
     /// Confirms a cached preview is a structurally complete PNG. A signature-only check accepts a
     /// truncated or half-published file, which then fails at display time and stays cached.
     /// </summary>
-    private static bool IsPng(string path)
+    private static bool IsValidPng(string path)
     {
         try
         {
@@ -687,7 +964,17 @@ public sealed class NativeTexturePreviewService
 
     private sealed record PreviewPlan(TexturePreviewRequest Request, string Destination, string Key);
 
-    private sealed record ReportItem(string? Status, string? Message);
+    private sealed record ReportItem(string? Status, string? Message, string? Format, int Width, int Height);
+
+    private sealed record TexturePreviewSidecar(
+        string Status,
+        string Backend,
+        string ArtifactVersion,
+        string SourcePath,
+        string? Format,
+        int Width,
+        int Height,
+        DateTimeOffset DecodedUtc);
 
     private readonly record struct PngIdentity(string Path, long Length, long ModifiedTicks);
 }

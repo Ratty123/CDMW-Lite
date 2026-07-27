@@ -13,11 +13,17 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 - Reduced large real-archive cache build and refresh time by avoiding repeated path allocations during native index sorting.
 - Item Finder icon pages now decode through a single shared texture-helper invocation per page instead of one helper process per icon.
+- Texture decode timeouts now scale with the compression family and output size of the batch instead of using one fixed allowance, and a long decode reports progress.
+- Cached texture previews now record the decoding helper build, so rebuilding the helper retires the previews it produced.
+- The preview cache is now pruned periodically rather than only at worker startup, and eviction skips entries a reader is holding or was just handed.
 
 ### Fixed
 
 - A texture batch in which one job fails is no longer discarded in full; the decode report is now authoritative and each request reports its own outcome.
 - Truncated, checksum-corrupt, and over-long cached texture previews are no longer served as warm cache hits.
+- A DDS that cannot decode inside the preview resource limits is now rejected from its header instead of starting a helper process that would fail or exhaust memory.
+- Texture decode failures are recorded in a bounded diagnostic history instead of being discarded with the exception.
+- Preview decode gates are released from their registry once idle, instead of retaining one lock per cache key for the life of the process.
 
 ## [0.6.1] - 2026-07-23
 

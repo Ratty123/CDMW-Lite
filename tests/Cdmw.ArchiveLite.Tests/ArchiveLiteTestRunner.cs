@@ -40,7 +40,8 @@ internal static class ArchiveLiteTestRunner
             ("archive grid exposes configurable sortable columns and categorized extensions", TestArchiveGridFeaturesAsync),
             ("associated assets resolve references and same-family companions read-only", TestAssociatedAssetsAsync),
             ("export paths reject traversal and roots", TestExportPathPolicyAsync),
-            ("isolated cache maintenance is bounded and deterministic", TestCacheMaintenanceAsync),
+            ("isolated cache maintenance is bounded, lease-aware, and deterministic", TestCacheMaintenanceAsync),
+            ("DDS header facts bound decode cost and preview resource use", TestDdsHeaderAndResourceLimitsAsync),
             ("standalone payload extraction is atomic, reusable, and traversal-safe", TestStandaloneRuntimeAsync),
             ("double-click build launcher routes to the verified release pipeline", TestBuildLauncherSourceAsync),
             ("game discovery recognizes archive roots and Steam libraries", TestGameInstallDiscoveryAsync),
@@ -1663,11 +1664,129 @@ internal static class ArchiveLiteTestRunner
             Require(result.BytesBefore == 3_000, "cache size accounting is wrong");
             Require(result.BytesAfter <= 1_350 && result.FilesRemoved == 2, "cache did not prune to its low-water mark");
             Require(File.Exists(Path.Combine(root, "cache-2.bin")), "cache pruning did not retain the newest entry");
+
+            await RequireLeaseAwarePruneAsync(root).ConfigureAwait(false);
+            RequirePruneThrottle(root);
         }
         finally
         {
+            PreviewCacheLeases.Reset();
+            ArchiveLiteCacheMaintenance.ResetPruneThrottle();
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    /// <summary>An entry a reader is holding, or was just handed, must survive an eviction pass.</summary>
+    private static async Task RequireLeaseAwarePruneAsync(string root)
+    {
+        PreviewCacheLeases.Reset();
+        foreach (var name in new[] { "leased", "recent", "cold-a", "cold-b" })
+        {
+            var path = Path.Combine(root, $"{name}.bin");
+            await File.WriteAllBytesAsync(path, new byte[1_000]).ConfigureAwait(false);
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddHours(-9));
+        }
+        var leasedPath = Path.Combine(root, "leased.bin");
+        var recentPath = Path.Combine(root, "recent.bin");
+        using (PreviewCacheLeases.Acquire(leasedPath))
+        {
+            PreviewCacheLeases.MarkRecent(recentPath, TimeSpan.FromMinutes(5));
+            ArchiveLiteCacheMaintenance.Prune(root, 1_200);
+            Require(File.Exists(leasedPath), "a leased cache entry was evicted while a reader held it");
+            Require(File.Exists(recentPath), "a just-returned cache entry was evicted inside its grace window");
+            Require(
+                !File.Exists(Path.Combine(root, "cold-a.bin")) || !File.Exists(Path.Combine(root, "cold-b.bin")),
+                "lease-aware pruning stopped evicting unprotected entries");
+        }
+        // Releasing the lease and expiring the grace window makes both evictable again.
+        PreviewCacheLeases.MarkRecent(recentPath, TimeSpan.Zero);
+        Require(
+            !PreviewCacheLeases.IsProtected(leasedPath) && !PreviewCacheLeases.IsProtected(recentPath),
+            "cache protection outlived both the lease and the grace window");
+    }
+
+    private static void RequirePruneThrottle(string root)
+    {
+        ArchiveLiteCacheMaintenance.ResetPruneThrottle();
+        Require(
+            ArchiveLiteCacheMaintenance.RequestPrune(root, 1_000_000, TimeSpan.FromMinutes(5)),
+            "the first background prune request was refused");
+        Require(
+            !ArchiveLiteCacheMaintenance.RequestPrune(root, 1_000_000, TimeSpan.FromMinutes(5)),
+            "background prune requests are not throttled to one per interval");
+    }
+
+    /// <summary>
+    /// Decode cost and resource bounds are read from the DDS header, so a helper process is never
+    /// started for a source that cannot decode inside the limits.
+    /// </summary>
+    private static Task TestDdsHeaderAndResourceLimitsAsync()
+    {
+        Require(
+            DdsTextureHeader.TryRead(SyntheticDds(4, 4, 1, dxgiFormat: 98), out var bc7)
+            && bc7 is { Width: 4, Height: 4, Family: DdsCompressedFamily.Bc7, DecodedBytesPerPixel: 4 },
+            "a DX10 BC7 header was not classified");
+        Require(
+            DdsTextureHeader.TryRead(SyntheticDds(8, 8, 1, dxgiFormat: 95), out var bc6)
+            && bc6 is { Family: DdsCompressedFamily.Bc6h, DecodedBytesPerPixel: 16 },
+            "a BC6H header was not classified as a wide-pixel decode");
+        Require(
+            DdsTextureHeader.TryRead(SyntheticDds(16, 16, 1, fourCc: "DXT1"), out var bc1)
+            && bc1.Family == DdsCompressedFamily.Bc1,
+            "a legacy DXT1 four-CC header was not classified");
+        Require(!DdsTextureHeader.TryRead("NOT A DDS AT ALL"u8.ToArray(), out _), "a non-DDS payload was accepted");
+
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-dds-limits-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var ok = Path.Combine(root, "ok.dds");
+            File.WriteAllBytes(ok, SyntheticDds(64, 64, 1, dxgiFormat: 98));
+            Require(DdsResourceLimits.DescribeRejection(ok) is null, "a small BC7 source was rejected");
+
+            var huge = Path.Combine(root, "huge.dds");
+            File.WriteAllBytes(huge, SyntheticDds(32_768, 32_768, 1, dxgiFormat: 98));
+            Require(
+                DdsResourceLimits.DescribeRejection(huge)?.Contains("px limit", StringComparison.Ordinal) == true,
+                "an over-large DDS was not rejected against the dimension limit");
+
+            // Inside the dimension limit, but the decoded BC6H image cannot fit the memory budget.
+            var wide = Path.Combine(root, "wide.dds");
+            File.WriteAllBytes(wide, SyntheticDds(16_384, 16_384, 1, dxgiFormat: 95));
+            Require(
+                DdsResourceLimits.DescribeRejection(wide)?.Contains("decoded", StringComparison.OrdinalIgnoreCase) == true,
+                "a DDS that decodes past the memory limit was not rejected");
+
+            var truncated = Path.Combine(root, "truncated.dds");
+            File.WriteAllBytes(truncated, "DDS "u8.ToArray());
+            Require(DdsResourceLimits.DescribeRejection(truncated) is not null, "a truncated DDS header was accepted");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+        return Task.CompletedTask;
+    }
+
+    private static byte[] SyntheticDds(int width, int height, int mipCount, uint dxgiFormat = 0, string? fourCc = null)
+    {
+        var isDx10 = fourCc is null;
+        var bytes = new byte[isDx10 ? 148 : 128];
+        "DDS "u8.CopyTo(bytes);
+        BitConverter.GetBytes(124).CopyTo(bytes, 4);
+        BitConverter.GetBytes(height).CopyTo(bytes, 12);
+        BitConverter.GetBytes(width).CopyTo(bytes, 16);
+        BitConverter.GetBytes(mipCount).CopyTo(bytes, 28);
+        BitConverter.GetBytes(32).CopyTo(bytes, 76);
+        var tag = isDx10 ? "DX10" : fourCc!;
+        Encoding.ASCII.GetBytes(tag).CopyTo(bytes, 84);
+        if (isDx10)
+        {
+            BitConverter.GetBytes(dxgiFormat).CopyTo(bytes, 128);
+            BitConverter.GetBytes(3).CopyTo(bytes, 132);
+            BitConverter.GetBytes(1).CopyTo(bytes, 140);
+        }
+        return bytes;
     }
 
     private static Task TestBuildLauncherSourceAsync()
@@ -5252,6 +5371,26 @@ internal static class ArchiveLiteTestRunner
         Require(
             textures.TryGetCachedThumbnail(session, entry, 120) == thumbnail,
             "a structurally valid cached thumbnail was rejected");
+
+        // A preview without its provenance sidecar has no recorded backend or decode status, so it
+        // must not count as a cache hit.
+        var sidecar = thumbnail + ".cdmw_texture.json";
+        Require(File.Exists(sidecar), "a published preview did not write a provenance sidecar");
+        var sidecarText = await File.ReadAllTextAsync(sidecar).ConfigureAwait(false);
+        File.Delete(sidecar);
+        Require(
+            textures.TryGetCachedThumbnail(session, entry, 120) is null,
+            "a cached thumbnail with no provenance sidecar was served as a warm hit");
+
+        await File.WriteAllTextAsync(sidecar, "{\"status\":\"error\"}").ConfigureAwait(false);
+        Require(
+            textures.TryGetCachedThumbnail(session, entry, 120) is null,
+            "a cached thumbnail whose sidecar records a failed decode was served as a warm hit");
+
+        await File.WriteAllTextAsync(sidecar, sidecarText).ConfigureAwait(false);
+        Require(
+            textures.TryGetCachedThumbnail(session, entry, 120) == thumbnail,
+            "restoring a valid sidecar did not restore the cache hit");
     }
 
     /// <summary>
@@ -5270,8 +5409,10 @@ internal static class ArchiveLiteTestRunner
         {
             var goodDds = Path.Combine(root, "good.dds");
             await File.WriteAllBytesAsync(goodDds, native.Decode(entry).Bytes).ConfigureAwait(false);
+            // A well-formed BC7 header with no pixel payload clears the pre-flight resource guard
+            // and still fails inside the helper, which is what drives the partial-failure exit code.
             var badDds = Path.Combine(root, "bad.dds");
-            await File.WriteAllBytesAsync(badDds, "DDS this is not a decodable texture"u8.ToArray()).ConfigureAwait(false);
+            await File.WriteAllBytesAsync(badDds, SyntheticDds(64, 64, 1, dxgiFormat: 98)).ConfigureAwait(false);
             // A distinct identity keeps the failing row out of the healthy row's cache slot.
             var badEntry = entry with { EntryId = entry.EntryId + 4096, Path = entry.Path + ".broken" };
 
@@ -5288,6 +5429,25 @@ internal static class ArchiveLiteTestRunner
             Require(
                 results[1].PngPath is null && !string.IsNullOrWhiteSpace(results[1].Error),
                 "an undecodable texture did not report a per-request decode error");
+            Require(
+                TexturePreviewDiagnostics.Failures().Any(static failure => failure.Reason == "helper_reported_error"),
+                "a helper decode failure was not recorded for later diagnosis");
+
+            // An oversized source must be rejected from the header, without starting the helper.
+            var oversizedDds = Path.Combine(root, "oversized.dds");
+            await File.WriteAllBytesAsync(oversizedDds, SyntheticDds(32_768, 32_768, 1, dxgiFormat: 98)).ConfigureAwait(false);
+            var oversizedEntry = entry with { EntryId = entry.EntryId + 8192, Path = entry.Path + ".oversized" };
+            var guarded = await textures.BuildThumbnailBatchAsync(
+                session,
+                [new TexturePreviewRequest(oversizedEntry, oversizedDds)],
+                96,
+                CancellationToken.None).ConfigureAwait(false);
+            Require(
+                guarded[0].PngPath is null && guarded[0].Error?.Contains("px limit", StringComparison.Ordinal) == true,
+                "an oversized DDS was not rejected against the preview resource limits");
+            Require(
+                TexturePreviewDiagnostics.Failures().Any(static failure => failure.Reason == "unsafe_dds_input"),
+                "a pre-flight resource rejection was not recorded");
         }
         finally
         {
