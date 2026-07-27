@@ -4,12 +4,13 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+
+- The standalone launcher now extracts its verified runtime beneath `%LocalAppData%\CDMW\CDMWArchiveLite\standalone\` instead of a vendor folder named after the author. An existing install re-extracts once on the next launch; the runtime left under the previous path is no longer read and can be deleted.
+
 ### Fixed
 
 - An embedded model preview renderer now closes when it reaches the end of its host's standard input, which is what happens when the hosting application ends. The renderer's kill-on-close job object is armed just after launch, so a host that ended inside that window previously left a renderer process running with no host to display it.
-
-### Fixed
-
 - The standalone launcher now places the application it starts in a kill-on-close job object, so force-closing the launcher stops the whole Archive Lite tree instead of leaving it running with no launcher attached.
 - A worker that no client ever connects to now stops after thirty seconds instead of waiting for a connection forever. The client arms its own kill-on-close job just after launch, so a client that dies during that window previously left a worker running with no pipe to notice and no window to close.
 

@@ -43,7 +43,7 @@ internal static class StandaloneRuntime
 
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Ratrider",
+            "CDMW",
             "CDMWArchiveLite",
             "standalone");
     }
