@@ -84,7 +84,23 @@ static const TextureBinding* best_binding_for_role(
             if (parameter_key.find("materialtexture") != std::string::npos && layer_role != "damage" && layer_role != "detail" && layer_role != "grime") {
                 score += 140;
             }
-            if (layer_role == "damage" || layer_role == "detail" || layer_role == "grime") {
+            // A layer-named parameter can still hold the surface's own map. On
+            // SkinnedMeshStandard garments the unsuffixed _detailMaterialMask
+            // points at <mesh>_sp.dds -- the same family as the base albedo --
+            // while the channel-suffixed _detailMaterialMask{R,G,B} point at the
+            // shared cd_texturelayer_* tiling library. Penalising both alike gave
+            // the material slot to _colorBlendingMaskTexture, which selects a
+            // colour layer and carries no surface response, so the garment ended
+            // up with no roughness or metal at all. Stay below the +140 an
+            // authored _materialTexture earns so a real one still wins.
+            const bool own_family_material_response =
+                (layer_role == "damage" || layer_role == "detail" || layer_role == "grime")
+                && binding.packed_channels.rfind("layer:material_response", 0) == 0
+                && texture_family_key.find("texturelayer") == std::string::npos
+                && base_binding_texture_family_matches_mesh(binding, mesh);
+            if (own_family_material_response) {
+                score += 120;
+            } else if (layer_role == "damage" || layer_role == "detail" || layer_role == "grime") {
                 score -= 190;
             }
         }
@@ -440,7 +456,32 @@ static const NativePbdSidecarHint* best_native_pbd_hint_for_binding(
     return best_score >= 80 ? best : nullptr;
 }
 
-static std::string packed_channels_for_role(const std::string& role, const std::string& name, const std::string& parameter_name) {
+// Crimson's `_sp` maps carry their surface response in G and B, read out of the
+// shipped shaders rather than inferred from the filename suffix:
+//
+//   Standard/Cloth/Fur/Emissive/...  sample G and B only. G is roughness,
+//                                    B is metalness. R and A are never sampled.
+//   Skin/SkinWrinkle/EyeCover        sample R, G and B. R is the subsurface
+//                                    term, which the preview has no lobe for,
+//                                    so it is dropped rather than folded into
+//                                    occlusion. G is roughness, B is metalness.
+//   Hair/AnimalHair/WhiteHornHair    sample G alone; hair carries no metal.
+//
+// R is *not* occlusion in any family. It is the most spatially detailed channel,
+// which is why it reads like a baked AO map, but only the skin shaders sample it
+// and they use it as subsurface. `_sp` files are BC1, so alpha is synthesised
+// opaque and never carries data; nothing may read it.
+static std::string material_response_channel_layout(const std::string& shader_rule) {
+    if (shader_rule == "hair") return "g=roughness";
+    return "g=roughness,b=metalness";
+}
+
+static std::string packed_channels_for_role(
+    const std::string& role,
+    const std::string& name,
+    const std::string& parameter_name,
+    const std::string& shader_rule
+) {
     const std::string lower = lower_copy(name + " " + parameter_name);
     const std::string parameter_key = normalized_key(parameter_name);
     if (role == "material") {
@@ -449,7 +490,11 @@ static std::string packed_channels_for_role(const std::string& role, const std::
         if (lower.find("mra") != std::string::npos) return "r=metalness,g=roughness,b=occlusion";
         if (lower.find("arm") != std::string::npos) return "r=occlusion,g=roughness,b=metalness";
         if (parameter_key == "colorblendingmasktexture" && lower.find("_ma") != std::string::npos) {
-            return "r=occlusion,g=roughness,b=metalness,a=specular_response";
+            // A colour-blending mask selects which authored colour layer owns a
+            // texel. Declaring it as packed occlusion/roughness/metal made the
+            // consumer read a layer weight as a surface property, which is how
+            // dyed cloth and leather picked up a metal response they never had.
+            return "layer:color_blending_mask";
         }
         if (parameter_key == "detailmasktexture" || lower.find("_mg") != std::string::npos) {
             return "layer:detail_grime_dye_mask";
@@ -460,13 +505,24 @@ static std::string packed_channels_for_role(const std::string& role, const std::
             || parameter_key.find("detailmaterialmask") != std::string::npos
             || parameter_key == "materialtexture"
         ) {
-            return "layer:material_response";
+            // Keep the layer marker for consumers that decode the map themselves,
+            // and declare the component layout so a consumer that samples the DDS
+            // directly binds roughness and metal to the channels the game reads.
+            return "layer:material_response," + material_response_channel_layout(shader_rule);
         }
         if (lower.find("_ma") != std::string::npos) return "diagnostic:crimson_material_mask";
         if (lower.find("_m") != std::string::npos) return "diagnostic:packed_material_mask";
     }
     if (role == "detail") return "layer:detail_grime_dye_mask";
-    if (role == "specular") return "layer:material_response";
+    if (role == "specular") {
+        // Only Crimson's `_sp` maps carry the G/B surface layout. A gloss or
+        // smoothness map that also lands in this slot is a different contract,
+        // so it keeps the bare marker and no component claim.
+        if (lower.find("_sp") != std::string::npos) {
+            return "layer:material_response," + material_response_channel_layout(shader_rule);
+        }
+        return "layer:material_response";
+    }
     if (role == "height") return "height";
     if (role == "normal") return "normal_xy";
     return "";
@@ -542,7 +598,15 @@ static std::array<float, 4> tint_for_layer(
 ) {
     std::vector<std::string> candidates;
     if (layer_role == "grime") {
-        candidates = {"scratchTintColor" + channel, "tintColor" + channel, "dyeingDetailLayerColorMask" + channel};
+        // _tintColor{R,G,B} is the base tint of the three layers the
+        // _colorBlendingMaskTexture selects; it sits alongside
+        // _grimeDiffuseTexture{R,G,B} one-for-one in the PAC.
+        // _scratchTintColor{R,G,B} is the wear accent for the same channels and
+        // carries a low alpha strength, so it is an overlay rather than the
+        // surface colour. Preferring scratch here painted the blade of
+        // cd_phm_02_sword_0014 near-white (#dbdbdb) and its grip yellow
+        // (#dbc03e) instead of the authored #ae8c54 gold and #625142 brown.
+        candidates = {"tintColor" + channel, "dyeingDetailLayerColorMask" + channel, "scratchTintColor" + channel};
     } else if (layer_role == "detail") {
         candidates = {"dyeingDetailLayerColorMask" + channel, "dyeingColorMask" + channel, "tintColor" + channel};
     } else if (layer_role == "overlay") {
@@ -622,7 +686,17 @@ static std::string role_from_parameter_shader_and_name(
     if (p.find("roughness") != std::string::npos || t.find("roughness") != std::string::npos) return "roughness";
     if (p.find("metallic") != std::string::npos || p.find("metalness") != std::string::npos || t.find("metallic") != std::string::npos || t.find("metalness") != std::string::npos) return "metalness";
     if (p.find("occlusion") != std::string::npos || p.find("ambientocclusion") != std::string::npos || t.find("_ao.dds") != std::string::npos) return "occlusion";
-    if (p.find("specular") != std::string::npos || p.find("_sp") != std::string::npos || t.find("_sp.dds") != std::string::npos) return "specular";
+    // The authored parameter outranks the file suffix: SkinnedMeshStandard writes its
+    // packed roughness/metal map to _materialTexture and still names the file _sp.dds,
+    // so matching the suffix first strands it in the specular slot and drops the batch
+    // onto the legacy specular-gloss response. Skin keeps the suffix reading below.
+    const bool parameter_declares_material_map =
+        p.find("material") != std::string::npos && shader_rule != "skin";
+    if (
+        p.find("specular") != std::string::npos
+        || p.find("_sp") != std::string::npos
+        || (t.find("_sp.dds") != std::string::npos && !parameter_declares_material_map)
+    ) return "specular";
     if (p.find("gloss") != std::string::npos || p.find("smoothness") != std::string::npos || t.find("gloss") != std::string::npos || t.find("smoothness") != std::string::npos) return "specular";
     if ((p.find("diffuse") != std::string::npos || p.find("basecolor") != std::string::npos || p.find("albedo") != std::string::npos) && p.find("mask") == std::string::npos) return "base";
     if (p.find("material") != std::string::npos || p.find("colorblendingmask") != std::string::npos || p.find("blending") != std::string::npos || t.find("_ma.dds") != std::string::npos || t.find("_m.dds") != std::string::npos) return "material";

@@ -10,6 +10,11 @@ internal sealed record NetMaterialLayerSource(
     Bitmap Diffuse,
     Bitmap? Mask);
 
+internal sealed record NetMaterialLayerSurfaceSource(
+    NetMaterialLayerBinding Binding,
+    Bitmap Material,
+    Bitmap? Mask);
+
 internal static class NetMaterialLayerCompiler
 {
     private const int MaximumDimension = 512;
@@ -66,6 +71,62 @@ internal static class NetMaterialLayerCompiler
         return target;
     }
 
+    // The surface companion of Compile. Crimson gives every colour layer its own
+    // packed surface map, and the mask that chooses which layer's colour owns a
+    // texel chooses that layer's roughness and metal too. Compositing through the
+    // same mask keeps the two in step; averaging the layers instead would pin the
+    // whole surface near one constant and describe no material that is present.
+    //
+    // No tint is applied: a tint recolours albedo, and multiplying it into a
+    // roughness or metal channel would invent surface properties the source
+    // never authored.
+    public static Bitmap? CompileSurface(
+        Bitmap? baseMaterial,
+        IReadOnlyList<NetMaterialLayerSurfaceSource> layers)
+    {
+        var firstLayer = layers.FirstOrDefault(layer => layer.Material.Width > 0 && layer.Material.Height > 0);
+        var source = baseMaterial ?? firstLayer?.Material;
+        if (source is null || source.Width <= 0 || source.Height <= 0)
+        {
+            return null;
+        }
+
+        var scale = Math.Min(1.0, MaximumDimension / (double)Math.Max(source.Width, source.Height));
+        var width = Math.Max(1, (int)Math.Round(source.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+        var target = ScaleToBgra(source, width, height);
+        var targetPixels = ReadBgra(target);
+        var layerSeed = baseMaterial is null ? firstLayer : null;
+        foreach (var layer in layers)
+        {
+            if (string.Equals(layer.Binding.LayerRole, "base", StringComparison.OrdinalIgnoreCase)
+                || ReferenceEquals(layer, layerSeed)
+                || layer.Binding.Weight <= 0.001f)
+            {
+                continue;
+            }
+            using var material = ScaleToBgra(layer.Material, width, height);
+            using var mask = layer.Mask is null ? null : ScaleToBgra(layer.Mask, width, height);
+            var materialPixels = ReadBgra(material);
+            var maskPixels = mask is null ? null : ReadBgra(mask);
+            var maskOffset = LayerChannelOffset(layer.Binding.MaskChannel);
+            var weight = Math.Clamp(layer.Binding.Weight, 0.0f, 1.0f);
+            for (var offset = 0; offset < targetPixels.Length; offset += 4)
+            {
+                var alpha = weight * (maskPixels is null ? 1.0f : maskPixels[offset + maskOffset] / 255.0f);
+                if (alpha <= 0.0001f)
+                {
+                    continue;
+                }
+                targetPixels[offset] = Blend(targetPixels[offset], materialPixels[offset], alpha);
+                targetPixels[offset + 1] = Blend(targetPixels[offset + 1], materialPixels[offset + 1], alpha);
+                targetPixels[offset + 2] = Blend(targetPixels[offset + 2], materialPixels[offset + 2], alpha);
+            }
+        }
+        WriteBgra(target, targetPixels);
+        return target;
+    }
+
     private static void ApplyTint(byte[] pixels, NetMaterialLayerBinding binding)
     {
         var tintB = Math.Clamp(binding.TintB, 0.0f, 2.0f);
@@ -105,6 +166,44 @@ internal static class NetMaterialLayerCompiler
             && compiled.GetPixel(1, 0).B < 35
             && compiled.GetPixel(1, 3).B > 220
             && compiled.GetPixel(1, 3).R < 35;
+    }
+
+    // Surface layers must follow the mask that selects their colour, and must not
+    // take the layer tint: a tint recolours albedo, and folding it into roughness
+    // or metal would invent surface properties the source never authored.
+    public static bool CompositesSurfaceThroughMask()
+    {
+        using var seed = new Bitmap(4, 4, PixelFormat.Format32bppArgb);
+        using var overlay = new Bitmap(4, 4, PixelFormat.Format32bppArgb);
+        using var mask = new Bitmap(4, 4, PixelFormat.Format32bppArgb);
+        // Seed reads roughness 1.0 / metal 0.0; the overlay reads the opposite.
+        using (var seedGraphics = Graphics.FromImage(seed)) seedGraphics.Clear(Color.FromArgb(255, 0, 255, 0));
+        using (var overlayGraphics = Graphics.FromImage(overlay)) overlayGraphics.Clear(Color.FromArgb(255, 0, 0, 255));
+        for (var y = 0; y < 4; y++)
+        {
+            for (var x = 0; x < 4; x++)
+            {
+                mask.SetPixel(x, y, y < 2 ? Color.White : Color.Black);
+            }
+        }
+        var seedBinding = new NetMaterialLayerBinding("base", "r", 1.0f, 1.0f, 1.0f, 1.0f, "", "", "seed");
+        // A saturated tint that must leave no trace in the composite.
+        var overlayBinding = new NetMaterialLayerBinding("detail", "r", 1.0f, 0.0f, 0.0f, 2.0f, "", "mask", "overlay");
+        using var compiled = CompileSurface(
+            seed,
+            new[]
+            {
+                new NetMaterialLayerSurfaceSource(seedBinding, seed, null),
+                new NetMaterialLayerSurfaceSource(overlayBinding, overlay, mask),
+            });
+        if (compiled is null)
+        {
+            return false;
+        }
+        var covered = compiled.GetPixel(1, 0);
+        var uncovered = compiled.GetPixel(1, 3);
+        return covered.B > 220 && covered.G < 35
+            && uncovered.G > 220 && uncovered.B < 35;
     }
 
     private static byte Blend(byte background, float foreground, float alpha)

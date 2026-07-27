@@ -43,6 +43,9 @@ cbuffer CameraConstants : register(b0)
     float4 MaterialAlphaPolicy;
     float4 MaterialAdditionalMaps;
     float4 MaterialFamilyPolicy;
+    // x: the base tint was authored by the user rather than inferred from a
+    // sidecar, so the metal-category damping below must not apply. y/z/w spare.
+    float4 MaterialBaseTintAuthored;
 };
 
 Texture2D BaseTexture : register(t0);
@@ -124,9 +127,16 @@ float3 SampleNormal(VSOutput input, float2 uv)
     {
         return baseNormal;
     }
-    float3 tangentNormal = NormalTexture.Sample(MaterialSampler, uv).xyz * 2.0f - 1.0f;
-    tangentNormal.y = MaterialNormalYInverted > 0.5f ? -tangentNormal.y : tangentNormal.y;
-    tangentNormal.xy *= saturate(PresentationMaterialTuning.w);
+    // Source normals are BC5 two-channel maps, so the sampled blue channel is
+    // always 0 and cannot be used as Z.  Rebuild Z from XY instead: tangent
+    // space normals are unit length with Z >= 0, so this is also correct for
+    // three-channel normal maps and needs no per-format branch.
+    float2 tangentXY = NormalTexture.Sample(MaterialSampler, uv).xy * 2.0f - 1.0f;
+    tangentXY.y = MaterialNormalYInverted > 0.5f ? -tangentXY.y : tangentXY.y;
+    tangentXY *= saturate(PresentationMaterialTuning.w);
+    float3 tangentNormal = float3(
+        tangentXY,
+        sqrt(saturate(1.0f - dot(tangentXY, tangentXY))));
     float3x3 tbn = float3x3(normalize(input.Tangent), normalize(input.Bitangent), baseNormal);
     return normalize(mul(tangentNormal, tbn));
 }
@@ -371,12 +381,18 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             float3(1.72f, 1.72f, 1.72f));
         float tintChroma = max(previewTint.r, max(previewTint.g, previewTint.b))
             - min(previewTint.r, min(previewTint.g, previewTint.b));
-        bool earlyCategoryMetal = MaterialBaseTintPolicy.y > 0.5f
+        // A user-authored recolour is a deliberate act, so it opts out of the
+        // metal damping below.  Without this a saturated colour on a metal part
+        // resolves to a 0.05 multiplier -- a 5% repaint that reads as a washed
+        // tint, while the baked DDS repaints in full.
+        bool authoredBaseTint = MaterialBaseTintAuthored.x > 0.5f;
+        bool earlyCategoryMetal = !authoredBaseTint
+            && MaterialBaseTintPolicy.y > 0.5f
             && MaterialBaseTintPolicy.y < 1.5f;
         float neutralMetalTint = earlyCategoryMetal ? saturate((0.12f - tintChroma) * 8.0f) : 0.0f;
         // Keep Archive Browser's source-tint authority.  Chromatic metal is
-        // already colored by its source-stable F0 below; amplifying this base
-        // tint a second time turns dark steel/copper sidecar hints into paint.
+        // already colored by its source-stable F0 below; amplifying an inferred
+        // base tint a second time turns dark steel/copper sidecar hints into paint.
         float strength = saturate(MaterialBaseTintPolicy.x
             * (earlyCategoryMetal ? lerp(0.05f, 1.25f, neutralMetalTint) : 1.0f));
         float albedoLuma = dot(baseColor.rgb, float3(0.299f, 0.587f, 0.114f));
@@ -441,11 +457,11 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         float declaredHeight = MaterialSurfaceOverrideFlags.w > 0.5f
             ? MaterialSurfaceOverrides.w
             : 0.0f;
-        heightStrength = saturate((MaterialHeightScale + declaredHeight * 0.04f) * 8.0f);
+        heightStrength = saturate(MaterialHeightScale + declaredHeight * 0.04f);
         float3 heightNormal = normalize(
             normal
-            - normalize(input.Tangent) * heightX * heightStrength * 2.4f
-            + normalize(input.Bitangent) * heightY * heightStrength * 2.4f);
+            - normalize(input.Tangent) * heightX * 2.4f
+            + normalize(input.Bitangent) * heightY * 2.4f);
         normal = normalize(lerp(normal, heightNormal, heightStrength));
     }
     float3 lightDirection = normalize(LightDirection);
@@ -492,8 +508,26 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     metallic = saturate(metallic * max(PresentationSurfaceTuning.y, 0.0f));
     if (MaterialFamilyPolicy.x > 0.5f)
     {
-        metallic = 0.0f;
+        // Skin and hair have no metal, so the family policy is authoritative for
+        // them.  Cloth is different: garments carry metal studs, buckles and
+        // trim, so an authored per-texel metal map has to survive on a cloth
+        // family instead of being zeroed for the whole submesh.
+        bool clothFamilyWithAuthoredMetal =
+            PresentationDiagnosticTuning.w > 2.5f
+            && PresentationDiagnosticTuning.w < 3.5f
+            && MaterialHasMetallic > 0.5f;
+        if (!clothFamilyWithAuthoredMetal)
+        {
+            metallic = 0.0f;
+        }
     }
+    // A bound roughness or metal map is measured per-texel source data.  The
+    // category and family tables below are filename and shader-family guesses
+    // that exist to keep untextured or unclassified parts readable, so they must
+    // never clamp away real map values -- a cloth-classified part carrying a
+    // metal buckle has to stay metal where the source says so.
+    bool hasSourceRoughnessMap = MaterialHasRoughness > 0.5f;
+    bool hasSourceMetallicMap = MaterialHasMetallic > 0.5f;
     float materialCategoryCode = MaterialBaseTintPolicy.y;
     float materialCategoryConfidence = saturate(MaterialBaseTintPolicy.z);
     bool hasSourceCategory = materialCategoryCode > 0.5f;
@@ -548,7 +582,7 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         familySpecularScale = 1.15f;
         familyRoughnessBias = -0.03f;
     }
-    if (MaterialSurfaceOverrideFlags.y < 0.5f)
+    if (MaterialSurfaceOverrideFlags.y < 0.5f && !hasSourceMetallicMap)
     {
         metallic = saturate(metallic * familyMetalScale);
     }
@@ -563,7 +597,7 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         || categorySkin || categoryHair || categoryStone || categoryTooth
         || (!hasSourceCategory && MaterialFamilyPolicy.x > 0.5f);
     bool knownNonmetal = conservativeNonmetal || glossyNonmetal;
-    float categoryMetalCap = categoryMetal
+    float categoryMetalCap = (categoryMetal || hasSourceMetallicMap)
         ? 1.0f
         : (knownNonmetal ? 0.0f : lerp(0.12f, 0.32f, materialCategoryConfidence));
     float categorySpecularCap = categoryMetal
@@ -578,18 +612,19 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
                                     : (categoryHair ? 0.22f
                                         : (categoryStone ? 0.10f
                                             : (categoryTooth ? 0.18f : 0.18f))))))))));
-    float categoryRoughnessFloor = categoryMetal
-        ? 0.16f
-        : (categoryGlass ? 0.30f
-            : (categoryGem ? 0.26f
-                : (categoryEye ? 0.30f
-                    : (categoryLeather ? 0.76f
-                        : (categoryWood ? 0.70f
-                            : (categoryCloth ? 0.84f
-                                : (categorySkin ? 0.58f
-                                    : (categoryHair ? 0.64f
-                                        : (categoryStone ? 0.82f
-                                            : (categoryTooth ? 0.58f : 0.66f))))))))));
+    float categoryRoughnessFloor = hasSourceRoughnessMap
+        ? 0.0f
+        : (categoryMetal ? 0.16f
+            : (categoryGlass ? 0.30f
+                : (categoryGem ? 0.26f
+                    : (categoryEye ? 0.30f
+                        : (categoryLeather ? 0.76f
+                            : (categoryWood ? 0.70f
+                                : (categoryCloth ? 0.84f
+                                    : (categorySkin ? 0.58f
+                                        : (categoryHair ? 0.64f
+                                            : (categoryStone ? 0.82f
+                                                : (categoryTooth ? 0.58f : 0.66f)))))))))));
     float categoryEnvironmentScale = categoryMetal
         ? 0.94f
         : (categoryGlass ? 0.26f
@@ -602,6 +637,14 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
                                     : (categoryHair ? 0.08f
                                         : (categoryStone ? 0.04f
                                             : (categoryTooth ? 0.08f : 0.08f))))))))));
+    if (!categoryMetal && hasSourceRoughnessMap)
+    {
+        // Same reasoning as the direct lobe: the per-category environment
+        // constants existed to divide out an inflated F0.  With a real roughness
+        // map the surface can take a normal share of the environment, and its own
+        // roughness decides how much of that reads as a highlight.
+        categoryEnvironmentScale = max(categoryEnvironmentScale, 0.45f);
+    }
     float materialRoughnessHint = saturate(MaterialBasePost.y);
     float materialMetalnessHint = saturate(MaterialBasePost.z);
     float materialSpecularHint = saturate(MaterialBasePost.w);
@@ -642,7 +685,13 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     }
     if (hasMaterialRoughnessHint)
     {
-        roughness = lerp(roughness, materialRoughnessHint, 0.55f);
+        // The sidecar hint is one scalar for the whole submesh.  It stands in
+        // for a missing map, but against a real one it would flatten per-texel
+        // variation toward a constant, so it only nudges when a map is bound.
+        roughness = lerp(
+            roughness,
+            materialRoughnessHint,
+            hasSourceRoughnessMap ? 0.15f : 0.55f);
     }
     roughness = saturate(roughness + familyRoughnessBias);
     float textureLuma = dot(baseColor.rgb, float3(0.299f, 0.587f, 0.114f));
@@ -695,7 +744,7 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             flattenedMaterial * 0.88f + 0.018f.xxx,
             mattePreview * 0.58f);
     }
-    if (categoryMetal)
+    if (categoryMetal && MaterialBaseTintPolicy.x > 0.001f)
     {
         float3 metalTint = saturate(MaterialBaseTint.rgb);
         float metalTintLuma = max(
@@ -708,7 +757,7 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         materialReferenceAlbedo = saturate(lerp(
             materialReferenceAlbedo,
             materialReferenceAlbedo * metalTintBias,
-            0.34f));
+            0.34f * saturate(MaterialBaseTintPolicy.x)));
     }
     float categoryMetalFallback = categoryMetal
         ? saturate(lerp(0.28f, 0.62f, materialCategoryConfidence)
@@ -729,16 +778,27 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         || MaterialBaseTintPolicy.w > 0.5f);
     if (directMetalResponse)
     {
-        metallic = max(metallic, categoryMetalFallback);
-        roughness = min(roughness, lerp(0.34f, 0.16f, materialCategoryConfidence));
-        categoryRoughnessFloor = min(categoryRoughnessFloor, 0.08f);
+        // Promotion only substitutes for missing data.  A part classified as
+        // metal that ships real maps is often mixed -- a steel blade with a
+        // leather grip shares one material texture -- so forcing a metal floor
+        // and a smooth ceiling across the whole surface would erase the split
+        // the source actually authored.
+        if (!hasSourceMetallicMap)
+        {
+            metallic = max(metallic, categoryMetalFallback);
+        }
+        if (!hasSourceRoughnessMap)
+        {
+            roughness = min(roughness, lerp(0.34f, 0.16f, materialCategoryConfidence));
+            categoryRoughnessFloor = min(categoryRoughnessFloor, 0.08f);
+        }
     }
     roughness = max(roughness, categoryRoughnessFloor);
     metallic = min(metallic, categoryMetalCap);
     if (MaterialHasHeight > 0.5f)
     {
         float heightRelief = (heightValue - 0.5f)
-            * saturate(MaterialHeightScale * 10.0f);
+            * saturate(MaterialHeightScale);
         roughness = saturate(roughness - heightRelief * 0.10f);
     }
     if (conservativeNonmetal)
@@ -746,36 +806,51 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         roughness = max(roughness, categoryRoughnessFloor);
         metallic = min(metallic, categoryMetalCap);
     }
-    float dielectricSpecular = saturate(PresentationDiagnosticTuning.y);
-    float3 specularColor = MaterialHasSpecular > 0.5f
-        ? SpecularTexture.Sample(MaterialSampler, uv).rgb
-        : lerp(dielectricSpecular.xxx, baseColor.rgb, metallic);
-    specularColor *= saturate(PresentationMaterialTuning.y);
+    // Reflectance is derived from the metal fraction, not from a specular map.
+    // Real dielectrics sit near 0.04 F0 whatever a synthesized specular map
+    // claims, and letting that map act as F0 is what gave leather, cloth and
+    // hair a metallic sheen they should never have.  Only the metal fraction
+    // takes its colour from the albedo.
+    float dielectricSpecular = clamp(PresentationDiagnosticTuning.y, 0.02f, 0.08f);
+    float3 sourceStableF0 = lerp(
+        dielectricSpecular.xxx,
+        materialReferenceAlbedo,
+        metallic);
+    float3 specularColor = sourceStableF0;
     if (MaterialHasSpecular > 0.5f)
     {
-        specularColor *= familySpecularScale;
+        // A source specular map shapes the metal highlight only; its influence
+        // fades out with the metal fraction so a dielectric cannot inherit it.
+        float3 mappedSpecular = SpecularTexture.Sample(MaterialSampler, uv).rgb
+            * familySpecularScale;
+        specularColor = lerp(
+            specularColor,
+            max(specularColor, mappedSpecular),
+            saturate(metallic));
     }
+    specularColor *= saturate(PresentationMaterialTuning.y);
     if (MaterialSurfaceOverrideFlags.z > 0.5f)
     {
         specularColor *= saturate(MaterialSurfaceOverrides.z);
     }
     if (hasMaterialSpecularHint && materialSpecularHint > 0.02f)
     {
-        specularColor = max(specularColor, materialSpecularHint.xxx);
+        // A declared specular hint may brighten metal but must not lift a
+        // dielectric above its physical reflectance.
+        specularColor = max(
+            specularColor,
+            lerp(dielectricSpecular, materialSpecularHint, saturate(metallic)).xxx);
     }
     if (MaterialFamilyPolicy.w > 0.0f)
     {
         float neutralSpecular = dot(specularColor, float3(0.2126f, 0.7152f, 0.0722f));
         specularColor = min(neutralSpecular, MaterialFamilyPolicy.z).xxx;
     }
-    if (!categoryMetal)
+    if (!categoryMetal && !hasSourceMetallicMap)
     {
+        // Fallback only: with no metal map the category guess is all we have.
         specularColor = min(specularColor, categorySpecularCap.xxx);
     }
-    float3 sourceStableF0 = lerp(
-        float3(0.035f, 0.035f, 0.035f),
-        materialReferenceAlbedo,
-        metallic);
     float3 resolvedSurfaceF0 = sourceStableF0;
     if (categoryMetal)
     {
@@ -828,9 +903,17 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             nonmetalSmoothness);
         float nonmetalDirectLobe = pow(nonmetalNdotH, nonmetalSpecularPower)
             * saturate(ndotl * 1.25f);
-        float nonmetalDirectSpecularScale = glossyNonmetal
-            ? 0.18f
-            : (conservativeNonmetal ? 0.025f : 0.08f);
+        // These scales were fitted while the specular map stood in for F0 at
+        // roughly ten times the physical value, so they had to divide it back
+        // out.  Against a real 0.04 dielectric F0 the Fresnel and GGX terms
+        // already keep the lobe subtle, and keeping the old 0.025 multiplied it
+        // away entirely -- which is why hair lost its strand highlights.  A
+        // bound roughness map means the surface can be lit on its own terms;
+        // rough cloth stays matte because its roughness says so, not because a
+        // category table suppressed it.
+        float nonmetalDirectSpecularScale = hasSourceRoughnessMap
+            ? 0.32f
+            : (glossyNonmetal ? 0.18f : (conservativeNonmetal ? 0.025f : 0.08f));
         spec = SourceStableFresnel(
             nonmetalCameraShape,
             resolvedSurfaceF0)
@@ -839,17 +922,29 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             * nonmetalDirectSpecularScale;
     }
     float3 emissive = float3(0.0f, 0.0f, 0.0f);
+    // The divisor normalises a declared intensity whose scale runs above 1.0.
+    // It was 12, left standing until a wider sample of declared
+    // _emissiveIntensity values settled the scale. A 535-asset sweep of the
+    // shipped archive found 27 emissive batches declaring only three values:
+    // 1.0 (20 of them), 4.0 (4) and 0.14 (3). Nothing authored above 4.0, so /12
+    // put the brightest emitter in the game at 0.33 and the common case at 0.083,
+    // which reads as unlit. /4 normalises the brightest authored emitter to full
+    // and leaves the common case visible.
     float emissiveIntensity = saturate(
         (MaterialEmissiveOverrideFlags.y > 0.5f
             ? MaterialEmissiveOverride.w
             : (MaterialHasEmissive > 0.5f ? 4.0f : 0.0f))
-        / 12.0f);
+        / 4.0f);
+    // Neutral when the material declares no emissive colour: the `_emi` map
+    // carries the colour it emits. The fallback was a fixed cyan, which is the
+    // one colour greek fire, a lightning thrower and an ancient giant's runes
+    // could not all be.
     float3 emissiveColor = MaterialEmissiveOverrideFlags.x > 0.5f
         ? clamp(
             MaterialEmissiveOverride.rgb,
             float3(0.0f, 0.0f, 0.0f),
             float3(2.0f, 2.0f, 2.0f))
-        : float3(0.35f, 0.68f, 1.0f);
+        : float3(1.0f, 1.0f, 1.0f);
     if (MaterialHasEmissive > 0.5f)
     {
         float4 emissiveSample = EmissiveTexture.Sample(MaterialSampler, uv);
@@ -953,7 +1048,9 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
         : 0.0f;
     float environmentMaterialScale = categoryMetal
         ? 0.55f + metallic * lerp(0.45f, 1.10f, smoothness)
-        : (glossyNonmetal ? 0.18f : (conservativeNonmetal ? 0.018f : 0.08f));
+        : (hasSourceRoughnessMap
+            ? lerp(0.06f, 0.30f, smoothness)
+            : (glossyNonmetal ? 0.18f : (conservativeNonmetal ? 0.018f : 0.08f)));
     environmentMaterialScale = max(environmentMaterialScale, authorityGlossCue * 0.32f);
     float3 environmentFresnel = SourceStableFresnel(ndotv, resolvedSurfaceF0);
     float3 environmentSpecular = environmentRadiance
@@ -984,6 +1081,11 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     float fillLight = WrappedNdotL(normal, fillDirection, 0.82f);
     float cameraShape = saturate(abs(dot(normal, viewDirection)));
     float rimShape = pow(saturate(1.0f - cameraShape), lerp(2.4f, 1.2f, smoothness));
+    // Lift the grazing-angle edge a little so a dark, rough surface still shows
+    // a readable silhouette against the backdrop instead of dissolving into it.
+    // Confined to the outer edge, so it shapes the outline without washing out
+    // the interior the way a flat ambient raise would.
+    rimShape = max(rimShape, pow(saturate(1.0f - cameraShape), 6.0f) * 0.35f);
     // Keep physically shaded metal source-readable in the neutral workbench.
     // The GGX and environment lobes remain authoritative for response, while
     // this floor prevents dark source albedo from collapsing between lobes.
@@ -1018,10 +1120,17 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     litDiffuse += materialReferenceAlbedo
         * authorityGlossCue
         * (0.035f + rimShape * 0.16f);
-    float3 metallicSourceAnchor = materialReferenceAlbedo
-        * metallic
-        * (0.14f + roughness * 0.06f + (1.0f - ndotv) * 0.30f)
-        * ambientOcclusion;
+    // The metal anchor added albedo back as fake ambient so dark metal stayed
+    // visible while the real metal signal was stuck near zero.  With a bound
+    // metal map the GGX and environment lobes carry that response, and keeping
+    // the anchor would double-count it into a flat wash.  Retained only as a
+    // floor for parts that still have no metal map at all.
+    float3 metallicSourceAnchor = hasSourceMetallicMap
+        ? float3(0.0f, 0.0f, 0.0f)
+        : materialReferenceAlbedo
+            * metallic
+            * (0.14f + roughness * 0.06f + (1.0f - ndotv) * 0.30f)
+            * ambientOcclusion;
     float3 finalColor = PresentationSurfaceTuning.w > 0.5f
         ? baseColor.rgb + emissive
         : litDiffuse + metallicSourceAnchor + spec + environmentSpecular + emissive;

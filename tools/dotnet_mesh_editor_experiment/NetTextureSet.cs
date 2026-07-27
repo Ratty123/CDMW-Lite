@@ -56,6 +56,7 @@ internal sealed partial class NetTextureSet : IDisposable
         foreach (var submeshIndex in materials.MaterialLayerSubmeshIndices())
         {
             _ = SynthesizedBaseReferenceForSubmesh(materials, submeshIndex);
+            _ = SynthesizedSurfaceReferenceForSubmesh(materials, submeshIndex);
         }
     }
 

@@ -59,6 +59,12 @@ struct PackageBatchState {
     fs::path geometry_path;
     fs::path identity_path;
     std::array<float, 3> color{};
+    // True while `color` still holds the per-batch palette hue that distinguishes
+    // submeshes in the untextured view. A textured preview must not publish that
+    // hue as albedo: with no base texture the renderer shows it directly, so an
+    // asset whose textures were never shipped renders as saturated peach or mauve
+    // and reads as a broken material rather than as missing source.
+    bool color_is_batch_palette = true;
     int vertex_count = 0;
     int base_score = 0;
     int normal_score = 0;

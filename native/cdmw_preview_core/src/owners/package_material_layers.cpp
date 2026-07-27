@@ -4,7 +4,8 @@ static std::string material_category_reason_for_bindings(
     const std::vector<const TextureBinding*>& bindings,
     const NativeSubmesh& mesh,
     const TextureBinding* base,
-    const std::vector<MaterialLayer>& layers
+    const std::vector<MaterialLayer>& layers,
+    const TextureBinding* surface
 ) {
     std::string evidence = lower_copy(mesh.material + " " + mesh.name + " " + mesh.source_component_label + " " + mesh.source_model_path);
     if (base != nullptr) {
@@ -16,6 +17,21 @@ static std::string material_category_reason_for_bindings(
     }
     for (const MaterialLayer& layer : layers) {
         evidence += " " + lower_copy(layer.diffuse_archive_path + " " + layer.source_parameter + " " + layer.layer_role);
+    }
+    const DecodedSurfaceEvidence decoded = decoded_surface_evidence(bindings, surface);
+    if (decoded.decoded) {
+        // Report the measurement rather than the rule it replaced, so a reader can
+        // tell a decoded verdict from a slot-position guess.
+        if (category == "metal" && decoded.metal_coverage >= kDecodedMetalDominantCoverage) {
+            return "metal:decoded_metal_channel:"
+                + std::to_string(static_cast<int>(decoded.metal_coverage * 100.0f + 0.5f)) + "pct";
+        }
+        if (category != "metal" && decoded.metal_coverage < kDecodedMetalDominantCoverage) {
+            return decoded.metal_coverage < kDecodedMetalAbsentCoverage
+                ? "nonmetal:decoded_metal_channel_absent"
+                : "nonmetal:decoded_metal_channel_minority:"
+                    + std::to_string(static_cast<int>(decoded.metal_coverage * 100.0f + 0.5f)) + "pct";
+        }
     }
     if (category == "metal") {
         if (mesh_has_crimson_armor_equipment_surface(mesh) && has_authoritative_equipment_material_response(bindings, mesh)) {
