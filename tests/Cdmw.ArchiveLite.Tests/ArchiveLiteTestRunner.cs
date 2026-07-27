@@ -306,6 +306,35 @@ internal static class ArchiveLiteTestRunner
         Require(
             File.ReadAllText(crashFiles[^1]).Contains("synthetic fatal diagnostic", StringComparison.Ordinal),
             "portable crash diagnostic omitted the underlying exception");
+
+        // Texture decode failures are recorded in the worker process and read by the user in the
+        // client's log, so both ends of that forwarding path have to stay connected.
+        var repositoryRoot = FindRepositoryRoot();
+        var workerRuntime = File.ReadAllText(Path.Combine(
+            repositoryRoot, "src", "Cdmw.ArchiveLite.Worker", "WorkerRuntime.cs"));
+        var workerHost = File.ReadAllText(Path.Combine(
+            repositoryRoot, "src", "Cdmw.ArchiveLite.App", "Services", "WorkerProcessHost.cs"));
+        Require(
+            workerRuntime.Contains("TexturePreviewDiagnostics.Sink", StringComparison.Ordinal),
+            "the worker does not forward recorded texture decode failures");
+        Require(
+            workerHost.Contains("DiagnosticLog.WriteAsync(\"worker\"", StringComparison.Ordinal),
+            "the client drains worker diagnostics without writing them to the portable log");
+
+        var described = TexturePreviewDiagnostics.Describe(new TextureDecodeFailure(
+            DateTimeOffset.UtcNow,
+            "batch-preview-json",
+            "helper_reported_error",
+            "ui/icon/example.dds",
+            $"first line{Environment.NewLine}second line"));
+        Require(
+            !described.Contains('\n') && !described.Contains('\r'),
+            "a described texture failure spans multiple lines and would corrupt the log");
+        Require(
+            described.Contains("helper_reported_error", StringComparison.Ordinal)
+            && described.Contains("ui/icon/example.dds", StringComparison.Ordinal)
+            && described.Contains("second line", StringComparison.Ordinal),
+            "a described texture failure dropped its reason, source, or detail");
         return Task.CompletedTask;
     }
 
@@ -5479,6 +5508,15 @@ internal static class ArchiveLiteTestRunner
     {
         var root = Path.Combine(Path.GetTempPath(), $"cdmw-texture-batch-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
+        var forwarded = new List<TextureDecodeFailure>();
+        var previousSink = TexturePreviewDiagnostics.Sink;
+        TexturePreviewDiagnostics.Sink = failure =>
+        {
+            lock (forwarded)
+            {
+                forwarded.Add(failure);
+            }
+        };
         try
         {
             var goodDds = Path.Combine(root, "good.dds");
@@ -5522,9 +5560,20 @@ internal static class ArchiveLiteTestRunner
             Require(
                 TexturePreviewDiagnostics.Failures().Any(static failure => failure.Reason == "unsafe_dds_input"),
                 "a pre-flight resource rejection was not recorded");
+
+            // The ring is only readable inside the process that records it, so each failure must
+            // also reach the host that forwards it to the user's log.
+            Require(
+                forwarded.Any(static failure => failure.Reason == "helper_reported_error")
+                && forwarded.Any(static failure => failure.Reason == "unsafe_dds_input"),
+                "recorded texture decode failures were not forwarded to the hosting process");
+            Require(
+                forwarded.All(static failure => !string.IsNullOrWhiteSpace(failure.SourcePath)),
+                "a forwarded texture decode failure did not identify its archive source");
         }
         finally
         {
+            TexturePreviewDiagnostics.Sink = previousSink;
             Directory.Delete(root, recursive: true);
         }
     }

@@ -24,7 +24,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 - A texture batch in which one job fails is no longer discarded in full; the decode report is now authoritative and each request reports its own outcome.
 - Truncated, checksum-corrupt, and over-long cached texture previews are no longer served as warm cache hits.
 - A DDS that cannot decode inside the preview resource limits is now rejected from its header instead of starting a helper process that would fail or exhaust memory.
-- Texture decode failures are recorded in a bounded diagnostic history instead of being discarded with the exception.
+- Texture decode failures are recorded in a bounded diagnostic history instead of being discarded with the exception, and are now written to the portable log with their reason and archive source. All worker diagnostics now reach that log rather than only a buffer kept for crash reports.
 - Preview decode gates are released from their registry once idle, instead of retaining one lock per cache key for the life of the process.
 
 ## [0.6.1] - 2026-07-23

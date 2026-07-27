@@ -5,6 +5,8 @@ namespace Cdmw.ArchiveLite.Worker;
 
 internal sealed class WorkerRuntime : IDisposable
 {
+    private const int MaximumForwardedTextureFailures = 512;
+    private static int _forwardedTextureFailures;
     private readonly NativeArchiveCore _native = new();
     private readonly ArchiveSessionManager _sessions;
     private readonly ArchiveQueryService _queries;
@@ -23,6 +25,24 @@ internal sealed class WorkerRuntime : IDisposable
 
     public WorkerRuntime()
     {
+        // Texture decode failures are recorded in the worker but read by the user in the client's
+        // log, so forward each one over the standard error the client already drains. A warm-up
+        // across a damaged archive can fail on every icon, so the stream is capped rather than
+        // allowed to fill the log.
+        TexturePreviewDiagnostics.Sink = static failure =>
+        {
+            var forwarded = Interlocked.Increment(ref _forwardedTextureFailures);
+            if (forwarded < MaximumForwardedTextureFailures)
+            {
+                Console.Error.WriteLine(TexturePreviewDiagnostics.Describe(failure));
+            }
+            else if (forwarded == MaximumForwardedTextureFailures)
+            {
+                Console.Error.WriteLine(
+                    $"texture decode failures beyond {MaximumForwardedTextureFailures} are no longer being reported; "
+                    + "the most recent are retained in the worker.");
+            }
+        };
         ArchiveLiteCacheMaintenance.Prune(ArchiveLiteDataPaths.Cache, ArchiveLiteCacheMaintenance.DefaultCacheMaximumBytes);
         _native.EnsureCompatible();
         _sessions = new ArchiveSessionManager(_native);

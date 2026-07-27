@@ -37,7 +37,7 @@ public sealed class WorkerProcessHost : IWorkerRequestClient, IAsyncDisposable
         _reader = reader;
         _writer = writer;
         _readTask = ReadLoopAsync(_lifetime.Token);
-        _stderrTask = DrainAsync(process.StandardError, _stderr, _lifetime.Token);
+        _stderrTask = DrainDiagnosticsAsync(process.StandardError, _stderr, _lifetime.Token);
         _stdoutTask = DrainAsync(process.StandardOutput, null, _lifetime.Token);
     }
 
@@ -386,6 +386,37 @@ public sealed class WorkerProcessHost : IWorkerRequestClient, IAsyncDisposable
         }
 
         throw new FileNotFoundException("CdmwArchiveLite.Worker.exe was not found beside the application or in the development output.");
+    }
+
+    /// <summary>
+    /// Keeps the bounded tail for crash reporting and also writes each worker diagnostic line to the
+    /// portable log. Worker-side failures are otherwise only readable inside the worker process.
+    /// </summary>
+    private static async Task DrainDiagnosticsAsync(
+        StreamReader reader,
+        BoundedTextTail tail,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                if (line is null)
+                {
+                    break;
+                }
+                tail.Append(line + Environment.NewLine);
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    await DiagnosticLog.WriteAsync("worker", line, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Expected during application shutdown.
+        }
     }
 
     private static async Task DrainAsync(StreamReader reader, BoundedTextTail? tail, CancellationToken cancellationToken)
