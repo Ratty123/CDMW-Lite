@@ -4,6 +4,11 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Hair and fur now take an anisotropic highlight along the strand instead of a round isotropic one. Crimson ships the strand direction as a two-channel `_f` map in UV space; where one is bound on a hair-family surface the preview evaluates a Kajiya-Kay pair of shifted lobes along it — a sharp near-white primary at the cuticle and a broader secondary carrying the strand's own colour. A single isotropic lobe reads as wet plastic. The highlight only switches where both a strand direction and the hair family agree, because the same binding role also carries screen-space displacement directions that are not strand tangents.
+- `SkinnedMeshTear` is no longer an unhandled family. It is a decal shell laid over a head that declares a normal, a surface map and an `_m` atlas whose three colour channels are alternative tear shapes; it has no colour of its own. The atlas now drives coverage rather than being rejected as a technical base, so the shell clips to the tear instead of drawing as an opaque grey card over the face. Its alpha is a broad unrelated field, not coverage, and the preview shows the first of the three shapes because it has no character to choose between them.
+
 ### Changed
 
 - Model previews now derive reflectance from the metal fraction instead of from a specular map. Physical dielectrics sit near 0.04 reflectance whatever a packed map claims, and letting that map act as reflectance is what gave cloth, leather and hair a metallic sheen they never have. A source specular map now shapes the metal highlight only, and its influence fades out with the metal fraction.

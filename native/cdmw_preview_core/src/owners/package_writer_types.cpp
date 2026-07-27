@@ -96,6 +96,7 @@ struct PackageBatchState {
     std::vector<const TextureBinding*> bindings;
     NativeClothRuntimeBatch cloth_runtime;
     bool is_hair = false;
+    bool is_tear_shell = false;
     bool is_eye_surface = false;
     bool has_alpha_test = false;
     bool uses_alpha_cutout = false;

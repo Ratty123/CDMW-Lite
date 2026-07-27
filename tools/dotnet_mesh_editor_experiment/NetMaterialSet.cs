@@ -106,6 +106,11 @@ internal sealed partial class NetMaterialSet
         return TexturePathForSubmesh(submeshIndex, "metallic");
     }
 
+    public string FlowTexturePathForSubmesh(int submeshIndex)
+    {
+        return TexturePathForSubmesh(submeshIndex, "flow");
+    }
+
     public string HeightTexturePathForSubmesh(int submeshIndex)
     {
         return TexturePathForSubmesh(submeshIndex, "height");
