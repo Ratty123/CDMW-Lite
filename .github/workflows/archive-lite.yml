@@ -25,47 +25,6 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
-          restore-keys: nuget-
-
-      # Keyed per component so a change to one native library still restores the
-      # other four. Debug and Release keep separate entries because both
-      # configurations build into the same tree.
-      - name: Cache native archive-core build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_archive_core/build
-          key: native-debug-archive-core-${{ hashFiles('native/cdmw_archive_core/**/CMakeLists.txt', 'native/cdmw_archive_core/**/*.cmake', 'native/cdmw_archive_core/**/*.cpp', 'native/cdmw_archive_core/**/*.h', 'native/cdmw_archive_core/**/*.hpp') }}
-
-      - name: Cache native preview-core build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_preview_core/build
-          key: native-debug-preview-core-${{ hashFiles('native/cdmw_preview_core/**/CMakeLists.txt', 'native/cdmw_preview_core/**/*.cmake', 'native/cdmw_preview_core/**/*.cpp', 'native/cdmw_preview_core/**/*.h', 'native/cdmw_preview_core/**/*.hpp') }}
-
-      - name: Cache native archive-accelerator build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_archive_accelerator/build
-          key: native-debug-accelerator-${{ hashFiles('native/cdmw_archive_accelerator/**/CMakeLists.txt', 'native/cdmw_archive_accelerator/**/*.cmake', 'native/cdmw_archive_accelerator/**/*.cpp', 'native/cdmw_archive_accelerator/**/*.h', 'native/cdmw_archive_accelerator/**/*.hpp') }}
-
-      - name: Cache native mesh-core build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_mesh_core/build
-          key: native-debug-mesh-core-${{ hashFiles('native/cdmw_mesh_core/**/CMakeLists.txt', 'native/cdmw_mesh_core/**/*.cmake', 'native/cdmw_mesh_core/**/*.cpp', 'native/cdmw_mesh_core/**/*.h', 'native/cdmw_mesh_core/**/*.hpp') }}
-
-      # Also caches the DirectXTex sources this component fetches at configure time.
-      - name: Cache native texture helper build
-        uses: actions/cache@v4
-        with:
-          path: native/cd_texture_dx/build
-          key: native-debug-texture-${{ hashFiles('native/cd_texture_dx/**/CMakeLists.txt', 'native/cd_texture_dx/**/*.cmake', 'native/cd_texture_dx/**/*.cpp', 'native/cd_texture_dx/**/*.h', 'native/cd_texture_dx/**/*.hpp', 'native/cd_texture_dx/**/*.hlsl') }}
-
       - name: Verify and test
         shell: pwsh
         run: .\scripts\test_archive_lite.ps1 -Configuration Debug
@@ -85,53 +44,6 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
-          restore-keys: nuget-
-
-      # Only this job bootstraps vgmstream; the Debug gate never creates
-      # .tools/vgmstream. ensure_vgmstream.ps1 re-verifies every restored file
-      # against the SHA-256 manifest and re-downloads on any mismatch, so a
-      # stale or partial entry cannot reach a build.
-      - name: Cache pinned vgmstream runtime
-        uses: actions/cache@v4
-        with:
-          path: .tools/vgmstream
-          key: vgmstream-${{ hashFiles('scripts/ensure_vgmstream.ps1') }}
-
-      - name: Cache native archive-core build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_archive_core/build
-          key: native-release-archive-core-${{ hashFiles('native/cdmw_archive_core/**/CMakeLists.txt', 'native/cdmw_archive_core/**/*.cmake', 'native/cdmw_archive_core/**/*.cpp', 'native/cdmw_archive_core/**/*.h', 'native/cdmw_archive_core/**/*.hpp') }}
-
-      - name: Cache native preview-core build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_preview_core/build
-          key: native-release-preview-core-${{ hashFiles('native/cdmw_preview_core/**/CMakeLists.txt', 'native/cdmw_preview_core/**/*.cmake', 'native/cdmw_preview_core/**/*.cpp', 'native/cdmw_preview_core/**/*.h', 'native/cdmw_preview_core/**/*.hpp') }}
-
-      - name: Cache native archive-accelerator build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_archive_accelerator/build
-          key: native-release-accelerator-${{ hashFiles('native/cdmw_archive_accelerator/**/CMakeLists.txt', 'native/cdmw_archive_accelerator/**/*.cmake', 'native/cdmw_archive_accelerator/**/*.cpp', 'native/cdmw_archive_accelerator/**/*.h', 'native/cdmw_archive_accelerator/**/*.hpp') }}
-
-      - name: Cache native mesh-core build
-        uses: actions/cache@v4
-        with:
-          path: native/cdmw_mesh_core/build
-          key: native-release-mesh-core-${{ hashFiles('native/cdmw_mesh_core/**/CMakeLists.txt', 'native/cdmw_mesh_core/**/*.cmake', 'native/cdmw_mesh_core/**/*.cpp', 'native/cdmw_mesh_core/**/*.h', 'native/cdmw_mesh_core/**/*.hpp') }}
-
-      - name: Cache native texture helper build
-        uses: actions/cache@v4
-        with:
-          path: native/cd_texture_dx/build
-          key: native-release-texture-${{ hashFiles('native/cd_texture_dx/**/CMakeLists.txt', 'native/cd_texture_dx/**/*.cmake', 'native/cd_texture_dx/**/*.cpp', 'native/cd_texture_dx/**/*.h', 'native/cd_texture_dx/**/*.hpp', 'native/cd_texture_dx/**/*.hlsl') }}
 
       - name: Verify, test, and package
         shell: pwsh
