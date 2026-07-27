@@ -117,6 +117,10 @@ static bool technical_for_visible_base(const std::string& parameter_name, const 
     if (compact_hint.find("blend") != std::string::npos
         && compact_hint.find("colorblending") == std::string::npos) return true;
     if (path_has_suffix_stem(raw_path, "_dec")) return true;
+    // An opacity mask carries coverage, not colour. `_overlayColorTexture` on the
+    // shared wrinkle material points at cd_common_00_ub_0001_wrinkle0_opacity.dds,
+    // and the parameter name alone does not say so.
+    if (path_has_suffix_stem(raw_path, "_opacity")) return true;
     if (path_has_suffix_stem(raw_path, "_orm") || path_has_suffix_stem(raw_path, "_rma") || path_has_suffix_stem(raw_path, "_mra")) return true;
     return false;
 }
