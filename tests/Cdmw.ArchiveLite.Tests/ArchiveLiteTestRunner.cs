@@ -66,6 +66,7 @@ internal static class ArchiveLiteTestRunner
             ("named-pipe worker opens and queries an archive", TestWorkerBoundaryAsync),
             ("an unclaimed worker stops instead of outliving its client", TestUnclaimedWorkerExitAsync),
             ("closing the standalone launcher job stops the application tree", TestStandaloneLauncherJobAsync),
+            ("the embedded renderer stops when it loses its host's input", TestEmbeddedRendererHostDisconnectAsync),
         };
         var failures = new List<string>();
         foreach (var test in tests)
@@ -5494,6 +5495,50 @@ internal static class ArchiveLiteTestRunner
             job?.Dispose();
             StopTestProcess(process);
         }
+    }
+
+    /// <summary>
+    /// The embedded renderer is the one child a dying client cannot rescue: its job fence is armed
+    /// just after launch, and unlike the worker it has no pipe of its own to lose. End of standard
+    /// input is the signal that stands in, which needs the renderer to act on it and the host to
+    /// keep providing it. The renderer is a GPU window, so this is guarded at the source level
+    /// rather than by launching it inside the nonvisual gate.
+    /// </summary>
+    private static async Task TestEmbeddedRendererHostDisconnectAsync()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var rendererSource = await File.ReadAllTextAsync(Path.Combine(
+            repositoryRoot,
+            "tools",
+            "dotnet_mesh_editor_experiment",
+            "ExperimentForm.Protocol.cs")).ConfigureAwait(false);
+        Require(
+            rendererSource.Contains("RequestHostDisconnectShutdown();", StringComparison.Ordinal),
+            "the embedded renderer no longer reacts to reaching end of its host's standard input");
+
+        var shutdownIndex = rendererSource.IndexOf(
+            "private void RequestHostDisconnectShutdown()",
+            StringComparison.Ordinal);
+        Require(shutdownIndex >= 0, "the renderer host-disconnect shutdown was removed");
+        var shutdown = rendererSource[shutdownIndex..];
+        Require(
+            shutdown.Contains("if (!_options.Embedded)", StringComparison.Ordinal),
+            "the renderer host-disconnect shutdown is no longer limited to embedded runs, where input is always redirected");
+        Require(
+            shutdown.Contains("BeginInvoke(new Action(Close))", StringComparison.Ordinal),
+            "the renderer no longer closes its window when its host disappears");
+
+        // The signal exists only while the host holds the write end of that pipe.
+        var hostSource = await File.ReadAllTextAsync(Path.Combine(
+            repositoryRoot,
+            "src",
+            "Cdmw.ArchiveLite.App",
+            "Controls",
+            "DotNetModelPreviewHost.cs")).ConfigureAwait(false);
+        Require(
+            hostSource.Contains("RedirectStandardInput = true", StringComparison.Ordinal)
+            && hostSource.Contains("\"--embedded\"", StringComparison.Ordinal),
+            "the preview host no longer starts the renderer embedded with redirected standard input");
     }
 
     private static ProcessStartInfo CreateUnconnectedWorkerStartInfo(string workerPath, string connectTimeoutSeconds)
