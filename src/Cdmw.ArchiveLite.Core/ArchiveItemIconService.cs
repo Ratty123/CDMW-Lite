@@ -11,6 +11,8 @@ public sealed class ArchiveItemIconService(
     ArchiveWorkPriority? workPriority = null)
 {
     private const int MaximumVisibleBatch = 64;
+    private const int MaximumWarmBatch = 16;
+    private const int ProgressPublishInterval = 10;
     private const long MaximumIconBytes = 256L * 1024L * 1024L;
     private const int MaximumIconCandidates = 8;
     private const int MaximumArchiveDecodeConcurrency = 3;
@@ -76,24 +78,44 @@ public sealed class ArchiveItemIconService(
         long ready = 0;
         long missing = 0;
         long failed = 0;
-        for (var index = 0; index < items.Length; index++)
+        var completed = 0;
+        var lastPublished = 0;
+        // Warm-up runs in chunks rather than one icon at a time so the texture helper starts once
+        // per chunk. The chunk stays well under a visible page because a visible request that
+        // arrives mid-chunk waits on the item gates this chunk holds.
+        for (var offset = 0; offset < items.Length; offset += MaximumWarmBatch)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await WaitForVisibleRequestsAsync(cancellationToken).ConfigureAwait(false);
-            var result = await LoadOneSafeAsync(
-                session,
-                catalog,
-                items[index].ItemId,
-                request.ThumbnailSize,
-                cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(result.PngPath)) ready++;
-            else if (result.Warning?.StartsWith("No archive DDS", StringComparison.OrdinalIgnoreCase) == true
-                || result.Warning?.StartsWith("No inventory icon", StringComparison.OrdinalIgnoreCase) == true) missing++;
-            else failed++;
-
-            if (publishProgress is not null && ((index + 1) % 10 == 0 || index + 1 == items.Length))
+            var count = Math.Min(MaximumWarmBatch, items.Length - offset);
+            var chunk = new int[count];
+            for (var index = 0; index < count; index++)
             {
-                await publishProgress(new ProgressUpdate(index + 1, items.Length, "item_icon_warmup", result.SourcePath)).ConfigureAwait(false);
+                chunk[index] = items[offset + index].ItemId;
+            }
+
+            var results = await LoadBatchAsync(session, catalog, chunk, request.ThumbnailSize, cancellationToken)
+                .ConfigureAwait(false);
+            string? lastSource = null;
+            foreach (var result in results)
+            {
+                if (!string.IsNullOrWhiteSpace(result.PngPath)) ready++;
+                else if (result.Warning?.StartsWith("No archive DDS", StringComparison.OrdinalIgnoreCase) == true
+                    || result.Warning?.StartsWith("No inventory icon", StringComparison.OrdinalIgnoreCase) == true) missing++;
+                else failed++;
+                if (result.SourcePath is not null)
+                {
+                    lastSource = result.SourcePath;
+                }
+            }
+            completed += results.Length;
+
+            if (publishProgress is not null
+                && (completed - lastPublished >= ProgressPublishInterval || completed == items.Length))
+            {
+                lastPublished = completed;
+                await publishProgress(new ProgressUpdate(completed, items.Length, "item_icon_warmup", lastSource))
+                    .ConfigureAwait(false);
             }
         }
         return new WarmItemIconsResult(request.SessionId, items.LongLength, ready, missing, failed);
@@ -118,17 +140,6 @@ public sealed class ArchiveItemIconService(
         return (session, catalog);
     }
 
-    private async Task<ItemIconResult> LoadOneSafeAsync(
-        ArchiveSession session,
-        ArchiveItemCatalog catalog,
-        int itemId,
-        int thumbnailSize,
-        CancellationToken cancellationToken)
-    {
-        var results = await LoadBatchAsync(session, catalog, [itemId], thumbnailSize, cancellationToken).ConfigureAwait(false);
-        return results[0];
-    }
-
     /// <summary>
     /// Resolves a whole visible page of icons together so the shared texture helper is started once
     /// per decode round instead of once per icon.
@@ -142,8 +153,15 @@ public sealed class ArchiveItemIconService(
     {
         var results = new Dictionary<int, ItemIconResult>();
         var plans = new List<IconPlan>(itemIds.Count);
+        var planned = new HashSet<int>();
         foreach (var itemId in itemIds)
         {
+            // A repeated id resolves to the same result, and planning it twice would take the same
+            // item gate twice and deadlock.
+            if (!planned.Add(itemId))
+            {
+                continue;
+            }
             if (!catalog.TryGet(itemId, out var item) || item is null)
             {
                 results[itemId] = new ItemIconResult(itemId, null, null, "The item is not present in the active catalog.");

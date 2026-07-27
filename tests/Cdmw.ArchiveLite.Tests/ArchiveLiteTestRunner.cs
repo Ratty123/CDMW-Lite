@@ -3381,6 +3381,72 @@ internal static class ArchiveLiteTestRunner
         Require(
             string.IsNullOrEmpty(icon.KnownName) && icon.NameEvidence == "Synthetic Blade",
             "recovered related evidence did not propagate to the derived item-icon texture");
+
+        await RequireChunkedIconWarmupAsync(sessions, session, service, native, opened.SessionId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Warm-up decodes in chunks, so a run has to cross a chunk boundary to prove the boundary
+    /// arithmetic. Every considered item must be classified exactly once and progress must advance
+    /// monotonically to the total.
+    /// </summary>
+    private static async Task RequireChunkedIconWarmupAsync(
+        ArchiveSessionManager sessions,
+        ArchiveSession session,
+        ArchiveItemNameIndexService nameIndexService,
+        NativeArchiveCore native,
+        string sessionId)
+    {
+        const int itemCount = 20; // more than one warm chunk
+        const string iconPath = "ui/itemicon/itemicon_prefab_cd_marni_laser_hel_0001_n.dds";
+        var records = Enumerable.Range(0, itemCount)
+            .Select(index => new ArchiveItemCatalogRecord(
+                9000 + index,
+                $"WarmSubject_{index}",
+                $"Warm Subject {index}",
+                [$"Warm Subject {index}"],
+                [],
+                [$"warm_subject_{index}"],
+                [],
+                [iconPath],
+                []))
+            .ToArray();
+        session.SetCatalogue(
+            ArchiveItemNameIndex.FromMappings(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+            ArchiveItemCatalog.FromRecords(records));
+
+        var icons = new ArchiveItemIconService(sessions, nameIndexService, native, new NativeTexturePreviewService());
+        var progress = new List<ProgressUpdate>();
+        var warm = await icons.WarmAsync(
+            new WarmItemIconsRequest(sessionId, ThumbnailSize: 64),
+            update =>
+            {
+                progress.Add(update);
+                return Task.CompletedTask;
+            },
+            CancellationToken.None).ConfigureAwait(false);
+        Console.WriteLine(
+            $"INFO: icon warm-up considered={warm.Considered} ready={warm.Ready} missing={warm.Missing} "
+            + $"failed={warm.Failed} progress-updates={progress.Count}");
+
+        Require(
+            warm.Considered == itemCount,
+            $"icon warm-up considered {warm.Considered} of {itemCount} icon-bearing catalog items");
+        Require(
+            warm.Ready + warm.Missing + warm.Failed == warm.Considered,
+            $"icon warm-up classified {warm.Ready + warm.Missing + warm.Failed} of {warm.Considered} considered icons");
+        Require(progress.Count >= 2, "a multi-chunk icon warm-up did not report progress per chunk");
+        Require(
+            progress[^1].Completed == warm.Considered,
+            "icon warm-up progress did not finish at the considered icon count");
+        Require(
+            progress.Zip(progress.Skip(1)).All(static pair => pair.First.Completed < pair.Second.Completed),
+            "icon warm-up progress did not advance monotonically across chunks");
+        Require(
+            progress.All(update => update.Total == warm.Considered && update.Phase == "item_icon_warmup"),
+            "icon warm-up progress reported an inconsistent total or phase");
     }
 
     private static async Task TestItemFinderCatalogAsync()
@@ -3577,8 +3643,10 @@ internal static class ArchiveLiteTestRunner
             && archiveBrowserViewModel.Contains("MostCommonExtensionChoices", StringComparison.Ordinal)
             && iconService.Contains("WaitForVisibleRequestsAsync", StringComparison.Ordinal)
             && iconService.Contains("WaitForForegroundAsync", StringComparison.Ordinal)
-            && iconService.Contains("BuildThumbnailBatchAsync", StringComparison.Ordinal),
-            "Item Finder icon loading is not memory-bounded, persistent, visible-first, and batched");
+            && iconService.Contains("BuildThumbnailBatchAsync", StringComparison.Ordinal)
+            && iconService.Contains("MaximumWarmBatch", StringComparison.Ordinal)
+            && !iconService.Contains("LoadOneSafeAsync", StringComparison.Ordinal),
+            "Item Finder icon loading is not memory-bounded, persistent, visible-first, and batched for both visible and warm work");
 
         var workPriority = new ArchiveWorkPriority();
         var lease = workPriority.EnterForeground();
