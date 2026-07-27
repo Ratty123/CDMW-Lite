@@ -2,7 +2,7 @@
 
 CDMW Archive Lite is a standalone, read-only Windows desktop application for browsing Crimson Desert PAMT/PAZ archives. It can search, inspect, preview, and export archive content without modifying the source archives.
 
-The application is self-contained in this repository, uses no Python runtime, and keeps archive queries, decoding, media conversion, and mesh rendering outside the UI process.
+The application is self-contained in this repository and keeps archive queries, decoding, media conversion, and mesh rendering outside the UI process.
 
 ## Highlights
 
