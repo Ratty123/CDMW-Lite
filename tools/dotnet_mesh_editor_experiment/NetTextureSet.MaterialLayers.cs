@@ -13,6 +13,109 @@ internal sealed partial class NetTextureSet
         get { lock (_gate) return _materialLayerCompositeCount; }
     }
 
+    // Composited roughness/metal for a submesh whose surface response exists only
+    // per colour layer. Returns Empty when the submesh binds its own surface map,
+    // which stays authoritative, or when no layer carries one.
+    public NetMaterialTextureReference SynthesizedSurfaceReferenceForSubmesh(
+        NetMaterialSet materials,
+        int submeshIndex)
+    {
+        if (!materials.TextureReferenceForSubmesh(submeshIndex, "roughness").IsEmpty
+            || !materials.TextureReferenceForSubmesh(submeshIndex, "metallic").IsEmpty)
+        {
+            return NetMaterialTextureReference.Empty;
+        }
+        var layers = materials.MaterialLayersForSubmesh(submeshIndex);
+        if (!layers.Any(layer => !string.IsNullOrWhiteSpace(layer.MaterialResourceId)))
+        {
+            return NetMaterialTextureReference.Empty;
+        }
+
+        var layerReferences = layers.Select(layer => (
+            Binding: layer,
+            Material: materials.TextureReferenceForResource(
+                layer.MaterialResourceId,
+                "layer_material",
+                "linear"),
+            Mask: materials.TextureReferenceForResource(
+                layer.MaskResourceId,
+                "layer_mask",
+                "linear")))
+            .ToArray();
+        var signatureText = string.Join(
+            "|",
+            materials.Signature,
+            submeshIndex,
+            "surface",
+            string.Join(";", layerReferences.Select(item => string.Join(
+                ",",
+                item.Binding.LayerRole,
+                item.Binding.MaskChannel,
+                item.Binding.Weight.ToString("R", CultureInfo.InvariantCulture),
+                item.Binding.MaterialResourceId,
+                item.Binding.MaskResourceId,
+                item.Material.SourceCacheKey,
+                item.Mask.SourceCacheKey))));
+        var fingerprint = "managed-surface-layer-" + Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(signatureText))).ToLowerInvariant();
+        var resourceId = $"material-surface-layer:{fingerprint}";
+        var path = layerReferences
+            .Select(item => item.Material)
+            .FirstOrDefault(reference => !reference.IsEmpty).Path;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return NetMaterialTextureReference.Empty;
+        }
+        var reference = new NetMaterialTextureReference(
+            resourceId,
+            path,
+            fingerprint,
+            "roughness",
+            "linear",
+            path,
+            "archive_lite_managed_surface_layer_compiler_v1");
+
+        lock (_gate)
+        {
+            if (_decodedByFingerprint.ContainsKey(reference.SourceCacheKey))
+            {
+                return reference;
+            }
+            var sources = new List<NetMaterialLayerSurfaceSource>();
+            foreach (var item in layerReferences)
+            {
+                if (item.Material.IsEmpty)
+                {
+                    continue;
+                }
+                var material = BitmapForReference(item.Material);
+                if (material is null)
+                {
+                    continue;
+                }
+                var mask = item.Mask.IsEmpty ? null : BitmapForReference(item.Mask);
+                if (!string.IsNullOrWhiteSpace(item.Binding.MaskResourceId) && mask is null)
+                {
+                    continue;
+                }
+                sources.Add(new NetMaterialLayerSurfaceSource(item.Binding, material, mask));
+            }
+            if (sources.Count == 0)
+            {
+                return NetMaterialTextureReference.Empty;
+            }
+            var compiled = NetMaterialLayerCompiler.CompileSurface(null, sources);
+            if (compiled is null)
+            {
+                return NetMaterialTextureReference.Empty;
+            }
+            _decodedByFingerprint[reference.SourceCacheKey] = compiled;
+            _lastGoodResourceKeys[resourceId] = reference.SourceCacheKey;
+            _materialLayerCompositeCount++;
+            return reference;
+        }
+    }
+
     public NetMaterialTextureReference SynthesizedBaseReferenceForSubmesh(
         NetMaterialSet materials,
         int submeshIndex)

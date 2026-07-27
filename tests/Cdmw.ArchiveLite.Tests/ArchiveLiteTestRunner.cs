@@ -2452,6 +2452,193 @@ internal static class ArchiveLiteTestRunner
         }).ConfigureAwait(false);
     }
 
+    // Crimson binds the same packed surface map through _materialTexture on some
+    // shader families and _specularTexture on others. Both must reach the
+    // renderer's per-texel roughness and metal slots; when only the material slot
+    // expanded, every specular-bound armour and weapon fell back to the
+    // filename-derived category guess for its whole material response.
+    private static async Task AssertSpecularSlotCarriesPackedSurfaceResponseAsync(
+        string sourceGeometryPath,
+        string sourceMaterialTexturePath)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-specular-response-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "geometry"));
+            Directory.CreateDirectory(Path.Combine(root, "textures"));
+            File.Copy(sourceGeometryPath, Path.Combine(root, "geometry", "batch_000.bin"));
+            var responseTexturePath = Path.Combine(root, "textures", "surface_sp.dds");
+            File.Copy(sourceMaterialTexturePath, responseTexturePath);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "manifest.json"),
+                JsonSerializer.Serialize(new
+                {
+                    schema_version = 8,
+                    backend = "d3d11",
+                    source_path = "character/model/01_weapon/sword/specular_bound.pac",
+                    batches = new[]
+                    {
+                        new
+                        {
+                            index = 0,
+                            material_name = "specular_bound_blade",
+                            vertex_file = "geometry/batch_000.bin",
+                            vertex_count = 3,
+                            base_color = new[] { 0.5f, 0.5f, 0.5f },
+                            material_category = "metal",
+                            shader_family = "SkinnedMeshStandard",
+                            dds_textures = new Dictionary<string, object>
+                            {
+                                ["specular"] = new
+                                {
+                                    source_path = "textures/surface_sp.dds",
+                                    packed_channels = "layer:material_response,g=roughness,b=metalness",
+                                    srgb_mode = "linear",
+                                },
+                            },
+                        },
+                    },
+                }),
+                Encoding.UTF8).ConfigureAwait(false);
+
+            await NativePreviewPackageAdapter.PrepareAsync(
+                root,
+                "synthetic:specular-response",
+                CancellationToken.None,
+                includeTextures: true).ConfigureAwait(false);
+            using var materials = JsonDocument.Parse(
+                await File.ReadAllTextAsync(Path.Combine(root, "net_materials.json")).ConfigureAwait(false));
+            var submesh = materials.RootElement.GetProperty("submeshes")[0];
+            var channels = submesh.GetProperty("resolved_channels");
+            var components = submesh.GetProperty("channel_components");
+            Require(
+                string.Equals(
+                    channels.GetProperty("roughness").GetString(),
+                    Path.GetFullPath(responseTexturePath),
+                    StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    channels.GetProperty("metallic").GetString(),
+                    Path.GetFullPath(responseTexturePath),
+                    StringComparison.OrdinalIgnoreCase)
+                && components.GetProperty("roughness").GetString() == "g"
+                && components.GetProperty("metallic").GetString() == "b",
+                "a specular-bound packed surface map did not reach the renderer's roughness and metal channels");
+            Require(
+                submesh.GetProperty("channel_color_spaces").GetProperty("roughness").GetString() == "linear"
+                && submesh.GetProperty("channel_color_spaces").GetProperty("metallic").GetString() == "linear",
+                "packed surface response was routed through an sRGB channel");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // A garment whose surface response only exists per colour layer has no single
+    // map to bind. The layers' own surface maps must still reach the renderer, and
+    // the submesh must declare the layout the composite will carry, or the part
+    // renders from a filename-derived category guess instead of its own source.
+    private static async Task AssertLayerSurfaceMapsReachTheRendererAsync(
+        string sourceGeometryPath,
+        string sourceMaterialTexturePath,
+        string sourceMaskPath)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-layer-surface-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "geometry"));
+            Directory.CreateDirectory(Path.Combine(root, "textures"));
+            File.Copy(sourceGeometryPath, Path.Combine(root, "geometry", "batch_000.bin"));
+            var layerDiffusePath = Path.Combine(root, "textures", "layer_diffuse.dds");
+            var layerSurfacePath = Path.Combine(root, "textures", "layer_sp.dds");
+            var layerMaskPath = Path.Combine(root, "textures", "layer_mask.dds");
+            File.Copy(sourceMaterialTexturePath, layerDiffusePath);
+            File.Copy(sourceMaterialTexturePath, layerSurfacePath);
+            File.Copy(sourceMaskPath, layerMaskPath);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "manifest.json"),
+                JsonSerializer.Serialize(new
+                {
+                    schema_version = 8,
+                    backend = "d3d11",
+                    source_path = "character/model/01_armor/09_upperbody/layered.pac",
+                    batches = new[]
+                    {
+                        new
+                        {
+                            index = 0,
+                            material_name = "layered_garment",
+                            vertex_file = "geometry/batch_000.bin",
+                            vertex_count = 3,
+                            base_color = new[] { 0.5f, 0.5f, 0.5f },
+                            material_category = "cloth",
+                            shader_family = "SkinnedMeshStandard",
+                            dds_textures = new Dictionary<string, object>
+                            {
+                                // The colour-blending mask wins the material slot and
+                                // carries no surface response, exactly as it does on a
+                                // real layered garment.
+                                ["material"] = new
+                                {
+                                    source_path = "textures/layer_mask.dds",
+                                    packed_channels = "layer:color_blending_mask",
+                                    srgb_mode = "linear",
+                                },
+                            },
+                            material_layers = new object[]
+                            {
+                                new
+                                {
+                                    layer_role = "grime",
+                                    mask_channel = "r",
+                                    blend_order = "base_then_grime",
+                                    diffuse_source = "textures/layer_diffuse.dds",
+                                    material_source = "textures/layer_sp.dds",
+                                    mask_source = "textures/layer_mask.dds",
+                                    weight = 0.5f,
+                                    tint = new[] { 1.0f, 1.0f, 1.0f, 1.0f },
+                                },
+                            },
+                        },
+                    },
+                }),
+                Encoding.UTF8).ConfigureAwait(false);
+
+            await NativePreviewPackageAdapter.PrepareAsync(
+                root,
+                "synthetic:layer-surface",
+                CancellationToken.None,
+                includeTextures: true).ConfigureAwait(false);
+            using var materials = JsonDocument.Parse(
+                await File.ReadAllTextAsync(Path.Combine(root, "net_materials.json")).ConfigureAwait(false));
+            var submesh = materials.RootElement.GetProperty("submeshes")[0];
+            Require(
+                !submesh.GetProperty("resolved_channels").TryGetProperty("roughness", out _),
+                "a colour-blending layer selector was bound as a surface map");
+            var layer = submesh.GetProperty("material_layers")[0];
+            Require(
+                !string.IsNullOrWhiteSpace(layer.GetProperty("material_resource_id").GetString()),
+                "a colour layer's own surface map was not published to the renderer");
+            Require(
+                submesh.GetProperty("channel_components").GetProperty("roughness").GetString() == "g"
+                && submesh.GetProperty("channel_components").GetProperty("metallic").GetString() == "b",
+                "the layer surface composite did not declare the channels the renderer must sample");
+            Require(
+                submesh.GetProperty("channel_color_spaces").GetProperty("roughness").GetString() == "linear",
+                "layer surface response was declared in an sRGB channel");
+            var resourceIds = materials.RootElement.GetProperty("resources").EnumerateArray()
+                .Select(resource => resource.GetProperty("resource_id").GetString())
+                .ToHashSet(StringComparer.Ordinal);
+            Require(
+                resourceIds.Contains(layer.GetProperty("material_resource_id").GetString()),
+                "the published layer surface resource is not in the renderer's resource table");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task TestNativeModelPreviewPackageAsync()
     {
         var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-model-preview-test-{Guid.NewGuid():N}");
@@ -2710,6 +2897,30 @@ internal static class ArchiveLiteTestRunner
             Require(
                 packedComponents.GetValueOrDefault("specular") == "a",
                 "specular_response is not routed from the packed material alpha channel");
+            var materialResponseComponents = (Dictionary<string, string>)(packedParser.Invoke(
+                null,
+                ["layer:material_response,g=roughness,b=metalness"])
+                ?? throw new InvalidOperationException("packed material parser returned no map"));
+            Require(
+                materialResponseComponents.Count == 2
+                && materialResponseComponents.GetValueOrDefault("roughness") == "g"
+                && materialResponseComponents.GetValueOrDefault("metallic") == "b",
+                "the Crimson _sp layout does not route roughness to G and metal to B");
+            var hairResponseComponents = (Dictionary<string, string>)(packedParser.Invoke(
+                null,
+                ["layer:material_response,g=roughness"])
+                ?? throw new InvalidOperationException("packed material parser returned no map"));
+            Require(
+                hairResponseComponents.Count == 1
+                && hairResponseComponents.GetValueOrDefault("roughness") == "g",
+                "hair _sp maps must not declare a metal channel the hair shaders never sample");
+            var colorBlendingMaskComponents = (Dictionary<string, string>)(packedParser.Invoke(
+                null,
+                ["layer:color_blending_mask"])
+                ?? throw new InvalidOperationException("packed material parser returned no map"));
+            Require(
+                colorBlendingMaskComponents.Count == 0,
+                "a colour-blending layer selector was decoded as a packed surface property");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
                 var initialCamera = scene.RootElement
@@ -2720,6 +2931,11 @@ internal static class ArchiveLiteTestRunner
                     && Math.Abs(initialCamera.GetProperty("fit_relative_zoom").GetSingle() - 0.9f) < 0.0001f,
                     "textured native preview did not select the renderer's textured display mode and relaxed initial fit");
             }
+            await AssertSpecularSlotCarriesPackedSurfaceResponseAsync(geometryPath, materialTexturePath)
+                .ConfigureAwait(false);
+            await AssertLayerSurfaceMapsReachTheRendererAsync(geometryPath, materialTexturePath, layerMaskPath)
+                .ConfigureAwait(false);
+
             Require(
                 ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/weapon/sword/example.pac")
                 && ArchiveModelPreviewPolicy.UsesOverheadCamera("character/model/01_sword/example.pac")

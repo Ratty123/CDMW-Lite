@@ -49,7 +49,7 @@ internal static class VisualAuditBatch
             {
                 throw new InvalidDataException($"Visual-audit asset count must be between 1 and {MaximumAssets}.");
             }
-            using var session = new ResidentVisualAuditSession(width, height);
+            using var session = new ResidentVisualAuditSession(width, height, JsonBool(root, "unlit"));
             foreach (var asset in assets.EnumerateArray())
             {
                 rows.Add(CaptureAsset(asset, outputRoot, width, height, session));
@@ -107,7 +107,14 @@ internal static class VisualAuditBatch
         var rendererAdoptedTextures = false;
         try
         {
-            var scenePath = Path.Combine(packageDir, "scene.obj");
+            // A native preview package carries binary geometry behind manifest.json;
+            // only the older workbench packages ship a scene.obj. ObjDocument.Load
+            // dispatches on the filename, so preferring the manifest lets this audit
+            // run against exactly the packages Archive Lite hands the renderer.
+            var manifestScenePath = Path.Combine(packageDir, "manifest.json");
+            var scenePath = File.Exists(manifestScenePath)
+                ? manifestScenePath
+                : Path.Combine(packageDir, "scene.obj");
             var materialsPath = Path.Combine(packageDir, "net_materials.json");
             var sceneStatePath = Path.Combine(packageDir, "dotnet_scene.json");
             RequirePackageFile(packageDir, scenePath);
@@ -222,13 +229,15 @@ internal static class VisualAuditBatch
     private sealed class ResidentVisualAuditSession : IDisposable
     {
         private readonly Form _form;
+        private readonly bool _unlit;
         private D3D11MaterialViewport? _viewport;
         private NetTextureSet? _activeTextures;
         private int _viewportCreateCount;
         private int _deviceInitializationCount;
 
-        public ResidentVisualAuditSession(int width, int height)
+        public ResidentVisualAuditSession(int width, int height, bool unlit = false)
         {
+            _unlit = unlit;
             _form = new Form
             {
                 ClientSize = new Size(width, height),
@@ -252,7 +261,13 @@ internal static class VisualAuditBatch
                 {
                     Dock = DockStyle.Fill,
                 };
-                viewport.ApplyPresentationSettings(new D3D11PresentationSettings());
+                // An unlit pass shows the albedo the renderer actually resolved,
+                // which is how a shading problem is told apart from a texture or
+                // colour-space one without guessing from the lit image.
+                viewport.ApplyPresentationSettings(new D3D11PresentationSettings
+                {
+                    DisableLighting = _unlit,
+                });
                 _form.Controls.Add(viewport);
                 try
                 {
@@ -445,6 +460,9 @@ internal static class VisualAuditBatch
         }
         return text;
     }
+
+    private static bool JsonBool(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
 
     private static int JsonInt(JsonElement root, string name, int fallback) =>
         root.TryGetProperty(name, out var value) && value.TryGetInt32(out var parsed) ? parsed : fallback;

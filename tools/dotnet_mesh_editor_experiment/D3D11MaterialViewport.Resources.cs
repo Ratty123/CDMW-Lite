@@ -129,8 +129,18 @@ internal sealed partial class D3D11MaterialViewport
         var baseTexture = CreateTextureSrv(baseReference);
         var normal = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "normal"));
         var specular = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "specular"));
-        var roughness = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "roughness"));
-        var metallic = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "metallic"));
+        // Where the surface response only exists per colour layer, one composite
+        // stands in for both channels; the declared component selectors still pick
+        // roughness out of green and metal out of blue.
+        var surfaceReference = _textureSet.SynthesizedSurfaceReferenceForSubmesh(_materials, submeshIndex);
+        var roughnessReference = surfaceReference.IsEmpty
+            ? _materials.TextureReferenceForSubmesh(submeshIndex, "roughness")
+            : surfaceReference;
+        var metallicReference = surfaceReference.IsEmpty
+            ? _materials.TextureReferenceForSubmesh(submeshIndex, "metallic")
+            : surfaceReference;
+        var roughness = CreateTextureSrv(roughnessReference);
+        var metallic = CreateTextureSrv(metallicReference);
         var height = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "height"));
         var emissive = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "emissive"));
         var layerMask = CreateTextureSrv(_materials.TextureReferenceForSubmesh(submeshIndex, "layer_mask", "mask"));

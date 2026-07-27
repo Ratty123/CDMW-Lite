@@ -583,6 +583,22 @@ public static class NativePreviewPackageAdapter
                     resourceFingerprints,
                     cancellationToken).ConfigureAwait(false)
                 : Array.Empty<Dictionary<string, object?>>();
+            // A submesh whose surface response only exists per colour layer has no
+            // single map to bind, so the renderer composites the layers through
+            // their own masks. Declare the layout that composite will carry -- the
+            // same G roughness / B metal the source layers use -- so the renderer
+            // samples it exactly as it samples a directly bound map.
+            if (!channels.ContainsKey("roughness")
+                && materialLayers.Any(layer =>
+                    layer.GetValueOrDefault("material_resource_id") is string id && id.Length > 0))
+            {
+                channelResolution.Components["roughness"] = "g";
+                channelResolution.Components["metallic"] = "b";
+                channelResolution.ColorSpaces["roughness"] = "linear";
+                channelResolution.ColorSpaces["metallic"] = "linear";
+                channelResolution.Authorities["roughness"] = "native_preview_core_material_layer";
+                channelResolution.Authorities["metallic"] = "native_preview_core_material_layer";
+            }
             slots.Add(new Dictionary<string, object?>
             {
                 ["index"] = index,
@@ -842,6 +858,21 @@ public static class NativePreviewPackageAdapter
                     resources,
                     fingerprints,
                     cancellationToken).ConfigureAwait(false);
+            // Each colour layer carries its own packed surface map beside its
+            // diffuse. Publishing it lets the renderer composite the layers'
+            // roughness and metal through the same mask that selects their
+            // colour, instead of leaving the submesh with no surface response.
+            var materialPath = ResolveTextureSource(packageRoot, ReadString(layer, "material_source"));
+            var materialResourceId = string.IsNullOrWhiteSpace(materialPath)
+                ? string.Empty
+                : await RegisterResourceAsync(
+                    submeshIndex,
+                    materialPath,
+                    "layer_material",
+                    "linear",
+                    resources,
+                    fingerprints,
+                    cancellationToken).ConfigureAwait(false);
             result.Add(new Dictionary<string, object?>
             {
                 ["layer_role"] = layerRole,
@@ -853,6 +884,7 @@ public static class NativePreviewPackageAdapter
                 ["tint"] = ReadFloatArray(layer, "tint", [1.0f, 1.0f, 1.0f]),
                 ["diffuse_resource_id"] = diffuseResourceId,
                 ["mask_resource_id"] = maskResourceId,
+                ["material_resource_id"] = materialResourceId,
             });
         }
         return result.ToArray();
@@ -1050,11 +1082,17 @@ public static class NativePreviewPackageAdapter
         {
             result.Components[semantic] = component;
         }
-        if (slot == "material")
+        // Crimson packs its surface response into one map and binds it through
+        // either _materialTexture or _specularTexture depending on the shader
+        // family. Both carry the same layout, so both expand into the per-texel
+        // roughness and metal channels the renderer samples; without this the
+        // packed map is uploaded but never read, and material response falls back
+        // to the filename-derived category guess for every armour and weapon.
+        if (slot == "material" || slot == "specular")
         {
             foreach (var semantic in new[] { "specular", "roughness", "metallic", "occlusion" })
             {
-                if (packedComponents.ContainsKey(semantic))
+                if (semantic != slot && packedComponents.ContainsKey(semantic))
                 {
                     SetChannel(result, semantic, path, "linear", authority, overwrite);
                 }

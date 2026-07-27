@@ -107,6 +107,16 @@ static bool technical_for_visible_base(const std::string& parameter_name, const 
     if (path_has_suffix_stem(raw_path, "_n") || path_has_suffix_stem(raw_path, "_disp") || path_has_suffix_stem(raw_path, "_ma")) return true;
     if (path_has_suffix_stem(raw_path, "_mg") || path_has_suffix_stem(raw_path, "_sp") || path_has_suffix_stem(raw_path, "_m")) return true;
     if (path_has_suffix_stem(raw_path, "_dr")) return true;
+    // A decal or blend input paints a local mark -- damage, scorch, an emblem --
+    // over a surface that already has a colour, and its alpha is the mark's own
+    // shape. Promoted to the visible base it paints the whole part with the decal
+    // sheet, including the rectangle around the mark. `_detailDiffuseBlend`
+    // pointing at cd_texturelayer_100_0044_dec.dds became the albedo of
+    // cd_phm_02_sword_0036_in this way, over the grime layers that hold its real
+    // colour. `_colorBlending*` is a layer selector handled above, not a decal.
+    if (compact_hint.find("blend") != std::string::npos
+        && compact_hint.find("colorblending") == std::string::npos) return true;
+    if (path_has_suffix_stem(raw_path, "_dec")) return true;
     if (path_has_suffix_stem(raw_path, "_orm") || path_has_suffix_stem(raw_path, "_rma") || path_has_suffix_stem(raw_path, "_mra")) return true;
     return false;
 }

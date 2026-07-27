@@ -107,6 +107,8 @@ internal static class D3D11MaterialLayerOrientationProof
             {
                 ["managed_compiler_preserves_source_rows"] = sourceRowsPreserved
                     && NetMaterialLayerCompiler.PreservesSourceOrientation(),
+                ["managed_surface_layers_follow_their_mask"] =
+                    NetMaterialLayerCompiler.CompositesSurfaceThroughMask(),
                 ["managed_layer_composite_created_once"] = textures.MaterialLayerCompositeCount == 1,
                 ["production_d3d11_backend"] = viewport.IsInitialized
                     && string.Equals(viewport.BackendName, "d3d11_vortice_shader", StringComparison.Ordinal),

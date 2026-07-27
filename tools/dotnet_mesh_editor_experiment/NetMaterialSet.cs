@@ -303,7 +303,8 @@ internal sealed partial class NetMaterialSet
                 tint.Length == 3 ? tint[1] : 1.0f,
                 tint.Length == 3 ? tint[2] : 1.0f,
                 JsonString(layer, "diffuse_resource_id"),
-                JsonString(layer, "mask_resource_id")));
+                JsonString(layer, "mask_resource_id"),
+                JsonString(layer, "material_resource_id")));
         }
         return result;
     }
@@ -353,11 +354,13 @@ internal sealed record NetMaterialLayerBinding(
     float TintG,
     float TintB,
     string DiffuseResourceId,
-    string MaskResourceId)
+    string MaskResourceId,
+    string MaterialResourceId = "")
 {
     public IEnumerable<string> ResourceIds()
     {
         if (!string.IsNullOrWhiteSpace(DiffuseResourceId)) yield return DiffuseResourceId;
         if (!string.IsNullOrWhiteSpace(MaskResourceId)) yield return MaskResourceId;
+        if (!string.IsNullOrWhiteSpace(MaterialResourceId)) yield return MaterialResourceId;
     }
 }
