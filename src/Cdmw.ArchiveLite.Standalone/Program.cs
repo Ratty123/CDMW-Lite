@@ -76,8 +76,21 @@ internal static class Program
         startInfo.Environment[PortableRootEnvironmentVariable] = portableRoot;
         startInfo.Environment[CacheRootEnvironmentVariable] = cacheRoot;
 
+        // Arm the kill-on-close fence before the launch so the window in which the application could
+        // outlive a force-closed launcher is as short as Windows allows.
+        using var job = StandaloneJob.TryCreate(out var jobFailure);
+        if (jobFailure is not null)
+        {
+            WriteDiagnostic(portableRoot, jobFailure);
+        }
+
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Windows did not start the extracted Archive Lite application.");
+        if (job is not null && !job.TryAdd(process, out var assignFailure) && assignFailure is not null)
+        {
+            WriteDiagnostic(portableRoot, assignFailure);
+        }
+
         // Reclaim superseded runtimes only once the application is already up, so cleanup can never
         // sit between the user and a launch.
         StandaloneRuntime.PrunePayloadsSafely(runtimeRoot, applicationDirectory);

@@ -4,6 +4,11 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- The standalone launcher now places the application it starts in a kill-on-close job object, so force-closing the launcher stops the whole Archive Lite tree instead of leaving it running with no launcher attached.
+- A worker that no client ever connects to now stops after thirty seconds instead of waiting for a connection forever. The client arms its own kill-on-close job just after launch, so a client that dies during that window previously left a worker running with no pipe to notice and no window to close.
+
 ## [0.7.0] - 2026-07-27
 
 ### Added
