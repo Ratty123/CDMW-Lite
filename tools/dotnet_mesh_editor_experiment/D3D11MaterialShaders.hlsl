@@ -103,6 +103,22 @@ float3 SrgbUiColorToLinear(float3 color)
     return lerp(upper, lower, step(color, float3(0.04045f, 0.04045f, 0.04045f)));
 }
 
+float LinearToSrgbScalar(float value)
+{
+    float clamped = saturate(value);
+    return clamped <= 0.0031308f
+        ? clamped * 12.92f
+        : 1.055f * pow(clamped, 1.0f / 2.4f) - 0.055f;
+}
+
+float SrgbToLinearScalar(float value)
+{
+    float clamped = saturate(value);
+    return clamped <= 0.04045f
+        ? clamped / 12.92f
+        : pow((clamped + 0.055f) / 1.055f, 2.4f);
+}
+
 float3 AcesToneMap(float3 color)
 {
     color = max(color, float3(0.0f, 0.0f, 0.0f));
@@ -394,18 +410,38 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             && MaterialBaseTintPolicy.y > 0.5f
             && MaterialBaseTintPolicy.y < 1.5f;
         float neutralMetalTint = earlyCategoryMetal ? saturate((0.12f - tintChroma) * 8.0f) : 0.0f;
-        // Keep Archive Browser's source-tint authority.  Chromatic metal is
-        // already colored by its source-stable F0 below; amplifying an inferred
-        // base tint a second time turns dark steel/copper sidecar hints into paint.
+        // Two different operations were sharing one strength.  `colorized`
+        // replaces the texture's own value with a lifted flat luma, which is
+        // what turns a copper hint into paint, so chromatic metal was damped to
+        // 5% to suppress it -- and that took `multiplied` down with it.
+        // `multiplied` is a luma-normalised hue shift: it recolours without
+        // changing brightness and keeps every texel of the source. Splitting
+        // them lets an authored brass or gold tint reach the surface (and, via
+        // F0, its reflection) while the painty path stays suppressed. 217 of
+        // 280 sampled metal parts carry a chromatic tint, so at 5% most of the
+        // game's brass and gold was resolving to grey steel.
+        float metalHueOnly = earlyCategoryMetal ? (1.0f - neutralMetalTint) : 0.0f;
         float strength = saturate(MaterialBaseTintPolicy.x
-            * (earlyCategoryMetal ? lerp(0.05f, 1.25f, neutralMetalTint) : 1.0f));
+            * (earlyCategoryMetal ? lerp(1.0f, 1.25f, neutralMetalTint) : 1.0f));
         float albedoLuma = dot(baseColor.rgb, float3(0.299f, 0.587f, 0.114f));
         float liftedLuma = saturate(albedoLuma * (1.05f + strength * 0.35f) + 0.10f * strength);
-        float3 multiplied = saturate(baseColor.rgb * tintBias);
+        // The metal tint exists to colour a shared library tile, and those tiles
+        // are authored neutral -- of six sampled, four measure a chroma of
+        // 0.001 or less, so the sidecar tint is the only thing saying brass or
+        // verdigris. A few carry their own colour, though, and there the tint
+        // would apply it twice and oversaturate, so the hue shift fades out as
+        // the source texture's own chroma rises.
+        float albedoChroma = max(baseColor.r, max(baseColor.g, baseColor.b))
+            - min(baseColor.r, min(baseColor.g, baseColor.b));
+        float3 hueBias = lerp(
+            tintBias,
+            float3(1.0f, 1.0f, 1.0f),
+            saturate((albedoChroma - 0.05f) * 5.0f) * metalHueOnly);
+        float3 multiplied = saturate(baseColor.rgb * hueBias);
         float3 colorized = saturate(liftedLuma.xxx * tintBias);
         float neutralMetalLuma = saturate(albedoLuma * (0.55f + tintLuma * 0.45f) + 0.012f);
         colorized = lerp(colorized, saturate(neutralMetalLuma.xxx * tintBias), neutralMetalTint);
-        float colorizeStrength = lerp(0.58f, 0.96f, neutralMetalTint);
+        float colorizeStrength = lerp(0.58f, 0.96f, neutralMetalTint) * (1.0f - metalHueOnly);
         baseColor.rgb = lerp(baseColor.rgb, lerp(multiplied, colorized, colorizeStrength), strength);
     }
     baseColor.rgb = saturate(baseColor.rgb * max(MaterialBaseAdjustments.x, 0.1f));
@@ -1116,6 +1152,20 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             * max(PresentationToneTuning.w, 0.0f)
             * categoryEnvironmentScale
             * metalEnvironmentScale;
+        // Metal has no diffuse lobe, so away from a highlight its tone comes
+        // entirely from wide-angle reflection.  This environment concentrates
+        // its energy in five narrow softboxes, so that wide component was
+        // missing: the diffuse path was scaled to a third and floored at 0.24,
+        // and nothing replaced it.  Sampling the same environment fully blurred
+        // about the normal recovers the broad term the softboxes leave out,
+        // tinted by F0 so steel stays steel and bronze stays bronze.
+        float3 metalIrradiance = PreviewEnvironmentRadiance(normal, 1.0f)
+            * sourceStableF0
+            * max(PresentationToneTuning.w, 0.0f)
+            * metallic
+            * lerp(1.35f, 0.85f, smoothness)
+            * ambientOcclusion;
+        environmentSpecular += metalIrradiance;
     }
     if (MaterialDebugMode > 5.5f && MaterialDebugMode < 6.5f)
     {
@@ -1137,17 +1187,24 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     // Keep physically shaded metal source-readable in the neutral workbench.
     // The GGX and environment lobes remain authoritative for response, while
     // this floor prevents dark source albedo from collapsing between lobes.
-    float ambientFloor = categoryMetal ? 0.24f : (categorySkin ? 0.60f : (conservativeNonmetal ? 0.58f : 0.52f));
+    float ambientFloor = categoryMetal ? 0.24f : (categorySkin ? 0.56f : (conservativeNonmetal ? 0.50f : 0.47f));
     float diffuseDepth = saturate(
         ambientFloor * PresentationLightingTuning.w
         + PresentationLightingTuning.z * (keyLight * 0.58f + fillLight * 0.30f + rimShape * 0.12f));
+    // How much of the directional shading survives. These were low enough that
+    // a garment kept only a quarter of its light-to-shadow range, so a pale
+    // cloth sat at 0.90-0.93 everywhere and lost its folds -- readable as
+    // colour, shapeless as an object. The suppression existed because the old
+    // contrast operator crushed anything dark, so shading had to be held back
+    // to stop shadowed cloth going black. With contrast pivoting perceptually
+    // that headroom exists, and the surface can be shaped by its own normal.
     float depthAuthority = categoryMetal
         ? 1.0f
-        : (glossyNonmetal ? 0.72f
-            : (categorySkin ? 0.40f
-                : (categoryHair ? 0.38f
-                    : (categoryCloth ? 0.46f
-                        : (categoryLeather ? 0.52f : 0.50f)))));
+        : (glossyNonmetal ? 0.80f
+            : (categorySkin ? 0.50f
+                : (categoryHair ? 0.52f
+                    : (categoryCloth ? 0.68f
+                        : (categoryLeather ? 0.70f : 0.68f)))));
     diffuseDepth = lerp(1.0f, diffuseDepth, depthAuthority);
     float nonmetalTextureScale = conservativeNonmetal ? 1.03f : 1.0f;
     float metalDiffuseScale = lerp(1.0f, 0.34f, saturate(metallic));
@@ -1189,9 +1246,17 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     float mappedLuma = AcesToneMap(exposedLuma.xxx).r;
     finalColor = exposedColor * (mappedLuma / max(exposedLuma, 1e-5f));
     float currentLuma = dot(finalColor, float3(0.2126f, 0.7152f, 0.0722f));
-    float contrastedLuma = (currentLuma - 0.5f)
-        * max(PresentationToneTuning.y, 0.01f) + 0.5f;
-    contrastedLuma = max(contrastedLuma, currentLuma * 0.55f);
+    // Contrast is a perceptual control, so it pivots about mid-grey in display
+    // space.  Pivoting about 0.5 in linear space subtracted a near-constant
+    // 0.04 from every pixel instead: 97% of a workbench frame sits below that
+    // pivot, so the operator crushed the whole image down and needed a 0.55
+    // floor to stop the darkest third collapsing to black.  That floor was
+    // doing the visible work -- a flat 45% cut on anything already dark, which
+    // is why metal, shields and weapons read as dim and low-contrast.
+    float displayLuma = LinearToSrgbScalar(currentLuma);
+    float contrastedDisplay = saturate(
+        (displayLuma - 0.5f) * max(PresentationToneTuning.y, 0.01f) + 0.5f);
+    float contrastedLuma = SrgbToLinearScalar(contrastedDisplay);
     finalColor *= max(contrastedLuma, 0.0f) / max(currentLuma, 1e-5f);
     finalColor = pow(saturate(finalColor), max(PresentationToneTuning.z, 0.01f));
     return float4(saturate(finalColor), baseColor.a);
