@@ -137,7 +137,9 @@ public sealed class ArchivePreviewService
             {
                 try
                 {
-                    artifact = await _texturePreviews.BuildAsync(session, entry, artifact, cancellationToken).ConfigureAwait(false);
+                    artifact = await _texturePreviews
+                        .BuildAsync(session, entry, artifact, cancellationToken, publishProgress)
+                        .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {

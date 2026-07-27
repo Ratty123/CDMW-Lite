@@ -212,6 +212,7 @@
   <data name="PreviewProgressPreparing" xml:space="preserve"><value>Preparando la vista previa...</value></data>
   <data name="PreviewProgressNative" xml:space="preserve"><value>Preparando la geometría PAC nativa...</value></data>
   <data name="PreviewProgressAdapting" xml:space="preserve"><value>Preparando la escena .NET de solo lectura...</value></data>
+  <data name="PreviewProgressDecodingTexture" xml:space="preserve"><value>Decodificando la textura... {0}s de {1}s</value></data>
   <data name="RendererStarting" xml:space="preserve"><value>Iniciando el visor .NET/Vortice...</value></data>
   <data name="RendererLoading" xml:space="preserve"><value>Cargando la malla y dibujando el primer fotograma...</value></data>
   <data name="RendererReady" xml:space="preserve"><value>Vista previa .NET/Vortice lista.</value></data>
