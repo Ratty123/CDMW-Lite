@@ -4902,6 +4902,7 @@ internal static class ArchiveLiteTestRunner
         }) ?? throw new InvalidOperationException("worker test process could not be started");
         var stderrTask = process.StandardError.ReadToEndAsync();
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var workerDiagnostics = string.Empty;
         try
         {
             await using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.WriteThrough);
@@ -4984,7 +4985,41 @@ internal static class ArchiveLiteTestRunner
                 ?? throw new InvalidDataException("worker cache-health response is missing");
             Require(health.State == ArchiveCacheHealthState.Current, "worker did not report the freshly opened archive cache as current");
 
-            await ExchangeAsync(writer, reader, WorkerProtocol.Shutdown, 7, new { }, timeout.Token).ConfigureAwait(false);
+            // A texture that fails to decode inside the worker must reach the client over standard
+            // error, which is the hop the client turns into portable log lines.
+            await using var brokenTextures = await SyntheticArchiveFixture.CreateBrokenTextureAsync().ConfigureAwait(false);
+            var brokenOpenMessage = await ExchangeAsync(
+                writer,
+                reader,
+                WorkerProtocol.OpenArchive,
+                7,
+                new OpenArchiveRequest(brokenTextures.Root, true),
+                timeout.Token).ConfigureAwait(false);
+            var brokenOpened = WorkerProtocol.ReadPayload<OpenArchiveResult>(brokenOpenMessage)
+                ?? throw new InvalidDataException("worker broken-texture open response is missing");
+            var brokenQueryMessage = await ExchangeAsync(
+                writer,
+                reader,
+                WorkerProtocol.QueryArchive,
+                8,
+                new ArchiveQuerySpec(brokenOpened.SessionId, Extensions: [".dds"]),
+                timeout.Token).ConfigureAwait(false);
+            var brokenPage = WorkerProtocol.ReadPayload<ArchivePageResult>(brokenQueryMessage)
+                ?? throw new InvalidDataException("worker broken-texture query response is missing");
+            var brokenPreviewMessage = await ExchangeAsync(
+                writer,
+                reader,
+                WorkerProtocol.Preview,
+                9,
+                new PreviewRequest(brokenOpened.SessionId, brokenPage.Entries.Single().EntryId),
+                timeout.Token).ConfigureAwait(false);
+            var brokenPreview = WorkerProtocol.ReadPayload<PreviewResult>(brokenPreviewMessage)
+                ?? throw new InvalidDataException("worker broken-texture preview response is missing");
+            Require(
+                brokenPreview.Kind != PreviewKind.Image,
+                "the worker reported an image preview for a texture DirectXTex cannot decode");
+
+            await ExchangeAsync(writer, reader, WorkerProtocol.Shutdown, 10, new { }, timeout.Token).ConfigureAwait(false);
             await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
             Require(process.ExitCode == 0, "worker did not exit cleanly");
         }
@@ -4997,9 +5032,22 @@ internal static class ArchiveLiteTestRunner
         {
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             await process.WaitForExitAsync().ConfigureAwait(false);
-            _ = await stderrTask.ConfigureAwait(false);
+            workerDiagnostics = await stderrTask.ConfigureAwait(false);
             _ = await stdoutTask.ConfigureAwait(false);
         }
+
+        Require(
+            workerDiagnostics.Contains("texture decode failed:", StringComparison.Ordinal),
+            "the worker did not report a texture decode failure over the standard error the client drains");
+        Require(
+            workerDiagnostics.Contains("texture/broken.dds", StringComparison.Ordinal),
+            "a forwarded worker texture failure did not identify the archive source that failed");
+        Require(
+            workerDiagnostics
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(static line => line.StartsWith("texture decode failed:", StringComparison.Ordinal))
+                .All(static line => line.Contains("reason=", StringComparison.Ordinal)),
+            "a forwarded worker texture failure arrived without its reason on one line");
 
         Require(await Sha256Async(fixture.Pamt).ConfigureAwait(false) == beforePamt, "worker changed the PAMT source");
         Require(await Sha256Async(fixture.Paz).ConfigureAwait(false) == beforePaz, "worker changed the PAZ source");
