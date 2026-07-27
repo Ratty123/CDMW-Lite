@@ -13,11 +13,26 @@ static const TextureBinding* best_binding_for_role(
         if (binding.role != desired_role) {
             continue;
         }
+        // Wrapper order says which of a model's materials a submesh uses. It is
+        // not a claim that a material's own maps belong to one submesh only: a
+        // model can bind the same material to several submeshes, and then only
+        // the one whose local index happens to equal the wrapper index accepted
+        // its normal and surface maps while the rest rendered flat. On
+        // cd_phm_00_bag_0035, CD_PHM_04_String_0001 is used by four submeshes and
+        // exactly one got its maps. Where the binding names the same material the
+        // mesh declares, identity is already established and wrapper order has
+        // nothing left to disambiguate.
+        const bool binding_declares_mesh_material =
+            !normalized_material_key(binding.material_name).empty()
+            && material_keys_match_for_identity(
+                normalized_material_key(binding.material_name),
+                normalized_material_key(mesh.material));
         if (
             binding.material_wrapper_order_authoritative
             && binding.material_wrapper_index >= 0
             && mesh.source_local_submesh_index >= 0
             && binding.material_wrapper_index != mesh.source_local_submesh_index
+            && !binding_declares_mesh_material
         ) {
             if (rejected_examples != nullptr && rejected_examples->size() < 16) {
                 rejected_examples->push_back(
