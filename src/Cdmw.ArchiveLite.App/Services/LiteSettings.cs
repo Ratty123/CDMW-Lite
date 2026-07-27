@@ -18,7 +18,18 @@ public sealed record LiteSettings(
     WindowPlacementSettings? WindowPlacement = null,
     WorkspaceLayoutSettings? WorkspaceLayout = null,
     GridColumnSettings[]? ArchiveColumnLayout = null,
-    GridColumnSettings[]? TextSearchColumnLayout = null);
+    GridColumnSettings[]? TextSearchColumnLayout = null,
+    int ArchiveColumnDefaultsRevision = 0);
+
+/// <summary>
+/// Tracks which shipped catalog column defaults a settings file was written against. A file left at
+/// an older revision is re-seeded with the current defaults once, so a changed default reaches
+/// existing portable installs instead of only first runs.
+/// </summary>
+public static class ArchiveColumnDefaults
+{
+    public const int Revision = 1;
+}
 
 public sealed record ArchiveBrowserSettings(
     string PathFilter = "",

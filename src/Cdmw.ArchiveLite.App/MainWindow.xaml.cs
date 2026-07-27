@@ -24,11 +24,10 @@ public partial class MainWindow : Window
     private static readonly HashSet<string> DefaultArchiveColumns = new(StringComparer.Ordinal)
     {
         nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.Name),
-        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.KnownName),
-        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.NameEvidence),
-        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.Extension),
         nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.FileType),
-        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.TextureUsage),
+        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.OriginalSize),
+        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.Compression),
+        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.Package),
         nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.Path),
     };
 
@@ -362,9 +361,11 @@ public partial class MainWindow : Window
         var configuredSet = configured is { Count: > 0 }
             ? configured.ToHashSet(StringComparer.Ordinal)
             : null;
-        var visible = configuredSet is null || configuredSet.SetEquals(LegacyDefaultArchiveColumns)
-            ? DefaultArchiveColumns
-            : MigrateArchiveColumnKeys(configuredSet);
+        var visible = configuredSet is null
+            || _viewModel.ArchiveColumnDefaultsAreStale
+            || configuredSet.SetEquals(LegacyDefaultArchiveColumns)
+                ? DefaultArchiveColumns
+                : MigrateArchiveColumnKeys(configuredSet);
         _applyingArchiveColumnLayout = true;
         try
         {

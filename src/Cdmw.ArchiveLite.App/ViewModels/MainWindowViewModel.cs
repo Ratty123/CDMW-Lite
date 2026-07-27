@@ -83,6 +83,9 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<string>? ArchiveVisibleColumns => _settings.ArchiveVisibleColumns;
 
+    public bool ArchiveColumnDefaultsAreStale =>
+        _settings.ArchiveColumnDefaultsRevision < ArchiveColumnDefaults.Revision;
+
     public WindowPlacementSettings? WindowPlacement => _settings.WindowPlacement;
 
     public WorkspaceLayoutSettings? WorkspaceLayout => _settings.WorkspaceLayout;
@@ -99,6 +102,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 .Where(static column => !string.IsNullOrWhiteSpace(column))
                 .Distinct(StringComparer.Ordinal)
                 .ToArray(),
+            ArchiveColumnDefaultsRevision = ArchiveColumnDefaults.Revision,
         };
     }
 

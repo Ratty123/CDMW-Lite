@@ -388,7 +388,11 @@ internal static class ArchiveLiteTestRunner
             [
                 new GridColumnSettings("Path", 0, 420),
                 new GridColumnSettings("Context", 2, 560),
-            ]);
+            ],
+            ArchiveColumnDefaultsRevision: ArchiveColumnDefaults.Revision);
+        Require(
+            defaults.ArchiveColumnDefaultsRevision < ArchiveColumnDefaults.Revision,
+            "a settings file written before the current catalog defaults is not detected as stale");
         var settingsStore = typeof(MainWindowViewModel).Assembly.GetType("Cdmw.ArchiveLite.App.Services.SettingsStore")
             ?? throw new InvalidOperationException("SettingsStore type was not found");
         var saveMethod = settingsStore.GetMethod("SaveAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
@@ -416,6 +420,9 @@ internal static class ArchiveLiteTestRunner
         Require(
             actual.TextSearchColumnLayout?.SequenceEqual(expected.TextSearchColumnLayout!) == true,
             "text-search column widths/order did not round-trip through portable settings");
+        Require(
+            actual.ArchiveColumnDefaultsRevision == ArchiveColumnDefaults.Revision,
+            "the catalog column defaults revision did not round-trip through portable settings");
 
         var portableRoot = Path.GetFullPath(Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DATA_ROOT")!);
         var settingsPath = Path.Combine(portableRoot, "settings.json");
@@ -1437,6 +1444,11 @@ internal static class ArchiveLiteTestRunner
             && windowSource.Contains("MigrateArchiveColumnKeys", StringComparison.Ordinal)
             && windowSource.Contains("MigrateArchiveColumnLayout", StringComparison.Ordinal),
             "legacy Role visibility, ordering, and width are not migrated to File type and Usage");
+        var mainViewModelSource = File.ReadAllText(Path.Combine(appRoot, "ViewModels", "MainWindowViewModel.cs"));
+        Require(
+            windowSource.Contains("_viewModel.ArchiveColumnDefaultsAreStale", StringComparison.Ordinal)
+            && mainViewModelSource.Contains("ArchiveColumnDefaultsRevision = ArchiveColumnDefaults.Revision", StringComparison.Ordinal),
+            "a changed shipped column default never reaches an existing settings file");
         Require(
             windowSource.Contains("grid.MaxColumnWidth", StringComparison.Ordinal)
             && windowSource.Contains("column.MaxWidth", StringComparison.Ordinal)
