@@ -95,7 +95,7 @@ The UI owns presentation. Long-running work remains cancellable in the worker or
 
 ## Local data
 
-Portable builds keep settings, caches, logs, and crash reports beside the executable. The single-file launcher extracts its verified runtime beneath `%LocalAppData%\Ratrider\CDMWArchiveLite\standalone\`; it does not place user settings, game data, or exports there.
+Portable builds keep settings, caches, logs, and crash reports beside the executable. The single-file launcher extracts its verified runtime beneath `%LocalAppData%\CDMW\CDMWArchiveLite\standalone\`; it does not place user settings, game data, or exports there.
 
 These paths and all build outputs are excluded from version control.
 

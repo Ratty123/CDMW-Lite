@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <Company>Ratrider</Company>
+    <Company>CDMW</Company>
     <Product>CDMW Archive Lite</Product>
     <!-- Development default. Release packaging overrides this with -p:Version from
          scripts/build_archive_lite.ps1, which is the version of record. -->
