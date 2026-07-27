@@ -79,6 +79,34 @@ function Invoke-CheckedPowerShellScript {
     }
 }
 
+function Initialize-NativeLinkerPath {
+    # The standalone launcher publishes with NativeAOT, and the ILCompiler targets locate the MSVC
+    # linker by running vswhere.exe from PATH. BUILD-FRESH-EXE.bat is meant to be double-clicked
+    # from Explorer, which never supplies a developer environment, so the build finds vswhere at the
+    # fixed location the Visual Studio Installer owns rather than requiring a developer prompt.
+    if (Get-Command "vswhere.exe" -ErrorAction SilentlyContinue) {
+        return
+    }
+    foreach ($programFiles in @(${env:ProgramFiles(x86)}, $env:ProgramFiles)) {
+        if ([string]::IsNullOrWhiteSpace($programFiles)) {
+            continue
+        }
+        $installerRoot = Join-Path $programFiles "Microsoft Visual Studio\Installer"
+        if (Test-Path -LiteralPath (Join-Path $installerRoot "vswhere.exe") -PathType Leaf) {
+            $env:PATH = "$installerRoot;$env:PATH"
+            Write-Host "Native linker discovery uses $installerRoot."
+            return
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:VCINSTALLDIR)) {
+        # Already inside a developer environment, where the targets skip vswhere entirely.
+        return
+    }
+    throw "vswhere.exe was not found. Install the Visual Studio Build Tools with the Desktop C++ workload."
+}
+
+Initialize-NativeLinkerPath
+
 Assert-ContainedOutput $stage
 Assert-ContainedOutput $workerStage
 Assert-ContainedOutput $rendererStage
