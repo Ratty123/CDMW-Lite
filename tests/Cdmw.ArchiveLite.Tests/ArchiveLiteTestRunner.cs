@@ -3091,6 +3091,13 @@ internal static class ArchiveLiteTestRunner
         }
         finally
         {
+            // An unusable package is removed before its rebuild starts, so cancelling that rebuild
+            // legitimately leaves nothing to write the manifest back into. Re-establish the package
+            // first rather than assuming the cancellation won the race.
+            if (!Directory.Exists(destination))
+            {
+                await previews.BuildAsync(session, entry, null, CancellationToken.None).ConfigureAwait(false);
+            }
             await File.WriteAllTextAsync(cacheManifestPath, crossSessionManifest).ConfigureAwait(false);
         }
 
@@ -3113,7 +3120,11 @@ internal static class ArchiveLiteTestRunner
                 cancelledByDependencyChange.Token)).ConfigureAwait(false);
         }
 
-        Directory.Delete(destination, recursive: true);
+        // The cancelled dependency-change rebuild above may already have removed the package.
+        if (Directory.Exists(destination))
+        {
+            Directory.Delete(destination, recursive: true);
+        }
         using (var cancelled = new CancellationTokenSource(TimeSpan.FromMilliseconds(5)))
         {
             await RequireThrowsAsync<OperationCanceledException>(() => previews.BuildAsync(
