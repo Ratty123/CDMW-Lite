@@ -7,6 +7,8 @@ internal sealed record D3D11PresentationSettings
 {
     public const string DefaultProfile = "mesh_editor_default_v1";
 
+    public static readonly Vector3 DefaultBackgroundColor = new(0.00598f, 0.00719f, 0.01002f);
+
     public bool HighQuality { get; init; } = true;
     public string ViewMode { get; init; } = "lit";
     public bool GameOutdoorApprox { get; init; }
@@ -50,6 +52,11 @@ internal sealed record D3D11PresentationSettings
     public bool InvertOrbitY { get; init; }
     public bool InvertPanX { get; init; }
     public bool InvertPanY { get; init; }
+    /// <summary>
+    /// Viewport clear colour in linear space, because the render target is sRGB. The default is the
+    /// workbench background the editor has always drawn.
+    /// </summary>
+    public Vector3 BackgroundColor { get; init; } = DefaultBackgroundColor;
     public Vector2 UvScale { get; init; } = Vector2.One;
     public Vector2 UvOffset { get; init; }
     public float UvRotationDegrees { get; init; }

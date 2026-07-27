@@ -40,6 +40,20 @@
   <data name="InvertPanY" xml:space="preserve"><value>Invertir desplazamiento Y</value></data>
   <data name="PreviewCameraInputHint" xml:space="preserve"><value>Estos ajustes solo cambian la navegación de la vista previa; nunca editan ni exportan el recurso.</value></data>
   <data name="ResetCameraInput" xml:space="preserve"><value>Restablecer cámara</value></data>
+  <data name="PreviewAppearance" xml:space="preserve"><value>Apariencia</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>Elija el color que se dibuja detrás de la vista previa. Las texturas oscuras se leen mejor sobre un fondo claro y las claras sobre uno oscuro; el magenta revela los píxeles transparentes.</value></data>
+  <data name="PreviewBackground" xml:space="preserve"><value>Fondo</value></data>
+  <data name="PreviewBackgroundTheme" xml:space="preserve"><value>Predeterminado del tema</value></data>
+  <data name="PreviewBackgroundBlack" xml:space="preserve"><value>Negro</value></data>
+  <data name="PreviewBackgroundCharcoal" xml:space="preserve"><value>Carbón</value></data>
+  <data name="PreviewBackgroundMidGray" xml:space="preserve"><value>Gris medio</value></data>
+  <data name="PreviewBackgroundLightGray" xml:space="preserve"><value>Gris claro</value></data>
+  <data name="PreviewBackgroundWhite" xml:space="preserve"><value>Blanco</value></data>
+  <data name="PreviewBackgroundMagenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="PreviewBackgroundCustom" xml:space="preserve"><value>Personalizado</value></data>
+  <data name="PreviewBackgroundCustomColor" xml:space="preserve"><value>Color personalizado</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>Color hexadecimal como #204060. Solo se usa con «Personalizado».</value></data>
+  <data name="PreviewBackgroundHint" xml:space="preserve"><value>El fondo se aplica a las vistas previas de texturas y modelos. Nunca cambia el recurso ni lo que se exporta de él.</value></data>
   <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>Recursos asociados ({0:N0})</value></data>
   <data name="FindAssociatedAssets" xml:space="preserve"><value>Buscar recursos</value></data>
   <data name="ShowAssociatedAsset" xml:space="preserve"><value>Mostrar en el navegador</value></data>

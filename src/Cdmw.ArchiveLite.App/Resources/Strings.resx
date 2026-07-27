@@ -40,6 +40,20 @@
   <data name="InvertPanY" xml:space="preserve"><value>Invert pan Y</value></data>
   <data name="PreviewCameraInputHint" xml:space="preserve"><value>These settings only change preview navigation; they never edit or export the asset.</value></data>
   <data name="ResetCameraInput" xml:space="preserve"><value>Reset camera input</value></data>
+  <data name="PreviewAppearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>Choose the colour drawn behind a preview. Dark textures read best on a light background and light ones on a dark background; magenta exposes transparent pixels.</value></data>
+  <data name="PreviewBackground" xml:space="preserve"><value>Background</value></data>
+  <data name="PreviewBackgroundTheme" xml:space="preserve"><value>Theme default</value></data>
+  <data name="PreviewBackgroundBlack" xml:space="preserve"><value>Black</value></data>
+  <data name="PreviewBackgroundCharcoal" xml:space="preserve"><value>Charcoal</value></data>
+  <data name="PreviewBackgroundMidGray" xml:space="preserve"><value>Mid grey</value></data>
+  <data name="PreviewBackgroundLightGray" xml:space="preserve"><value>Light grey</value></data>
+  <data name="PreviewBackgroundWhite" xml:space="preserve"><value>White</value></data>
+  <data name="PreviewBackgroundMagenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="PreviewBackgroundCustom" xml:space="preserve"><value>Custom</value></data>
+  <data name="PreviewBackgroundCustomColor" xml:space="preserve"><value>Custom colour</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>Hexadecimal colour such as #204060. Used only when Custom is selected.</value></data>
+  <data name="PreviewBackgroundHint" xml:space="preserve"><value>The background applies to texture and model previews. It never changes the asset or anything exported from it.</value></data>
   <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>Associated assets ({0:N0})</value></data>
   <data name="FindAssociatedAssets" xml:space="preserve"><value>Find assets</value></data>
   <data name="ShowAssociatedAsset" xml:space="preserve"><value>Show in browser</value></data>

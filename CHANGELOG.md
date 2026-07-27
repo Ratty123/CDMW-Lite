@@ -6,6 +6,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Added
 
+- A preview background colour choice under Preview Settings, applied to both texture and model previews. Presets cover the neutral range plus magenta for reading transparent pixels, and a custom hexadecimal colour is accepted. Preview Settings is now reachable from a texture selection, not only a model one.
 - Initial private GitHub repository publication and collaboration documents.
 - A distinct three-cell CDMW family icon for Lite windows, portable builds, and the standalone launcher.
 

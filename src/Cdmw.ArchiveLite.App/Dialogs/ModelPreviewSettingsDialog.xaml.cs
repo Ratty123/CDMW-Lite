@@ -8,6 +8,9 @@ namespace Cdmw.ArchiveLite.App.Dialogs;
 
 public partial class ModelPreviewSettingsDialog : Window
 {
+    private const int CameraInputTabIndex = 0;
+    private const int AppearanceTabIndex = 1;
+
     public ModelPreviewSettingsDialog(ArchiveBrowserViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
@@ -18,9 +21,13 @@ public partial class ModelPreviewSettingsDialog : Window
         Closed += OnClosed;
     }
 
-    public void ShowCameraInputTab()
+    public void ShowCameraInputTab() => ShowTab(CameraInputTabIndex);
+
+    public void ShowAppearanceTab() => ShowTab(AppearanceTabIndex);
+
+    private void ShowTab(int tabIndex)
     {
-        SettingsTabs.SelectedIndex = 0;
+        SettingsTabs.SelectedIndex = tabIndex;
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Normal;

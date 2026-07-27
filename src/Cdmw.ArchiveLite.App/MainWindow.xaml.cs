@@ -257,7 +257,16 @@ public partial class MainWindow : Window
             dialog.Show();
         }
 
-        _modelPreviewSettingsDialog.ShowCameraInputTab();
+        // Camera input has nothing to offer a decoded texture, so a non-model selection opens on
+        // the tab that does.
+        if (_viewModel.ArchiveBrowser.IsModelSelection)
+        {
+            _modelPreviewSettingsDialog.ShowCameraInputTab();
+        }
+        else
+        {
+            _modelPreviewSettingsDialog.ShowAppearanceTab();
+        }
     }
 
     private void OnItemFinderClick(object sender, RoutedEventArgs eventArgs)

@@ -58,6 +58,12 @@ internal sealed partial class D3D11MaterialViewport
             ["diffuse_light_scale"] = settings.DiffuseLightScale,
             ["specular_base"] = settings.SpecularBase,
             ["specular_max"] = settings.SpecularMax,
+            ["background_color_linear"] = new[]
+            {
+                settings.BackgroundColor.X,
+                settings.BackgroundColor.Y,
+                settings.BackgroundColor.Z,
+            },
             ["color_pipeline"] = "srgb_srv_linear_shader_srgb_rtv",
             ["anti_aliasing_mode"] = AntiAliasingMode,
             ["sample_count"] = _renderSampleCount,
