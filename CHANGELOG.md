@@ -4,6 +4,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-28
+
 ### Added
 
 - Hair and fur now take an anisotropic highlight along the strand instead of a round isotropic one. Crimson ships the strand direction as a two-channel `_f` map in UV space; where one is bound on a hair-family surface the preview evaluates a Kajiya-Kay pair of shifted lobes along it — a sharp near-white primary at the cuticle and a broader secondary carrying the strand's own colour. A single isotropic lobe reads as wet plastic. The highlight only switches where both a strand direction and the hair family agree, because the same binding role also carries screen-space displacement directions that are not strand tangents.

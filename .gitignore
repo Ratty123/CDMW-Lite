@@ -16,4 +16,4 @@ workspace/
 *.user
 
 # Headless GPU soak run artifact
-tools/dotnet_mesh_editor_experiment/dotnet-gpu-sparse-soak.json
+dotnet-gpu-sparse-soak.json

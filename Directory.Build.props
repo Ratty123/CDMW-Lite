@@ -10,7 +10,7 @@
     <Product>CDMW Archive Lite</Product>
     <!-- Development default. Release packaging overrides this with -p:Version from
          scripts/build_archive_lite.ps1, which is the version of record. -->
-    <Version>0.7.0</Version>
+    <Version>0.8.0</Version>
     <Copyright>Copyright (c) 2026</Copyright>
   </PropertyGroup>
 </Project>
