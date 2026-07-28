@@ -662,7 +662,7 @@ public static class NativePreviewPackageAdapter
                         StringComparison.OrdinalIgnoreCase))
                     ? "archive_lite_managed_albedo_layer_compiler_v1"
                     : "none",
-                ["parameters"] = BuildInitialParameters(batch, channels, color, category),
+                ["parameters"] = BuildInitialParameters(batch, channels, channelResolution.Formats, color, category),
             });
         }
         if (submeshes.Count == 0)
@@ -1077,6 +1077,11 @@ public static class NativePreviewPackageAdapter
             "source_authority",
             ReadString(descriptor, "binding_authority", "native_preview_core"));
         SetChannel(result, slot, path, colorSpace, authority, overwrite);
+        var ddsFormat = ReadString(descriptor, "format");
+        if (!string.IsNullOrWhiteSpace(ddsFormat) && (overwrite || !result.Formats.ContainsKey(slot)))
+        {
+            result.Formats[slot] = ddsFormat;
+        }
 
         var packedComponents = ParsePackedComponents(ReadString(descriptor, "packed_channels"));
         foreach (var (semantic, component) in packedComponents)
@@ -1145,6 +1150,7 @@ public static class NativePreviewPackageAdapter
     private static Dictionary<string, object?> BuildInitialParameters(
         JsonElement batch,
         IReadOnlyDictionary<string, string> channels,
+        IReadOnlyDictionary<string, string> formats,
         float[] color,
         string category)
     {
@@ -1177,6 +1183,11 @@ public static class NativePreviewPackageAdapter
             result["emissive_intensity"] = emissiveIntensity ?? 1.0f;
             result["emissive_color"] = ReadFloatArray(batch, "emissive_color", [1.0f, 1.0f, 1.0f]);
             result["emissive_color_authoritative"] = true;
+            if (formats.TryGetValue("emissive", out var emissiveFormat)
+                && DdsFormatIsSingleChannel(emissiveFormat))
+            {
+                result["emissive_scalar_mask"] = true;
+            }
         }
         return result;
     }
@@ -1328,7 +1339,21 @@ public static class NativePreviewPackageAdapter
         public Dictionary<string, string> Components { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> ColorSpaces { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> Authorities { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Formats { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
+
+    // Crimson authors emissive as an intensity mask, not a colour: every one of
+    // 134 sampled `_emi` maps is a single-channel BC4, bound through
+    // `_emissiveIntensityTexture`. Sampled as RGB such a map reads (r, 0, 0),
+    // so multiplying an authored emissive colour by it leaves only the red
+    // component -- which is why every emitter glowed red regardless of the
+    // colour its material declares. The renderer has a scalar path for exactly
+    // this; nothing was telling it when to take it.
+    private static bool DdsFormatIsSingleChannel(string format) => format.ToUpperInvariant() switch
+    {
+        "BC4U" or "BC4S" or "BC4" or "ATI1" or "R8_UNORM" or "R8" or "L8" or "A8" => true,
+        _ => false,
+    };
 
     private static async Task WriteJsonAsync(string path, object payload, CancellationToken cancellationToken)
     {
