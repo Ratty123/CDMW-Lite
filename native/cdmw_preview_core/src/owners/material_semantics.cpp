@@ -126,6 +126,13 @@ static bool technical_for_visible_base(const std::string& parameter_name, const 
     // shared wrinkle material points at cd_common_00_ub_0001_wrinkle0_opacity.dds,
     // and the parameter name alone does not say so.
     if (path_has_suffix_stem(raw_path, "_opacity")) return true;
+    // `_tornPatternTexture` carries the shape of a tear, not a colour. Every one
+    // of its 13 bindings across 4,665 sampled assets points at
+    // cd_texturelayer_endpattern_0001_tp.dds, a shared library pattern; where it
+    // won the visible base the garment rendered as neon green and magenta
+    // stripes, which is that pattern sampled as albedo.
+    if (compact_hint.find("tornpattern") != std::string::npos) return true;
+    if (path_has_suffix_stem(raw_path, "_tp")) return true;
     // Placeholders and unfinished authoring: the visible-base guard knew about
     // these but only the layer paths consulted it, so the primary selector let a
     // default overlay or a cd_temp_* texture become a part's albedo.

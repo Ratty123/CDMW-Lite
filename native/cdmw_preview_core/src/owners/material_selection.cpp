@@ -43,6 +43,35 @@ static const TextureBinding* best_binding_for_role(
             }
             continue;
         }
+        // cd_temp_* and the none/null/dummy family are unfinished authoring left
+        // in the shipped archive. Where a placeholder's absence is equivalent --
+        // a flat normal, a neutral surface -- letting it stand in costs nothing,
+        // so it is only demoted and a real map outranks it. Where it would
+        // *create* an effect the part does not otherwise have, it must not be
+        // used at all: cd_temp_r_m.dds decodes to (1, 0, 0), so as an emissive
+        // map it makes a part glow and as a height map its R drives maximum
+        // displacement across the whole surface.
+        //
+        // The colour-blending mask is deliberately excluded. There the same
+        // texture is a real instruction -- "layer R at 100%" -- that the game
+        // reads the same way, and 252 sampled assets that composite through it
+        // render correctly; rejecting it would make the preview less faithful,
+        // not more.
+        const bool placeholder_support_texture =
+            desired_role != "material"
+            && (placeholder_layer_mask_path(binding.archive_path)
+                || placeholder_layer_mask_path(binding.texture_name));
+        if (placeholder_support_texture
+            && (desired_role == "emissive" || desired_role == "height")) {
+            if (rejected_examples != nullptr && rejected_examples->size() < 16) {
+                rejected_examples->push_back(
+                    desired_role + " rejected placeholder candidate "
+                    + (binding.texture_name.empty() ? basename_from_path(binding.archive_path) : binding.texture_name)
+                    + " for " + mesh.material
+                );
+            }
+            continue;
+        }
         if (support_role_requires_material_scope(desired_role) && !material_binding_matches_mesh_source(binding, mesh)) {
             if (rejected_examples != nullptr && rejected_examples->size() < 16) {
                 rejected_examples->push_back(
@@ -85,6 +114,8 @@ static const TextureBinding* best_binding_for_role(
         }
         int score = material_match_score(binding, mesh, desired_role);
         score += identity_score / 2;
+        // A real map of any provenance outranks unfinished authoring.
+        if (placeholder_support_texture) score -= 400;
         const std::string parameter_key = normalized_key(binding.parameter_name);
         const std::string layer_role = lower_copy(binding.layer_role);
         if (desired_role == "normal") {
@@ -734,6 +765,16 @@ static std::string role_from_parameter_shader_and_name(
             || p.find("diffuse") != std::string::npos
             || p.find("albedo") != std::string::npos)) {
         return "opacity";
+    }
+    // `_tornPatternTexture` is the shape of a tear, not a surface input. It has
+    // no colour role, no normal, no response -- it selects where a garment is
+    // torn. Left to fall through it landed in the base role, and on
+    // cd_m0001_00_so_pgm_ub_belt_42008 the shared library pattern it points at
+    // became the albedo, rendering the garment as neon green and magenta
+    // stripes. Naming its own role keeps the binding on record as evidence
+    // while leaving it out of every channel the renderer samples.
+    if (p.find("tornpattern") != std::string::npos || t.find("_tp.dds") != std::string::npos) {
+        return "torn_pattern";
     }
     if (technique_parameter != nullptr && technique_parameter->declared) {
         const std::string declared_type = lower_copy(technique_parameter->type);
