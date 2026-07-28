@@ -72,21 +72,30 @@ Build outputs are written beneath the ignored `artifacts/` directory. On a clean
 
 ```mermaid
 flowchart TD
-    UI["CdmwArchiveLite.exe<br/>WPF presentation and selection state"]
-    W["CdmwArchiveLite.Worker.exe<br/>archive queries, search, preview, export"]
-    CORE["cdmw-archive-core.dll<br/>read-only PAMT / PAZ / PATHC decoding"]
-    HELP["native helper processes<br/>indexing, DDS, model and media preparation"]
-    CONTENT["managed content library<br/>semantic archive documents"]
-    MESH["cdmw-mesh-dotnet-editor.exe<br/>read-only Vortice D3D11 mesh viewport"]
+    UI["App"]
+    W["Worker"]
+    MESH["Mesh viewport"]
+    CORE["Archive core"]
+    HELP["Native helpers"]
+    CONTENT["Content library"]
 
-    UI -- "private named pipe<br/>request IDs, cancellation" --> W
-    UI -- "child process" --> MESH
+    UI -->|named pipe| W
+    UI -->|child process| MESH
     W --> CORE
     W --> HELP
     W --> CONTENT
 ```
 
-The UI owns presentation. Long-running work remains cancellable in the worker or a dedicated native process, and the renderer runs in its own child process.
+| node | process or library | responsibility |
+| --- | --- | --- |
+| App | `CdmwArchiveLite.exe` | WPF presentation and selection state |
+| Worker | `CdmwArchiveLite.Worker.exe` | archive queries, search, preview, export |
+| Mesh viewport | `cdmw-mesh-dotnet-editor.exe` | read-only Vortice D3D11 rendering |
+| Archive core | `cdmw-archive-core.dll` | read-only PAMT / PAZ / PATHC decoding |
+| Native helpers | helper processes | indexing, DDS, model and media preparation |
+| Content library | managed | semantic archive documents |
+
+The named pipe carries request IDs and cancellation. The UI owns presentation; long-running work stays cancellable in the worker or a dedicated native process, and the renderer runs in its own child process.
 
 ## Model preview
 
@@ -94,12 +103,13 @@ A model preview is assembled from the geometry, its material sidecar, and the te
 
 ```mermaid
 flowchart LR
-    PAC[".pac<br/>geometry"] --> P
-    XML[".pac_xml<br/>material sidecar"] --> P
-    DDS[".dds<br/>textures"] --> P
-    P["preview core<br/>role assignment<br/>slot selection<br/>layer resolution"] --> A
-    A["adapter<br/>channels, components<br/>colour layers"] --> R["renderer<br/>D3D11"]
+    PAC["geometry"] --> P["Preview core"]
+    XML["materials"] --> P
+    DDS["textures"] --> P
+    P --> A["Adapter"] --> R["Renderer"]
 ```
+
+`.pac` geometry, the `.pac_xml` material sidecar, and the `.dds` textures it names go to the preview core, which assigns each binding a role, selects a slot per submesh, and resolves colour layers. The adapter turns that into channels, packed components, and layer bindings; the renderer samples them.
 
 | suffix | role | notes |
 | --- | --- | --- |
