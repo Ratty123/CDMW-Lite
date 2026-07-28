@@ -924,11 +924,22 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             * metalGeometry
             * metalFresnel
             / metalDenominator;
-        float metalDirectSpecularScale = 0.35f + metallic * 0.35f;
+        // This scale reached 0.70 at most, under a 0.52 specular cap, so the
+        // metal lobe ran at about a third of the strength Cook-Torrance
+        // returns. Both numbers were fitted while a specular map stood in for
+        // F0 at roughly ten times the physical value and had to be divided
+        // back out -- the same fitting already lifted for dielectrics once a
+        // real roughness map is bound. Where the source supplies a metal map,
+        // F0 is its own albedo and the GGX term is already energy-normalised,
+        // so dividing it down only removes the compact highlight that is what
+        // makes metal read as metal rather than as grey plastic. The 0.85
+        // ceiling still holds the hotspot below white.
+        float metalDirectSpecularScale = hasSourceMetallicMap
+            ? 1.0f
+            : (0.35f + metallic * 0.35f) * saturate(PresentationMaterialTuning.y);
         spec = min(
             metalCookTorrance
                 * metalNdotL
-                * saturate(PresentationMaterialTuning.y)
                 * metalDirectSpecularScale,
             float3(0.85f, 0.85f, 0.85f));
     }
@@ -1145,8 +1156,15 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     if (categoryMetal)
     {
         float metalCameraShape = saturate(abs(dot(normal, viewDirection)));
-        float metalEnvironmentScale = 0.55f
-            + metallic * lerp(0.45f, 1.10f, smoothness);
+        // The energy the diffuse term no longer supplies has to arrive through
+        // the reflection instead -- that is the whole point of the change.
+        // This lobe is sampled about the reflection vector, so it sweeps as the
+        // surface curves and gives metal the moving highlight that separates it
+        // from a painted surface, where the diffuse it replaces did not vary at
+        // all.
+        float metalEnvironmentScale = hasSourceMetallicMap
+            ? 0.85f + metallic * lerp(0.90f, 2.00f, smoothness)
+            : 0.55f + metallic * lerp(0.45f, 1.10f, smoothness);
         environmentSpecular = environmentRadiance
             * SourceStableFresnel(metalCameraShape, sourceStableF0)
             * max(PresentationToneTuning.w, 0.0f)
@@ -1207,7 +1225,17 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
                         : (categoryLeather ? 0.70f : 0.68f)))));
     diffuseDepth = lerp(1.0f, diffuseDepth, depthAuthority);
     float nonmetalTextureScale = conservativeNonmetal ? 1.03f : 1.0f;
-    float metalDiffuseScale = lerp(1.0f, 0.34f, saturate(metallic));
+    // A conductor has no diffuse lobe at all; every photon that leaves it left
+    // by reflection. Keeping a third of the diffuse term gave metal a large,
+    // view-independent glow that does not vary with the surface, so polished
+    // steel read as chalky white plaster -- bright everywhere, reflective
+    // nowhere. Where the source supplies a metal map the reflection paths can
+    // be trusted to carry the surface, so the residue drops to a floor that
+    // only keeps a very dark alloy from collapsing between lobes.
+    float metalDiffuseScale = lerp(
+        1.0f,
+        hasSourceMetallicMap ? 0.12f : 0.34f,
+        saturate(metallic));
     float3 litDiffuse = materialReferenceAlbedo
         * ambientOcclusion
         * nonmetalTextureScale
