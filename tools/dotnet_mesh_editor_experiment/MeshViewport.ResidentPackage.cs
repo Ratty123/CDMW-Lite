@@ -76,6 +76,16 @@ internal sealed partial class MeshViewport
     {
         if (!_scene.HasArchivePreviewCamera)
         {
+            // Only where the package declares nothing: the preview pipeline
+            // already frames by equipment slot -- weapons and shields overhead
+            // at pitch -89 so a flat face is toward the camera, helmets and
+            // torsos from the front -- and that authored choice outranks
+            // anything inferred from bounds here.
+            (_yaw, _pitch) = NetViewportCamera.FramingAnglesFor(
+                SceneBoundsForContext(_activeCameraContextId),
+                _yaw,
+                _pitch);
+            UpdateGpuViewport();
             return;
         }
         _yaw = _scene.ArchivePreviewYawDegrees * MathF.PI / 180.0f;

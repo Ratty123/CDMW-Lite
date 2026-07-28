@@ -170,11 +170,26 @@ internal static class VisualAuditBatch
                 var pitch = JsonFloat(view, "pitch", 0.0f);
                 var rendererYaw = yaw;
                 var rendererPitch = pitch;
-                // A flat piece shows its edge under a fixed angle. Let the model's
-                // own extents choose the angle instead, so a shield or a blade
-                // presents its face and there is something to look at and measure.
-                if (JsonBool(view, "auto_frame") || JsonBool(asset, "auto_frame"))
+                // The preview package carries the camera the app opens the asset
+                // on, chosen per equipment slot: weapons and shields overhead at
+                // pitch -89 so a flat face is toward the camera, helmets and
+                // torsos from the front. Ignoring it and imposing a fixed angle
+                // is what made captured shields read as edge-on slivers when the
+                // app had been showing them face-on all along -- an artefact of
+                // this harness, not of the renderer. Follow the package by
+                // default so a sheet shows what a viewer sees; `"use_package_
+                // camera": false` keeps a fixed angle where that is the point,
+                // such as an A/B against an earlier capture.
+                if (JsonBoolOrDefault(view, "use_package_camera",
+                        JsonBoolOrDefault(asset, "use_package_camera", true))
+                    && scene.HasArchivePreviewCamera)
                 {
+                    rendererYaw = scene.ArchivePreviewYawDegrees;
+                    rendererPitch = Math.Clamp(scene.ArchivePreviewPitchDegrees, -89.0f, 89.0f);
+                }
+                else if (JsonBool(view, "auto_frame") || JsonBool(asset, "auto_frame"))
+                {
+                    // Fallback for packages that declare no camera.
                     var (autoYaw, autoPitch) = NetViewportCamera.FramingAnglesFor(
                         document.Bounds(),
                         yaw * MathF.PI / 180.0f,
@@ -493,6 +508,15 @@ internal static class VisualAuditBatch
 
     private static bool JsonBool(JsonElement root, string name) =>
         root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
+
+    /// <summary>
+    /// Reads a boolean that defaults to something other than false, so an absent
+    /// key and an explicit <c>false</c> are distinguishable.
+    /// </summary>
+    private static bool JsonBoolOrDefault(JsonElement root, string name, bool fallback) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.ValueKind == JsonValueKind.True
+            : fallback;
 
     private static int JsonInt(JsonElement root, string name, int fallback) =>
         root.TryGetProperty(name, out var value) && value.TryGetInt32(out var parsed) ? parsed : fallback;
