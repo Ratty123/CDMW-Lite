@@ -147,13 +147,35 @@ struct BaseBindingAvailability {
     bool authoritative_sidecar = false;
     bool non_low_authority_visible = false;
     bool mesh_family_visible = false;
+    // The part binds a primary base colour of its own texture family -- the
+    // thing an overlay is painted on top of, not a substitute for it.
+    bool same_family_primary_base = false;
 };
+
+static bool mesh_binds_its_own_primary_base_color(
+    const std::vector<TextureBinding>& bindings,
+    const NativeSubmesh& mesh
+) {
+    for (const TextureBinding& binding : bindings) {
+        if (binding.source_path.empty() || binding.role != "base") continue;
+        if (placeholder_visible_base_path(binding.archive_path) || placeholder_visible_base_path(binding.texture_name)) continue;
+        if (technical_for_visible_base(binding.parameter_name, binding.archive_path, binding.role)
+            || dds_format_is_data_only_for_visible_base(binding.dds_format)) continue;
+        if (!material_binding_matches_mesh_source(binding, mesh)) continue;
+        if (!binding_is_primary_apparel_base_color(binding)) continue;
+        if (base_binding_is_wrong_family_layer_or_environment(binding, mesh)) continue;
+        if (!base_binding_texture_family_matches_mesh(binding, mesh)) continue;
+        return true;
+    }
+    return false;
+}
 
 static BaseBindingAvailability inspect_base_binding_availability(
     const std::vector<TextureBinding>& bindings,
     const NativeSubmesh& mesh
 ) {
     BaseBindingAvailability availability;
+    availability.same_family_primary_base = mesh_binds_its_own_primary_base_color(bindings, mesh);
     for (const TextureBinding& binding : bindings) {
         if (binding.source_path.empty() || binding.role != "base") continue;
         if (technical_for_visible_base(binding.parameter_name, binding.archive_path, binding.role)
@@ -274,7 +296,17 @@ static const TextureBinding* best_base_binding_for_mode(
         int score = material_match_score(binding, mesh, "base");
         score += visible_class_priority(binding.visible_class) * 18;
         if (mesh_family_visible_base) score += 190;
-        if (same_family_overlay_base) score += apparel_slot_surface ? -120 : 260;
+        // An `_overlayColorTexture` is dirt, wear or a paint pass laid over a
+        // part's own colour, not the colour itself. It used to outrank the real
+        // base by 260 unless the part looked like a torso or legs, and that
+        // slot list never covered gloves, hoods, boots, bags or rings -- so
+        // across 3,148 sampled parts 223 rendered an `_o` overlay as their
+        // albedo, every one of them with its own `_baseColorTexture` bound
+        // alongside. The slot list was a proxy for the real question, which is
+        // whether the part supplies a primary base colour of its own family.
+        const bool overlay_would_replace_real_base =
+            apparel_slot_surface || availability.same_family_primary_base;
+        if (same_family_overlay_base) score += overlay_would_replace_real_base ? -120 : 260;
         if (apparel_slot_surface && binding_is_primary_apparel_base_color(binding)) score += 180;
         if (wrong_family_layer_base) score -= 320;
         if (authoritative_visible_base && identity_score >= 120) score += 155;
