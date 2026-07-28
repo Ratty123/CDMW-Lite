@@ -125,6 +125,24 @@ internal static class VisualAuditBatch
             var document = ObjDocument.Load(scenePath);
             var materials = NetMaterialSet.Load(materialsPath);
             var scene = NetSceneState.Load(sceneStatePath, document.Submeshes.Count);
+            // Optional per-submesh isolation. A whole-object colour average is
+            // dominated by whichever part covers the most pixels, so a thin blade
+            // seen near edge-on is drowned out by its own guard and grip and the
+            // measurement says nothing about the blade. Naming the submeshes to
+            // keep hides the rest, which lets one part be measured on its own.
+            if (asset.TryGetProperty("only_submesh_indices", out var only)
+                && only.ValueKind == JsonValueKind.Array)
+            {
+                var keep = only.EnumerateArray()
+                    .Where(value => value.ValueKind == JsonValueKind.Number)
+                    .Select(value => value.GetInt32())
+                    .ToHashSet();
+                if (keep.Count > 0)
+                {
+                    scene.SetPresentationHiddenSubmeshes(
+                        Enumerable.Range(0, document.Submeshes.Count).Where(index => !keep.Contains(index)));
+                }
+            }
             parseMs = phase.Elapsed.TotalMilliseconds;
 
             textures = NetTextureSet.Load(materials);
