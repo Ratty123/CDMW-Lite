@@ -277,7 +277,16 @@ static std::vector<MaterialLayer> compile_material_layers(
         if (placeholder_layer_mask_path(mask->archive_path) || placeholder_layer_mask_path(mask->texture_name)) {
             continue;
         }
-        if (!mask->layer_channel.empty()) {
+        // The layer parameter says which channel of the mask selects it, so it
+        // outranks anything read off the mask binding. `_detailMaskTexture`
+        // resolves to a fixed "b", and letting that overwrite the layer put
+        // `_detailDiffuseMaskR`, `G` and `B` all on the blue channel: two of the
+        // three layers painted in the wrong regions and the areas the red and
+        // green channels mark got nothing, which is why a fully layered helmet
+        // like cd_phm_00_hel_00_0354 collapsed to one flat tone. The mask's own
+        // channel is still the fallback for layers that name none.
+        if (!mask->layer_channel.empty()
+            && !layer_parameter_names_channel(binding->parameter_name)) {
             layer.layer_channel = mask->layer_channel;
         }
         layer.mask_source = mask->source_path;
