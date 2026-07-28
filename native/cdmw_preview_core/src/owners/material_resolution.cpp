@@ -717,7 +717,11 @@ static bool selected_base_should_yield_to_overlay(
 ) {
     if (selected == nullptr) return true;
     if (!binding_is_authoritative_same_family_overlay_base(overlay, mesh)) return false;
-    if (mesh_has_apparel_slot_surface_for_base_selection(mesh) && binding_is_primary_apparel_base_color(*selected)) {
+    // Same reasoning as the overlay score in the selector: if what is already
+    // selected is the part's own primary base colour, an overlay has nothing to
+    // stand in for. The apparel-slot test that used to gate this only knew
+    // about torsos and legs, so gloves, hoods and boots still yielded.
+    if (binding_is_primary_apparel_base_color(*selected)) {
         return false;
     }
     const bool selected_wrong_layer = base_binding_is_wrong_family_layer_or_environment(*selected, mesh);
