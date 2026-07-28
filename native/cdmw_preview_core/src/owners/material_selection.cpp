@@ -628,6 +628,15 @@ static std::string layer_channel_from_parameter(const std::string& parameter_nam
     return "r";
 }
 
+// Whether the parameter itself names the mask channel that selects its layer.
+// `_detailDiffuseMaskR/G/B` do; `_detailMaskTexture` is the mask, not a layer,
+// and its "b" above is a fallback for layers that name no channel of their own.
+static bool layer_parameter_names_channel(const std::string& parameter_name) {
+    const std::string key = normalized_key(parameter_name);
+    if (key.find("detailmasktexture") != std::string::npos) return false;
+    return key.ends_with("r") || key.ends_with("g") || key.ends_with("b") || key.ends_with("a");
+}
+
 static int layer_channel_index(const std::string& channel) {
     const std::string value = lower_copy(channel);
     if (value == "g") return 1;
