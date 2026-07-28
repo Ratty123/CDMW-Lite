@@ -353,6 +353,30 @@ internal static class ArchiveLiteTestRunner
                 locExtensionSource.Contains("LocalizedStringSource.Instance", StringComparison.Ordinal)
                 && locExtensionSource.Contains("BindingMode.OneWay", StringComparison.Ordinal),
                 "XAML localization still resolves to a one-time static string");
+
+            // Resource resolution being correct does not mean the visible window updates. Grid cells
+            // localize through converters bound to the row's own DTO, and the settled catalogue line
+            // used to be stored as formatted text, so both kept the language they were built in
+            // while everything bound through Loc switched around them. This is a source-level guard
+            // on the two mechanisms, not a runtime assertion that the rows repainted.
+            var browserSource = File.ReadAllText(Path.Combine(
+                FindRepositoryRoot(),
+                "src",
+                "Cdmw.ArchiveLite.App",
+                "ViewModels",
+                "ArchiveBrowserViewModel.cs"));
+            var refreshBody = browserSource[browserSource.IndexOf("public void RefreshLocalization()", StringComparison.Ordinal)..];
+            refreshBody = refreshBody[..refreshBody.IndexOf("\n    public ", StringComparison.Ordinal)];
+            Require(
+                refreshBody.Contains("_catalogueStatusSource()", StringComparison.Ordinal),
+                "a language change no longer re-resolves the settled catalogue line");
+            Require(
+                refreshBody.Contains("GetDefaultView(Entries)", StringComparison.Ordinal)
+                && refreshBody.Contains(".Refresh()", StringComparison.Ordinal),
+                "a language change no longer re-runs the archive grid's label converters");
+            Require(
+                browserSource.Contains("_catalogueStatusSource = null;", StringComparison.Ordinal),
+                "a transient catalogue line can be overwritten by a stale settled result");
         }
         finally
         {
