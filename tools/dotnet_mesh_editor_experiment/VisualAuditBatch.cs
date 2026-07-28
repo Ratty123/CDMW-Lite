@@ -170,6 +170,18 @@ internal static class VisualAuditBatch
                 var pitch = JsonFloat(view, "pitch", 0.0f);
                 var rendererYaw = yaw;
                 var rendererPitch = pitch;
+                // A flat piece shows its edge under a fixed angle. Let the model's
+                // own extents choose the angle instead, so a shield or a blade
+                // presents its face and there is something to look at and measure.
+                if (JsonBool(view, "auto_frame") || JsonBool(asset, "auto_frame"))
+                {
+                    var (autoYaw, autoPitch) = NetViewportCamera.FramingAnglesFor(
+                        document.Bounds(),
+                        yaw * MathF.PI / 180.0f,
+                        pitch * MathF.PI / 180.0f);
+                    rendererYaw = autoYaw * 180.0f / MathF.PI;
+                    rendererPitch = autoPitch * 180.0f / MathF.PI;
+                }
                 session.SetArchiveCamera(document, rendererYaw, rendererPitch);
                 Application.DoEvents();
                 var capturePath = Path.Combine(assetOutput, name + ".png");
