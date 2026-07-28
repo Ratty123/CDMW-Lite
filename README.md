@@ -18,6 +18,7 @@ The application is self-contained in this repository and keeps archive queries, 
 - Preview text, XML, images, DDS textures, supported media, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
 - Discover and export associated assets without altering game data.
 - Run as a portable Windows application or a single self-extracting executable.
+- Switch the interface between the fourteen languages Crimson Desert itself ships; every one but English is machine translated and unreviewed.
 - Keep settings, caches, logs, and crash reports isolated from the full CDMW workbench.
 
 ## Safety boundary
