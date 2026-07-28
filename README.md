@@ -102,6 +102,7 @@ These paths and all build outputs are excluded from version control.
 ## Project documents
 
 - [TESTING.md](TESTING.md) - validation matrix and proof boundaries
+- [PREVIEW-MATERIAL-AUDIT.md](PREVIEW-MATERIAL-AUDIT.md) - how a preview is checked against its source, what is confirmed authored, and which explanations were refuted
 - [CONTRIBUTING.md](CONTRIBUTING.md) - development and review expectations
 - [SECURITY.md](SECURITY.md) - supported versions and private reporting
 - [CHANGELOG.md](CHANGELOG.md) - notable version changes
