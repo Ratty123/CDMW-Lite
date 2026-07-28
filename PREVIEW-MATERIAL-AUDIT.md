@@ -40,8 +40,6 @@ Each of these looks like a defect and is not. All were traced to the source.
 - **`cd_phm_03_shield_0121`** renders a red thorn ring. Its material authors
   `emissive_color` `[0.435, 0, 0]` over a single-channel intensity mask. Authored
   red emissive.
-- **`cd_phm_03_shield_0137`** renders near-black. Its layer tile measures 0.117
-  linear and its tint 0.37/0.36/0.33; the product is genuinely that dark.
 - **`cd_phm_03_shield_0112`**'s black centre is a `[0.02, 0.02, 0.02]` tint.
 - **`cd_phm_01_axe_0003`**'s saturated orange is in its own untinted textures,
   which measure value 0.78-0.86.
@@ -83,9 +81,23 @@ full population.
   same 6-7% dark tail in both.
 
 The last three failed the same way: a hypothesis formed on a handful of assets
-selected *because* they were extreme. Roughly 6% of assets being dark is the
-distribution, not a defect. Test against the full population with a paired
-measurement before believing a correlation.
+selected *because* they were extreme. Test against the full population with a
+paired measurement before believing a correlation.
+
+## Corrected
+
+`cd_phm_03_shield_0137` and its `phw` variant were listed above as authored dark,
+twice, on the arithmetic of their layer tile and tint. That was wrong. The unlit
+render shows the resolved albedo is a mid-toned teal; the renderer was crushing it
+to 0.20 of that, and the shield is now readable at 0.84. The mistake was
+estimating an albedo from a tile and a tint by hand instead of reading it off the
+unlit render — layer compositing produces the actual albedo, and hand arithmetic
+over one tile does not predict it. Take the albedo from the unlit pass.
+
+That is also why "roughly 6% of assets being dark is the distribution" was too
+comfortable a conclusion. Some of that tail was a defect: 4% of assets rendered
+below half the brightness their own albedo carries, and correcting the metal
+compensation below halved it.
 
 ## Coverage
 
