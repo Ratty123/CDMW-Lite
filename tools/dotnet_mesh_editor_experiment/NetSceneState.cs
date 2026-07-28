@@ -237,6 +237,15 @@ internal sealed class NetSceneState
     public bool IsEditable(int submeshIndex) => submeshIndex >= 0 && submeshIndex < EditableSubmeshCount;
     public bool IsReference(int submeshIndex) => submeshIndex >= EditableSubmeshCount && submeshIndex < EditableSubmeshCount + ReferenceSubmeshCount;
 
+    /// <summary>
+    /// Whether the caller has explicitly hidden this submesh. Separate from
+    /// <see cref="IsVisible"/> because that also folds in the comparison mode,
+    /// and a pane showing one side of a comparison must still honour an explicit
+    /// hide.
+    /// </summary>
+    public bool IsHiddenByPresentation(int submeshIndex) =>
+        _presentationHiddenSubmeshes.Contains(submeshIndex);
+
     public bool IsVisible(int submeshIndex)
     {
         if (_presentationHiddenSubmeshes.Contains(submeshIndex))
