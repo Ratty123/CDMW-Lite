@@ -131,6 +131,18 @@ Preview output is checked against the assets themselves rather than by eye. [PRE
 | equipment assets rendered and compared | **~5,400** |
 | whole-corpus scans of all 12,340 equipment PACs | **4** |
 
+## Verified behaviour
+
+These are asserted by the focused gate, not measured by hand. `scripts/test_archive_lite.ps1 -Configuration Debug` reproduces them.
+
+| | |
+| --- | --- |
+| focused scenarios | 43, covering archive, preview, export, worker lifetime and cache eviction |
+| model preview, cold cache | ~100 ms |
+| model preview, warm cache | ~1 ms, and warm across sessions |
+| renderer | headless GPU soak, production D3D11 backend, windows stay hidden |
+| archive access | read-only; export is contained, atomic and manifested |
+
 ## Repository layout
 
 - `src/` — WPF application, worker, shared contracts, and managed archive services
