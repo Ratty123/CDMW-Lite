@@ -1,5 +1,11 @@
 # CDMW Archive Lite
 
+[![Archive Lite](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml/badge.svg)](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml)
+![version](https://img.shields.io/badge/version-0.8.0-blue)
+![platform](https://img.shields.io/badge/platform-Windows%2011%20x64-lightgrey)
+![.NET](https://img.shields.io/badge/.NET-10-512BD4)
+![read-only](https://img.shields.io/badge/archives-read--only-brightgreen)
+
 CDMW Archive Lite is a standalone, read-only Windows desktop application for browsing Crimson Desert PAMT/PAZ archives. It can search, inspect, preview, and export archive content without modifying the source archives.
 
 The application is self-contained in this repository and keeps archive queries, decoding, media conversion, and mesh rendering outside the UI process.
@@ -64,24 +70,56 @@ Build outputs are written beneath the ignored `artifacts/` directory. On a clean
 
 ## Architecture
 
-```text
-CdmwArchiveLite.exe                  WPF presentation and selection state
-        |
-        | private named pipe, request IDs, cancellation
-        v
-CdmwArchiveLite.Worker.exe           archive queries, search, preview, export
-        |
-        +-- cdmw-archive-core.dll     read-only PAMT/PAZ/PATHC decoding
-        +-- native helper processes   indexing, DDS, model and media preparation
-        +-- managed content library   semantic archive documents
+```mermaid
+flowchart TD
+    UI["CdmwArchiveLite.exe<br/>WPF presentation and selection state"]
+    W["CdmwArchiveLite.Worker.exe<br/>archive queries, search, preview, export"]
+    CORE["cdmw-archive-core.dll<br/>read-only PAMT / PAZ / PATHC decoding"]
+    HELP["native helper processes<br/>indexing, DDS, model and media preparation"]
+    CONTENT["managed content library<br/>semantic archive documents"]
+    MESH["cdmw-mesh-dotnet-editor.exe<br/>read-only Vortice D3D11 mesh viewport"]
 
-CdmwArchiveLite.exe
-        |
-        +-- cdmw-mesh-dotnet-editor.exe
-            read-only Vortice D3D11 mesh viewport
+    UI -- "private named pipe<br/>request IDs, cancellation" --> W
+    UI -- "child process" --> MESH
+    W --> CORE
+    W --> HELP
+    W --> CONTENT
 ```
 
 The UI owns presentation. Long-running work remains cancellable in the worker or a dedicated native process, and the renderer runs in its own child process.
+
+## Model preview
+
+A model preview is assembled from the geometry, its material sidecar, and the textures those materials name. Crimson packs surface response into one map, so the preview reads the channels rather than guessing from a filename.
+
+```mermaid
+flowchart LR
+    PAC[".pac<br/>geometry"] --> P
+    XML[".pac_xml<br/>material sidecar"] --> P
+    DDS[".dds<br/>textures"] --> P
+    P["preview core<br/>role assignment<br/>slot selection<br/>layer resolution"] --> A
+    A["adapter<br/>channels, components<br/>colour layers"] --> R["renderer<br/>D3D11"]
+```
+
+| suffix | role | notes |
+| --- | --- | --- |
+| `X.dds` | albedo | the part's own colour |
+| `X_n.dds` | normal | two-channel BC5; Z is rebuilt |
+| `X_sp.dds` | surface response | **G** roughness, **B** metalness |
+| `X_ma.dds` | colour-blending mask | selects among colour layers, not a response map |
+| `X_emi.dds` | emissive intensity | single-channel BC4; the colour is authored, not sampled |
+| `X_disp.dds` | height | |
+| `X_f.dds` | strand direction | orients the anisotropic hair highlight |
+
+Preview output is checked against the assets themselves rather than by eye. [PREVIEW-MATERIAL-AUDIT.md](PREVIEW-MATERIAL-AUDIT.md) records the method, what is confirmed authored, and which explanations were refuted.
+
+| measured over | result |
+| --- | --- |
+| brightness reproduced vs. the asset's own textures | **0.982** (1.000 = exact) |
+| colour reproduced vs. the asset's own textures | **0.926** |
+| lighting preserves albedo, lit/unlit over 728 assets | **0.97 – 1.01** |
+| equipment assets rendered and compared | **~5,400** |
+| whole-corpus scans of all 12,340 equipment PACs | **4** |
 
 ## Repository layout
 
