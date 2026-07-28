@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ProductName" xml:space="preserve"><value>CDMW Archive Lite</value></data>
+  <data name="ArchiveBrowserTab" xml:space="preserve"><value>Explorateur</value></data>
+  <data name="TextSearchTab" xml:space="preserve"><value>Recherche</value></data>
+  <data name="ArchiveRoot" xml:space="preserve"><value>Racine de l'archive</value></data>
+  <data name="Browse" xml:space="preserve"><value>Parcourir…</value></data>
+  <data name="OpenArchive" xml:space="preserve"><value>Ouvrir l'archive</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="Filters" xml:space="preserve"><value>Filtres</value></data>
+  <data name="PathFilter" xml:space="preserve"><value>Chemin contient</value></data>
+  <data name="ExtensionFilter" xml:space="preserve"><value>Extension</value></data>
+  <data name="PackageFilter" xml:space="preserve"><value>Paquet</value></data>
+  <data name="RoleFilter" xml:space="preserve"><value>Rôle</value></data>
+  <data name="MinimumSize" xml:space="preserve"><value>Taille minimale</value></data>
+  <data name="PreviewableOnly" xml:space="preserve"><value>Prévisualisables uniquement</value></data>
+  <data name="ViewMode" xml:space="preserve"><value>Affichage</value></data>
+  <data name="ReadOnlyTools" xml:space="preserve"><value>Options d'exportation</value></data>
+  <data name="ReadOnlyCaption" xml:space="preserve"><value>Les sources d'archive sont ouvertes en lecture seule et ne sont jamais modifiées.</value></data>
+  <data name="ReadOnlyBadge" xml:space="preserve"><value>LECTURE SEULE</value></data>
+  <data name="ItemFinder" xml:space="preserve"><value>Recherche d'objets</value></data>
+  <data name="MaterialFinder" xml:space="preserve"><value>Recherche de matériaux</value></data>
+  <data name="AssetFamily" xml:space="preserve"><value>Famille d'assets</value></data>
+  <data name="AssociatedAssets" xml:space="preserve"><value>Assets associés</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>Afficher les textures</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>Résout et affiche les textures du modèle à la demande. Laissez décoché pour la sélection PAC la plus rapide.</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>Paramètres d'aperçu</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>Commandes de caméra</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>Commandes de caméra .NET/Vortice : clic gauche glissé pour orbiter ; clic milieu, clic droit ou Maj+clic gauche glissé pour un panoramique ; la molette pour zoomer.</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>Sensibilité de l'orbite</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>Sensibilité du panoramique</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>Inverser l'orbite X</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>Inverser l'orbite Y</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>Inverser le panoramique X</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>Inverser le panoramique Y</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>Ces paramètres ne changent que la navigation dans l'aperçu ; ils ne modifient ni n'exportent jamais l'asset.</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>Réinitialiser les commandes</value></data>
+  <data name="PreviewAppearance" xml:space="preserve"><value>Apparence</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>Choisissez la couleur dessinée derrière un aperçu. Les textures sombres se lisent mieux sur un fond clair et les claires sur un fond sombre ; le magenta révèle les pixels transparents.</value></data>
+  <data name="PreviewBackground" xml:space="preserve"><value>Arrière-plan</value></data>
+  <data name="PreviewBackgroundTheme" xml:space="preserve"><value>Défaut du thème</value></data>
+  <data name="PreviewBackgroundBlack" xml:space="preserve"><value>Noir</value></data>
+  <data name="PreviewBackgroundCharcoal" xml:space="preserve"><value>Anthracite</value></data>
+  <data name="PreviewBackgroundMidGray" xml:space="preserve"><value>Gris moyen</value></data>
+  <data name="PreviewBackgroundLightGray" xml:space="preserve"><value>Gris clair</value></data>
+  <data name="PreviewBackgroundWhite" xml:space="preserve"><value>Blanc</value></data>
+  <data name="PreviewBackgroundMagenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="PreviewBackgroundCustom" xml:space="preserve"><value>Personnalisé</value></data>
+  <data name="PreviewBackgroundCustomColor" xml:space="preserve"><value>Couleur personnalisée</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>Couleur hexadécimale telle que #204060. Utilisée uniquement quand Personnalisé est sélectionné.</value></data>
+  <data name="PreviewBackgroundHint" xml:space="preserve"><value>L'arrière-plan s'applique aux aperçus de texture et de modèle. Il ne change jamais l'asset ni ce qui en est exporté.</value></data>
+  <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>Assets associés ({0:N0})</value></data>
+  <data name="FindAssociatedAssets" xml:space="preserve"><value>Trouver les assets</value></data>
+  <data name="ShowAssociatedAsset" xml:space="preserve"><value>Afficher dans l'explorateur</value></data>
+  <data name="AssociatedAssetsSelectFile" xml:space="preserve"><value>Sélectionnez un fichier pour trouver ses assets associés.</value></data>
+  <data name="AssociatedAssetsNotLoaded" xml:space="preserve"><value>Cliquez sur Trouver les assets pour inspecter les références de l'archive et les fichiers de la même famille.</value></data>
+  <data name="AssociatedAssetsSearching" xml:space="preserve"><value>Recherche des assets associés...</value></data>
+  <data name="AssociatedAssetsScanningProgress" xml:space="preserve"><value>Analyse des noms de l'archive : {0:N0} / {1:N0}</value></data>
+  <data name="AssociatedAssetsFound" xml:space="preserve"><value>{0:N0} assets associés trouvés.</value></data>
+  <data name="AssociatedAssetsFoundTruncated" xml:space="preserve"><value>Affichage des {0:N0} premiers assets associés.</value></data>
+  <data name="AssociatedAssetsNone" xml:space="preserve"><value>Aucun asset associé n'a été trouvé.</value></data>
+  <data name="AssociatedAssetsFailed" xml:space="preserve"><value>Échec de la recherche d'assets associés : {0}</value></data>
+  <data name="AssociatedAssetNotLocated" xml:space="preserve"><value>L'asset associé n'est plus présent dans la vue d'archive actuelle.</value></data>
+  <data name="AssociatedCategoryModel" xml:space="preserve"><value>Modèles</value></data>
+  <data name="AssociatedCategoryMaterial" xml:space="preserve"><value>Matériau</value></data>
+  <data name="AssociatedCategoryTexture" xml:space="preserve"><value>Textures</value></data>
+  <data name="AssociatedCategoryPhysics" xml:space="preserve"><value>Physique</value></data>
+  <data name="AssociatedCategoryMeshMetadata" xml:space="preserve"><value>Métadonnées de maillage</value></data>
+  <data name="AssociatedCategoryPrefabMetadata" xml:space="preserve"><value>Prefab / métadonnées</value></data>
+  <data name="AssociatedCategorySkeletonRig" xml:space="preserve"><value>Squelette / rig</value></data>
+  <data name="AssociatedCategoryAnimationMotion" xml:space="preserve"><value>Animation / mouvement</value></data>
+  <data name="AssociatedCategoryAudioVideo" xml:space="preserve"><value>Audio / vidéo</value></data>
+  <data name="AssociatedCategoryUserInterface" xml:space="preserve"><value>Interface utilisateur</value></data>
+  <data name="AssociatedCategoryOther" xml:space="preserve"><value>Autre</value></data>
+  <data name="AssociationEvidenceExplicitReference" xml:space="preserve"><value>Référence explicite</value></data>
+  <data name="AssociationEvidenceExactCompanion" xml:space="preserve"><value>Compagnon attendu</value></data>
+  <data name="AssociationEvidenceSameStem" xml:space="preserve"><value>Même famille de noms</value></data>
+  <data name="AssociationEvidenceCachedFamily" xml:space="preserve"><value>Famille résolue</value></data>
+  <data name="AssociationReasonExplicitReference" xml:space="preserve"><value>Référencé par {0}.</value></data>
+  <data name="AssociationReasonExactCompanion" xml:space="preserve"><value>Compagnon attendu de {0}.</value></data>
+  <data name="AssociationReasonSameStem" xml:space="preserve"><value>Partage le nom de famille d'assets de {0}.</value></data>
+  <data name="AssociationReasonCachedFamily" xml:space="preserve"><value>Résolu dans la même famille d'assets que {0}.</value></data>
+  <data name="ExportMesh" xml:space="preserve"><value>Exporter le maillage...</value></data>
+  <data name="ExportMeshHint" xml:space="preserve"><value>Exportez le maillage PAC/PAM sélectionné pour Blender ou un autre outil 3D.</value></data>
+  <data name="MeshExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx</value></data>
+  <data name="MeshExportUnsupportedExtension" xml:space="preserve"><value>Choisissez un fichier de sortie .glb, .obj ou .fbx.</value></data>
+  <data name="ExportSelected" xml:space="preserve"><value>Exporter la sélection</value></data>
+  <data name="ExportFolder" xml:space="preserve"><value>Dossier d'exportation</value></data>
+  <data name="ExportFiltered" xml:space="preserve"><value>Exporter les filtrés</value></data>
+  <data name="ExportAssociatedSelected" xml:space="preserve"><value>Exporter l'asset sélectionné</value></data>
+  <data name="ExportAssociatedFamily" xml:space="preserve"><value>Exporter la famille</value></data>
+  <data name="Path" xml:space="preserve"><value>Chemin</value></data>
+  <data name="Name" xml:space="preserve"><value>Nom</value></data>
+  <data name="KnownName" xml:space="preserve"><value>Nom connu</value></data>
+  <data name="NameEvidence" xml:space="preserve"><value>Indice de nom</value></data>
+  <data name="Extension" xml:space="preserve"><value>Extension</value></data>
+  <data name="Type" xml:space="preserve"><value>Type</value></data>
+  <data name="FileType" xml:space="preserve"><value>Type de fichier</value></data>
+  <data name="Usage" xml:space="preserve"><value>Usage</value></data>
+  <data name="Size" xml:space="preserve"><value>Taille</value></data>
+  <data name="StoredSize" xml:space="preserve"><value>Stocké</value></data>
+  <data name="Compression" xml:space="preserve"><value>Compression</value></data>
+  <data name="Package" xml:space="preserve"><value>Paquet</value></data>
+  <data name="Columns" xml:space="preserve"><value>Colonnes</value></data>
+  <data name="ChooseColumns" xml:space="preserve"><value>Choisir les colonnes visibles</value></data>
+  <data name="ShowAllColumns" xml:space="preserve"><value>Afficher toutes les colonnes</value></data>
+  <data name="Preview" xml:space="preserve"><value>Aperçu</value></data>
+  <data name="PreviewEmpty" xml:space="preserve"><value>Sélectionnez un fichier pour l'afficher.</value></data>
+  <data name="SearchSource" xml:space="preserve"><value>Source de recherche</value></data>
+  <data name="Archive" xml:space="preserve"><value>Archive</value></data>
+  <data name="LooseFolder" xml:space="preserve"><value>Dossier libre</value></data>
+  <data name="Query" xml:space="preserve"><value>Requête</value></data>
+  <data name="RegularExpression" xml:space="preserve"><value>Expression régulière</value></data>
+  <data name="CaseSensitive" xml:space="preserve"><value>Respecter la casse</value></data>
+  <data name="Extensions" xml:space="preserve"><value>Extensions</value></data>
+  <data name="Search" xml:space="preserve"><value>Rechercher</value></data>
+  <data name="ExportResults" xml:space="preserve"><value>Exporter les résultats</value></data>
+  <data name="Matches" xml:space="preserve"><value>Correspondances</value></data>
+  <data name="Line" xml:space="preserve"><value>Ligne</value></data>
+  <data name="Context" xml:space="preserve"><value>Contexte</value></data>
+  <data name="Ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="ConnectingWorker" xml:space="preserve"><value>Connexion au processus en lecture seule…</value></data>
+  <data name="WorkerConnected" xml:space="preserve"><value>Processus en lecture seule connecté (protocole {0}).</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>CDMW Archive Lite n'a pas pu démarrer</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>L'application en lecture seule n'a pas pu démarrer.\n\n{0}</value></data>
+  <data name="Closing" xml:space="preserve"><value>Arrêt des tâches en arrière-plan…</value></data>
+  <data name="FoldersView" xml:space="preserve"><value>Dossiers</value></data>
+  <data name="CategoriesView" xml:space="preserve"><value>Catégories</value></data>
+  <data name="CategoriesFoldersView" xml:space="preserve"><value>Catégories + dossiers</value></data>
+  <data name="FlatView" xml:space="preserve"><value>Plat</value></data>
+  <data name="FolderFilter" xml:space="preserve"><value>Dossier</value></data>
+  <data name="SortBy" xml:space="preserve"><value>Trier par</value></data>
+  <data name="Descending" xml:space="preserve"><value>Décroissant</value></data>
+  <data name="Folders" xml:space="preserve"><value>Dossiers</value></data>
+  <data name="Categories" xml:space="preserve"><value>Catégories</value></data>
+  <data name="PreviousPage" xml:space="preserve"><value>Précédent</value></data>
+  <data name="NextPage" xml:space="preserve"><value>Suivant</value></data>
+  <data name="Metadata" xml:space="preserve"><value>Métadonnées</value></data>
+  <data name="Language" xml:space="preserve"><value>Langue</value></data>
+  <data name="Theme" xml:space="preserve"><value>Thème</value></data>
+  <data name="ThemeGraphite" xml:space="preserve"><value>Graphite</value></data>
+  <data name="ThemeMidnight" xml:space="preserve"><value>Minuit</value></data>
+  <data name="ThemeNord" xml:space="preserve"><value>Nord</value></data>
+  <data name="ThemeEmber" xml:space="preserve"><value>Braise</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>Clair</value></data>
+  <data name="ThemeFrost" xml:space="preserve"><value>Givre</value></data>
+  <data name="ThemeApplied" xml:space="preserve"><value>Thème appliqué.</value></data>
+  <data name="FontSize" xml:space="preserve"><value>Taille du texte</value></data>
+  <data name="FontSizeSmall" xml:space="preserve"><value>Petite</value></data>
+  <data name="FontSizeMedium" xml:space="preserve"><value>Moyenne</value></data>
+  <data name="FontSizeLarge" xml:space="preserve"><value>Grande</value></data>
+  <data name="FontSizeExtraLarge" xml:space="preserve"><value>Très grande</value></data>
+  <data name="FontSizeApplied" xml:space="preserve"><value>Taille du texte appliquée.</value></data>
+  <data name="LayoutDensity" xml:space="preserve"><value>Densité</value></data>
+  <data name="LayoutCompact" xml:space="preserve"><value>Compacte</value></data>
+  <data name="LayoutComfortable" xml:space="preserve"><value>Confortable</value></data>
+  <data name="LayoutSpacious" xml:space="preserve"><value>Spacieuse</value></data>
+  <data name="LayoutApplied" xml:space="preserve"><value>Densité appliquée.</value></data>
+  <data name="LanguageApplied" xml:space="preserve"><value>Langue appliquée.</value></data>
+  <data name="CollisionPolicy" xml:space="preserve"><value>Si un fichier existe</value></data>
+  <data name="ManifestFormat" xml:space="preserve"><value>Format du manifeste</value></data>
+  <data name="RoleOther" xml:space="preserve"><value>Autre</value></data>
+  <data name="RoleModel" xml:space="preserve"><value>Modèle</value></data>
+  <data name="RoleAnimation" xml:space="preserve"><value>Animation</value></data>
+  <data name="RolePhysics" xml:space="preserve"><value>Physique</value></data>
+  <data name="RoleMetadata" xml:space="preserve"><value>Métadonnées</value></data>
+  <data name="RoleVideo" xml:space="preserve"><value>Vidéo</value></data>
+  <data name="RoleAudio" xml:space="preserve"><value>Audio</value></data>
+  <data name="RoleUserInterface" xml:space="preserve"><value>Interface utilisateur</value></data>
+  <data name="RoleImpostor" xml:space="preserve"><value>Imposteur</value></data>
+  <data name="RoleNormal" xml:space="preserve"><value>Carte de normales</value></data>
+  <data name="RoleMaterial" xml:space="preserve"><value>Matériau</value></data>
+  <data name="RoleImage" xml:space="preserve"><value>Image</value></data>
+  <data name="RoleText" xml:space="preserve"><value>Texte</value></data>
+  <data name="FileTypeOther" xml:space="preserve"><value>Autre</value></data>
+  <data name="FileTypeModel" xml:space="preserve"><value>Modèle</value></data>
+  <data name="FileTypeAnimation" xml:space="preserve"><value>Animation</value></data>
+  <data name="FileTypePhysics" xml:space="preserve"><value>Physique</value></data>
+  <data name="FileTypeMetadata" xml:space="preserve"><value>Métadonnées</value></data>
+  <data name="FileTypeVideo" xml:space="preserve"><value>Vidéo</value></data>
+  <data name="FileTypeAudio" xml:space="preserve"><value>Audio</value></data>
+  <data name="FileTypeUserInterface" xml:space="preserve"><value>Interface utilisateur</value></data>
+  <data name="FileTypeTexture" xml:space="preserve"><value>Texture</value></data>
+  <data name="FileTypeImage" xml:space="preserve"><value>Image</value></data>
+  <data name="FileTypeText" xml:space="preserve"><value>Texte</value></data>
+  <data name="TextureUsageUnknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="TextureUsageColor" xml:space="preserve"><value>Couleur</value></data>
+  <data name="TextureUsageNormalMap" xml:space="preserve"><value>Carte de normales</value></data>
+  <data name="TextureUsageMaterialMap" xml:space="preserve"><value>Carte de matériau</value></data>
+  <data name="SortPath" xml:space="preserve"><value>Chemin</value></data>
+  <data name="SortName" xml:space="preserve"><value>Nom</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>Nom connu</value></data>
+  <data name="SortNameEvidence" xml:space="preserve"><value>Indice de nom</value></data>
+  <data name="SortExtension" xml:space="preserve"><value>Extension</value></data>
+  <data name="SortPackage" xml:space="preserve"><value>Paquet</value></data>
+  <data name="SortOriginalSize" xml:space="preserve"><value>Taille d'origine</value></data>
+  <data name="SortStoredSize" xml:space="preserve"><value>Taille stockée</value></data>
+  <data name="SortCompression" xml:space="preserve"><value>Compression</value></data>
+  <data name="SortRole" xml:space="preserve"><value>Rôle</value></data>
+  <data name="SortFileType" xml:space="preserve"><value>Type de fichier</value></data>
+  <data name="SortTextureUsage" xml:space="preserve"><value>Usage de la texture</value></data>
+  <data name="CollisionSkip" xml:space="preserve"><value>Ignorer</value></data>
+  <data name="CollisionOverwrite" xml:space="preserve"><value>Remplacer</value></data>
+  <data name="CollisionCancel" xml:space="preserve"><value>Annuler l'exportation</value></data>
+  <data name="ManifestNone" xml:space="preserve"><value>Aucun</value></data>
+  <data name="ManifestJson" xml:space="preserve"><value>JSON</value></data>
+  <data name="ManifestCsv" xml:space="preserve"><value>CSV</value></data>
+  <data name="ManifestText" xml:space="preserve"><value>Texte</value></data>
+  <data name="EntriesCount" xml:space="preserve"><value>{0:N0} entrées</value></data>
+  <data name="OpeningArchive" xml:space="preserve"><value>Ouverture de {0}…</value></data>
+  <data name="OpenedEntries" xml:space="preserve"><value>{0:N0} entrées d'archive ouvertes.</value></data>
+  <data name="ShowingEntries" xml:space="preserve"><value>Affichage de {0} entrées d'archive.</value></data>
+  <data name="ExportSummary" xml:space="preserve"><value>Exportés : {0:N0} ; ignorés : {1:N0} ; échoués : {2:N0}.</value></data>
+  <data name="SearchSummary" xml:space="preserve"><value>{0:N0} correspondances trouvées dans {1:N0} fichiers.</value></data>
+  <data name="SearchExportSummary" xml:space="preserve"><value>{0:N0} fichiers de résultats exportés.</value></data>
+  <data name="OpenArchiveFirst" xml:space="preserve"><value>Utilise l'archive actuellement ouverte dans l'Explorateur.</value></data>
+  <data name="ProgressDiscovering" xml:space="preserve"><value>Découverte des fichiers d'archive...</value></data>
+  <data name="ProgressFingerprinting" xml:space="preserve"><value>Vérification de l'identité de l'archive...</value></data>
+  <data name="ProgressOpeningIndex" xml:space="preserve"><value>Ouverture de l'index en cache...</value></data>
+  <data name="ProgressBuildingIndex" xml:space="preserve"><value>Construction de l'index d'archive...</value></data>
+  <data name="ProgressParsingPackages" xml:space="preserve"><value>Lecture des catalogues d'archive...</value></data>
+  <data name="ProgressSortingIndex" xml:space="preserve"><value>Tri des entrées d'archive...</value></data>
+  <data name="ProgressWritingIndex" xml:space="preserve"><value>Écriture de l'index d'archive...</value></data>
+  <data name="ProgressPublishingIndex" xml:space="preserve"><value>Publication de l'index d'archive...</value></data>
+  <data name="ProgressValidating" xml:space="preserve"><value>Vérification des références de paquets...</value></data>
+  <data name="ProgressLoadingEntries" xml:space="preserve"><value>Chargement des entrées...</value></data>
+  <data name="ProgressExporting" xml:space="preserve"><value>Exportation...</value></data>
+  <data name="ProgressPreparingMesh" xml:space="preserve"><value>Préparation des données de maillage...</value></data>
+  <data name="ProgressWritingMesh" xml:space="preserve"><value>Écriture du fichier de maillage...</value></data>
+  <data name="ProgressFinishing" xml:space="preserve"><value>Finalisation...</value></data>
+  <data name="ProgressWorking" xml:space="preserve"><value>Traitement...</value></data>
+  <data name="PreviewProgressPreparing" xml:space="preserve"><value>Préparation de l'aperçu...</value></data>
+  <data name="PreviewProgressNative" xml:space="preserve"><value>Préparation de la géométrie PAC native...</value></data>
+  <data name="PreviewProgressAdapting" xml:space="preserve"><value>Préparation de la scène .NET en lecture seule...</value></data>
+  <data name="PreviewProgressDecodingTexture" xml:space="preserve"><value>Décodage de la texture... {0} s sur {1} s</value></data>
+  <data name="RendererStarting" xml:space="preserve"><value>Démarrage de l'aperçu .NET/Vortice...</value></data>
+  <data name="RendererLoading" xml:space="preserve"><value>Chargement du maillage et rendu de la première image...</value></data>
+  <data name="RendererReady" xml:space="preserve"><value>Aperçu .NET/Vortice prêt.</value></data>
+  <data name="RendererFailed" xml:space="preserve"><value>Aperçu .NET indisponible : {0}</value></data>
+  <data name="RendererUnknownError" xml:space="preserve"><value>L'aperçu .NET a signalé une erreur inconnue.</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>Tous les fichiers</value></data>
+  <data name="ExtensionGroupAll" xml:space="preserve"><value>Tout</value></data>
+  <data name="ExtensionGroupModelMeshPhysics" xml:space="preserve"><value>Modèle / Maillage / Physique</value></data>
+  <data name="ExtensionGroupTextureImage" xml:space="preserve"><value>Texture / Image</value></data>
+  <data name="ExtensionGroupMaterialMetadata" xml:space="preserve"><value>Matériau / Métadonnées</value></data>
+  <data name="ExtensionGroupAnimationScene" xml:space="preserve"><value>Animation / Scène</value></data>
+  <data name="ExtensionGroupAudioVideo" xml:space="preserve"><value>Audio / Vidéo</value></data>
+  <data name="ExtensionGroupUserInterfaceText" xml:space="preserve"><value>Interface / Texte</value></data>
+  <data name="ExtensionGroupOther" xml:space="preserve"><value>Autre</value></data>
+  <data name="ExtensionCatalogLoading" xml:space="preserve"><value>Chargement des extensions catégorisées...</value></data>
+  <data name="ExtensionCatalogProgress" xml:space="preserve"><value>Indexation des extensions : {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexLoading" xml:space="preserve"><value>Chargement des noms connus du jeu et du catalogue de Recherche d'objets...</value></data>
+  <data name="NameIndexScanProgress" xml:space="preserve"><value>Indexation des sources de noms : {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexExtracting" xml:space="preserve"><value>Lecture de la source de noms : {0}</value></data>
+  <data name="NameIndexResolving" xml:space="preserve"><value>Résolution des noms connus et des indices associés...</value></data>
+  <data name="NameIndexPublishing" xml:space="preserve"><value>Enregistrement de l'index de noms...</value></data>
+  <data name="NameIndexReady" xml:space="preserve"><value>Catalogue prêt : {0:N0} noms exacts, {1:N0} indices associés, {2:N0} lignes de Recherche d'objets</value></data>
+  <data name="NameIndexUnavailable" xml:space="preserve"><value>Les noms connus du jeu ne sont pas disponibles pour cette archive.</value></data>
+  <data name="NameIndexFailed" xml:space="preserve"><value>Index de noms indisponible : {0}</value></data>
+  <data name="ProductSubtitle" xml:space="preserve"><value>Parcourir, prévisualiser, rechercher et exporter</value></data>
+  <data name="ReadOnlyPill" xml:space="preserve"><value>ESPACE EN LECTURE SEULE</value></data>
+  <data name="DetectGame" xml:space="preserve"><value>Détecter le jeu</value></data>
+  <data name="DetectingGame" xml:space="preserve"><value>Détection de l'installation de Crimson Desert...</value></data>
+  <data name="GameDetected" xml:space="preserve"><value>Dossier du jeu détecté : {0}</value></data>
+  <data name="GameNotFound" xml:space="preserve"><value>Crimson Desert n'a pas été trouvé automatiquement. Choisissez le dossier du jeu.</value></data>
+  <data name="GameFolderReady" xml:space="preserve"><value>Dossier du jeu sélectionné : {0}</value></data>
+  <data name="CacheNotChecked" xml:space="preserve"><value>CACHE NON VÉRIFIÉ</value></data>
+  <data name="CacheChecking" xml:space="preserve"><value>VÉRIFICATION DU CACHE</value></data>
+  <data name="CacheCurrent" xml:space="preserve"><value>CACHE À JOUR</value></data>
+  <data name="CacheSessionOnly" xml:space="preserve"><value>SESSION UNIQUE</value></data>
+  <data name="CacheMissing" xml:space="preserve"><value>CACHE ABSENT</value></data>
+  <data name="CacheStale" xml:space="preserve"><value>CACHE OBSOLÈTE</value></data>
+  <data name="CacheRefreshRecommended" xml:space="preserve"><value>Les fichiers d'archive du jeu ont changé. Utilisez Actualiser pour reconstruire le cache.</value></data>
+  <data name="CacheInvalid" xml:space="preserve"><value>DOSSIER INVALIDE</value></data>
+  <data name="CacheReused" xml:space="preserve"><value>L'index d'archive vérifié a été réutilisé.</value></data>
+  <data name="CacheRebuilt" xml:space="preserve"><value>L'index d'archive a été reconstruit et ses métadonnées de cache sont à jour.</value></data>
+  <data name="CacheSessionOnlyLoaded" xml:space="preserve"><value>L'archive a été indexée à neuf pour cette session. Aucun index d'archive persistant n'a été créé ni modifié.</value></data>
+  <data name="CacheChoiceTitle" xml:space="preserve"><value>Chargement de l'archive</value></data>
+  <data name="CacheChoiceHeading" xml:space="preserve"><value>Choisissez comment charger l'archive</value></data>
+  <data name="CacheChoiceIntro" xml:space="preserve"><value>Archive Lite a besoin d'un index des fichiers du jeu. Choisissez si cet index doit être réutilisable ou ne durer que cette session.</value></data>
+  <data name="CacheChoiceSourceLabel" xml:space="preserve"><value>Dossier</value></data>
+  <data name="CacheChoiceRecommended" xml:space="preserve"><value>RECOMMANDÉ</value></data>
+  <data name="CacheChoicePersistentTitle" xml:space="preserve"><value>Utiliser le cache persistant</value></data>
+  <data name="CacheChoicePersistentBody" xml:space="preserve"><value>Réutilise un index vérifié quand c'est possible. S'il est absent ou obsolète, Archive Lite le construit et le stocke localement pour accélérer nettement les chargements suivants. Cela occupe un peu d'espace disque local.</value></data>
+  <data name="CacheChoicePersistentRefreshTitle" xml:space="preserve"><value>Reconstruire le cache persistant</value></data>
+  <data name="CacheChoicePersistentRefreshBody" xml:space="preserve"><value>Analyse de nouveau l'archive et remplace l'index enregistré en toute sécurité. Les chargements suivants peuvent réutiliser le cache actualisé.</value></data>
+  <data name="CacheChoiceSessionTitle" xml:space="preserve"><value>Charger cette fois seulement</value></data>
+  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>Construit un index temporaire de la liste d'archive pour cette session. Il n'est pas ajouté au cache d'index réutilisable et disparaît à la fermeture d'Archive Lite ; Charger ou Actualiser relancera donc l'analyse la prochaine fois.</value></data>
+  <data name="CacheChoiceTimeNotice" xml:space="preserve"><value>La première analyse peut prendre plusieurs minutes sur les grandes installations. Les sources d'archive restent en lecture seule dans les deux modes.</value></data>
+  <data name="EnterToSearch" xml:space="preserve"><value>Appuyez sur Entrée pour rechercher</value></data>
+  <data name="Minimize" xml:space="preserve"><value>Réduire</value></data>
+  <data name="Maximize" xml:space="preserve"><value>Agrandir ou restaurer</value></data>
+  <data name="Close" xml:space="preserve"><value>Fermer</value></data>
+  <data name="ReadOnlyFooter" xml:space="preserve"><value>Espace d'archive en lecture seule</value></data>
+  <data name="All" xml:space="preserve"><value>Tout</value></data>
+  <data name="FindInFile" xml:space="preserve"><value>Rechercher dans le fichier</value></data>
+  <data name="FindPrevious" xml:space="preserve"><value>Précédent (Maj+Entrée)</value></data>
+  <data name="FindNext" xml:space="preserve"><value>Suivant (Entrée)</value></data>
+  <data name="ExportSelectedHint" xml:space="preserve"><value>Exportez les fichiers sélectionnés. Un modèle PAC unique peut être enregistré en GLB, OBJ, FBX ou dans son format d'archive d'origine.</value></data>
+  <data name="ExportFamilyHint" xml:space="preserve"><value>Trouvez et exportez le fichier sélectionné avec ses assets associés.</value></data>
+  <data name="ExportChoiceTitle" xml:space="preserve"><value>Exporter la sélection</value></data>
+  <data name="ExportChoiceHeading" xml:space="preserve"><value>Choisissez ce qu'il faut exporter</value></data>
+  <data name="ExportChoiceIntro" xml:space="preserve"><value>Sélectionnez la disposition de sortie pour {0:N0} fichier(s) sélectionné(s).</value></data>
+  <data name="ExportChoiceFilesOnlyTitle" xml:space="preserve"><value>Fichier seul</value></data>
+  <data name="ExportChoiceFilesOnlyBody" xml:space="preserve"><value>Écrit le fichier sélectionné directement dans la destination sans recréer ses dossiers d'archive.</value></data>
+  <data name="ExportChoiceStructureTitle" xml:space="preserve"><value>Structure de dossiers complète</value></data>
+  <data name="ExportChoiceStructureBody" xml:space="preserve"><value>Conserve le paquet et le chemin d'archive virtuel exactement comme affichés dans l'Explorateur.</value></data>
+  <data name="ExportChoiceFamilyTitle" xml:space="preserve"><value>Famille d'assets associés</value></data>
+  <data name="ExportChoiceFamilyBody" xml:space="preserve"><value>Trouve et exporte le fichier ciblé ainsi que ses matériaux, textures, descripteurs et autres assets résolus.</value></data>
+  <data name="ExportChoiceFormat" xml:space="preserve"><value>Format de fichier</value></data>
+  <data name="ExportChoiceOriginal" xml:space="preserve"><value>Format d'archive d'origine</value></data>
+  <data name="ExportChoiceGlb" xml:space="preserve"><value>glTF Binary (.glb)</value></data>
+  <data name="ExportChoiceObj" xml:space="preserve"><value>Wavefront OBJ (.obj)</value></data>
+  <data name="ExportChoiceFbx" xml:space="preserve"><value>Autodesk FBX (.fbx)</value></data>
+  <data name="ExportChoiceAction" xml:space="preserve"><value>Continuer</value></data>
+  <data name="SelectedModelExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx|Fichier d'archive d'origine (*{0})|*{0}</value></data>
+  <data name="Play" xml:space="preserve"><value>Lire</value></data>
+  <data name="Pause" xml:space="preserve"><value>Pause</value></data>
+  <data name="Stop" xml:space="preserve"><value>Arrêter</value></data>
+  <data name="Clear" xml:space="preserve"><value>Effacer</value></data>
+  <data name="None" xml:space="preserve"><value>Aucun</value></data>
+  <data name="ItemFinderTitle" xml:space="preserve"><value>Recherche d'objets</value></data>
+  <data name="ItemFinderNavigation" xml:space="preserve"><value>Objets</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Noms récupérés, icônes d'inventaire, liens de modèles et indices de matériaux</value></data>
+  <data name="ItemFinderIntro" xml:space="preserve"><value>Parcourez le même catalogue d'objets natif que CDMW Full. Les icônes visibles se chargent d'abord ; les autres vignettes d'inventaire sont préparées en arrière-plan et réutilisées depuis le cache persistant.</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Rechercher par nom affiché, nom interne, ID d'objet, catégorie, modèle, chemin d'icône, nom localisé ou étiquette de matériau</value></data>
+  <data name="ItemFinderButtonHint" xml:space="preserve"><value>Parcourez les objets récupérés du jeu avec les icônes d'inventaire préchargées de façon persistante.</value></data>
+  <data name="ItemFinderOpenArchive" xml:space="preserve"><value>Chargez une archive avant d'ouvrir la Recherche d'objets.</value></data>
+  <data name="ItemFinderReady" xml:space="preserve"><value>La Recherche d'objets est prête.</value></data>
+  <data name="ItemFinderLoading" xml:space="preserve"><value>Chargement de la Recherche d'objets...</value></data>
+  <data name="ItemFinderNoMatches" xml:space="preserve"><value>Aucun objet correspondant.</value></data>
+  <data name="ItemFinderPageSummary" xml:space="preserve"><value>Affichage de {0:N0}-{1:N0} sur {2:N0} objets correspondants</value></data>
+  <data name="ItemFinderFailed" xml:space="preserve"><value>Échec de la Recherche d'objets : {0}</value></data>
+  <data name="ItemFinderAllCategories" xml:space="preserve"><value>Toutes les catégories</value></data>
+  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>Toutes les étiquettes de matériaux</value></data>
+  <data name="ItemFinderIconFailed" xml:space="preserve"><value>Certaines icônes d'inventaire n'ont pas pu être préparées : {0}</value></data>
+  <data name="ItemFinderIconWarmup" xml:space="preserve"><value>Préchargement des icônes d'inventaire : {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Préparation du cache persistant d'icônes d'inventaire...</value></data>
+  <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Cache persistant d'icônes d'inventaire prêt : {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>{0:N0} lien(s) de modèle, {1:N0} chemin(s) d'icône, {2:N0} variante(s)</value></data>
+  <data name="ItemFinderEvidence" xml:space="preserve"><value>Indices</value></data>
+  <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Noms localisés</value></data>
+  <data name="ItemFinderMaterials" xml:space="preserve"><value>Étiquettes de matériaux</value></data>
+  <data name="ItemFinderModels" xml:space="preserve"><value>Modèles liés</value></data>
+  <data name="ItemFinderIcons" xml:space="preserve"><value>Chemins d'icônes d'inventaire</value></data>
+  <data name="ItemFinderShowExact" xml:space="preserve"><value>Afficher les liens exacts</value></data>
+  <data name="ItemFinderShowExactHint" xml:space="preserve"><value>Fermer la Recherche d'objets et n'afficher que les fichiers de modèle et d'icône directement récupérés dans l'Explorateur.</value></data>
+  <data name="ItemFinderShowRelated" xml:space="preserve"><value>Afficher l'ensemble lié</value></data>
+  <data name="ItemFinderShowRelatedHint" xml:space="preserve"><value>Fermer la Recherche d'objets et afficher les liens directs ainsi que les matériaux, textures, métadonnées, squelettes et animations indexés qui les accompagnent.</value></data>
+  <data name="ItemFinderScopeLoading" xml:space="preserve"><value>Résolution des liens de la Recherche d'objets...</value></data>
+  <data name="ItemFinderExactScopeApplied" xml:space="preserve"><value>Recherche d'objets : {0} - {1:N0} fichier(s) lié(s) exact(s)</value></data>
+  <data name="ItemFinderRelatedScopeApplied" xml:space="preserve"><value>Recherche d'objets : {0} - {1:N0} fichier(s) lié(s), dont {2:N0} lien(s) direct(s)</value></data>
+  <data name="ClearItemScope" xml:space="preserve"><value>Effacer l'ensemble d'objets</value></data>
+  <data name="MostCommonExtensions" xml:space="preserve"><value>Les plus courantes</value></data>
+  <data name="MostCommonExtensionsHint" xml:space="preserve"><value>Afficher les extensions les plus courantes dans l'archive active ou l'ensemble de la Recherche d'objets.</value></data>
+</root>

@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ProductName" xml:space="preserve"><value>CDMW Archive Lite</value></data>
+  <data name="ArchiveBrowserTab" xml:space="preserve"><value>アーカイブ閲覧</value></data>
+  <data name="TextSearchTab" xml:space="preserve"><value>テキスト検索</value></data>
+  <data name="ArchiveRoot" xml:space="preserve"><value>アーカイブのルート</value></data>
+  <data name="Browse" xml:space="preserve"><value>参照…</value></data>
+  <data name="OpenArchive" xml:space="preserve"><value>アーカイブを開く</value></data>
+  <data name="Refresh" xml:space="preserve"><value>更新</value></data>
+  <data name="Cancel" xml:space="preserve"><value>キャンセル</value></data>
+  <data name="Filters" xml:space="preserve"><value>フィルター</value></data>
+  <data name="PathFilter" xml:space="preserve"><value>パスに含む</value></data>
+  <data name="ExtensionFilter" xml:space="preserve"><value>拡張子</value></data>
+  <data name="PackageFilter" xml:space="preserve"><value>パッケージ</value></data>
+  <data name="RoleFilter" xml:space="preserve"><value>役割</value></data>
+  <data name="MinimumSize" xml:space="preserve"><value>最小サイズ</value></data>
+  <data name="PreviewableOnly" xml:space="preserve"><value>プレビュー可能のみ</value></data>
+  <data name="ViewMode" xml:space="preserve"><value>表示</value></data>
+  <data name="ReadOnlyTools" xml:space="preserve"><value>エクスポート設定</value></data>
+  <data name="ReadOnlyCaption" xml:space="preserve"><value>アーカイブは読み取り専用で開かれ、変更されることはありません。</value></data>
+  <data name="ReadOnlyBadge" xml:space="preserve"><value>読み取り専用</value></data>
+  <data name="ItemFinder" xml:space="preserve"><value>アイテム検索</value></data>
+  <data name="MaterialFinder" xml:space="preserve"><value>マテリアル検索</value></data>
+  <data name="AssetFamily" xml:space="preserve"><value>アセットファミリー</value></data>
+  <data name="AssociatedAssets" xml:space="preserve"><value>関連アセット</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>テクスチャを表示</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>必要に応じてモデルのテクスチャを解決して表示します。PAC の選択を最速にするにはオフのままにしてください。</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>プレビュー設定</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>カメラ操作</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>.NET/Vortice のカメラ操作: 左ドラッグで回転、中ドラッグ・右ドラッグ・Shift+左ドラッグで平行移動、ホイールでズームします。</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>回転の感度</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>平行移動の感度</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>回転 X を反転</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>回転 Y を反転</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>平行移動 X を反転</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>平行移動 Y を反転</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>これらの設定はプレビューの操作だけを変更します。アセットの編集やエクスポートは行いません。</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>カメラ操作をリセット</value></data>
+  <data name="PreviewAppearance" xml:space="preserve"><value>外観</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>プレビューの背後に描画する色を選びます。暗いテクスチャは明るい背景で、明るいテクスチャは暗い背景で見やすくなります。マゼンタは透明なピクセルを明らかにします。</value></data>
+  <data name="PreviewBackground" xml:space="preserve"><value>背景</value></data>
+  <data name="PreviewBackgroundTheme" xml:space="preserve"><value>テーマの既定</value></data>
+  <data name="PreviewBackgroundBlack" xml:space="preserve"><value>黒</value></data>
+  <data name="PreviewBackgroundCharcoal" xml:space="preserve"><value>チャコール</value></data>
+  <data name="PreviewBackgroundMidGray" xml:space="preserve"><value>ミドルグレー</value></data>
+  <data name="PreviewBackgroundLightGray" xml:space="preserve"><value>ライトグレー</value></data>
+  <data name="PreviewBackgroundWhite" xml:space="preserve"><value>白</value></data>
+  <data name="PreviewBackgroundMagenta" xml:space="preserve"><value>マゼンタ</value></data>
+  <data name="PreviewBackgroundCustom" xml:space="preserve"><value>カスタム</value></data>
+  <data name="PreviewBackgroundCustomColor" xml:space="preserve"><value>カスタム色</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>#204060 のような 16 進数の色。「カスタム」を選択したときのみ使われます。</value></data>
+  <data name="PreviewBackgroundHint" xml:space="preserve"><value>背景はテクスチャとモデルのプレビューに適用されます。アセットやそこからエクスポートされるものを変えることはありません。</value></data>
+  <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>関連アセット ({0:N0})</value></data>
+  <data name="FindAssociatedAssets" xml:space="preserve"><value>アセットを探す</value></data>
+  <data name="ShowAssociatedAsset" xml:space="preserve"><value>ブラウザーで表示</value></data>
+  <data name="AssociatedAssetsSelectFile" xml:space="preserve"><value>関連アセットを探すファイルを選択してください。</value></data>
+  <data name="AssociatedAssetsNotLoaded" xml:space="preserve"><value>「アセットを探す」をクリックすると、アーカイブ内の参照と同じファミリーのファイルを調べます。</value></data>
+  <data name="AssociatedAssetsSearching" xml:space="preserve"><value>関連アセットを検索しています...</value></data>
+  <data name="AssociatedAssetsScanningProgress" xml:space="preserve"><value>アーカイブ名をスキャン中: {0:N0} / {1:N0}</value></data>
+  <data name="AssociatedAssetsFound" xml:space="preserve"><value>関連アセットが {0:N0} 件見つかりました。</value></data>
+  <data name="AssociatedAssetsFoundTruncated" xml:space="preserve"><value>関連アセットの先頭 {0:N0} 件を表示しています。</value></data>
+  <data name="AssociatedAssetsNone" xml:space="preserve"><value>関連アセットは見つかりませんでした。</value></data>
+  <data name="AssociatedAssetsFailed" xml:space="preserve"><value>関連アセットの検索に失敗しました: {0}</value></data>
+  <data name="AssociatedAssetNotLocated" xml:space="preserve"><value>関連アセットは現在のアーカイブ表示にはもう存在しません。</value></data>
+  <data name="AssociatedCategoryModel" xml:space="preserve"><value>モデル</value></data>
+  <data name="AssociatedCategoryMaterial" xml:space="preserve"><value>マテリアル</value></data>
+  <data name="AssociatedCategoryTexture" xml:space="preserve"><value>テクスチャ</value></data>
+  <data name="AssociatedCategoryPhysics" xml:space="preserve"><value>物理</value></data>
+  <data name="AssociatedCategoryMeshMetadata" xml:space="preserve"><value>メッシュのメタデータ</value></data>
+  <data name="AssociatedCategoryPrefabMetadata" xml:space="preserve"><value>プレハブ / メタデータ</value></data>
+  <data name="AssociatedCategorySkeletonRig" xml:space="preserve"><value>スケルトン / リグ</value></data>
+  <data name="AssociatedCategoryAnimationMotion" xml:space="preserve"><value>アニメーション / モーション</value></data>
+  <data name="AssociatedCategoryAudioVideo" xml:space="preserve"><value>音声 / 動画</value></data>
+  <data name="AssociatedCategoryUserInterface" xml:space="preserve"><value>ユーザーインターフェイス</value></data>
+  <data name="AssociatedCategoryOther" xml:space="preserve"><value>その他</value></data>
+  <data name="AssociationEvidenceExplicitReference" xml:space="preserve"><value>明示的な参照</value></data>
+  <data name="AssociationEvidenceExactCompanion" xml:space="preserve"><value>想定される付随ファイル</value></data>
+  <data name="AssociationEvidenceSameStem" xml:space="preserve"><value>同じ名前のファミリー</value></data>
+  <data name="AssociationEvidenceCachedFamily" xml:space="preserve"><value>解決済みのファミリー</value></data>
+  <data name="AssociationReasonExplicitReference" xml:space="preserve"><value>{0} から参照されています。</value></data>
+  <data name="AssociationReasonExactCompanion" xml:space="preserve"><value>{0} に付随すると想定されるファイルです。</value></data>
+  <data name="AssociationReasonSameStem" xml:space="preserve"><value>{0} とアセットファミリー名を共有しています。</value></data>
+  <data name="AssociationReasonCachedFamily" xml:space="preserve"><value>{0} と同じアセットファミリーとして解決されました。</value></data>
+  <data name="ExportMesh" xml:space="preserve"><value>メッシュをエクスポート...</value></data>
+  <data name="ExportMeshHint" xml:space="preserve"><value>選択した PAC/PAM メッシュを Blender などの 3D ツール向けにエクスポートします。</value></data>
+  <data name="MeshExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx</value></data>
+  <data name="MeshExportUnsupportedExtension" xml:space="preserve"><value>.glb、.obj、.fbx のいずれかの出力ファイルを選んでください。</value></data>
+  <data name="ExportSelected" xml:space="preserve"><value>選択項目をエクスポート</value></data>
+  <data name="ExportFolder" xml:space="preserve"><value>エクスポート先フォルダー</value></data>
+  <data name="ExportFiltered" xml:space="preserve"><value>絞り込み結果をエクスポート</value></data>
+  <data name="ExportAssociatedSelected" xml:space="preserve"><value>選択したアセットをエクスポート</value></data>
+  <data name="ExportAssociatedFamily" xml:space="preserve"><value>ファミリーをエクスポート</value></data>
+  <data name="Path" xml:space="preserve"><value>パス</value></data>
+  <data name="Name" xml:space="preserve"><value>名前</value></data>
+  <data name="KnownName" xml:space="preserve"><value>判明した名前</value></data>
+  <data name="NameEvidence" xml:space="preserve"><value>名前の根拠</value></data>
+  <data name="Extension" xml:space="preserve"><value>拡張子</value></data>
+  <data name="Type" xml:space="preserve"><value>種類</value></data>
+  <data name="FileType" xml:space="preserve"><value>ファイルの種類</value></data>
+  <data name="Usage" xml:space="preserve"><value>用途</value></data>
+  <data name="Size" xml:space="preserve"><value>サイズ</value></data>
+  <data name="StoredSize" xml:space="preserve"><value>格納サイズ</value></data>
+  <data name="Compression" xml:space="preserve"><value>圧縮</value></data>
+  <data name="Package" xml:space="preserve"><value>パッケージ</value></data>
+  <data name="Columns" xml:space="preserve"><value>列</value></data>
+  <data name="ChooseColumns" xml:space="preserve"><value>表示する列を選択</value></data>
+  <data name="ShowAllColumns" xml:space="preserve"><value>すべての列を表示</value></data>
+  <data name="Preview" xml:space="preserve"><value>プレビュー</value></data>
+  <data name="PreviewEmpty" xml:space="preserve"><value>プレビューするファイルを選択してください。</value></data>
+  <data name="SearchSource" xml:space="preserve"><value>検索対象</value></data>
+  <data name="Archive" xml:space="preserve"><value>アーカイブ</value></data>
+  <data name="LooseFolder" xml:space="preserve"><value>通常のフォルダー</value></data>
+  <data name="Query" xml:space="preserve"><value>検索文字列</value></data>
+  <data name="RegularExpression" xml:space="preserve"><value>正規表現</value></data>
+  <data name="CaseSensitive" xml:space="preserve"><value>大文字と小文字を区別</value></data>
+  <data name="Extensions" xml:space="preserve"><value>拡張子</value></data>
+  <data name="Search" xml:space="preserve"><value>検索</value></data>
+  <data name="ExportResults" xml:space="preserve"><value>結果をエクスポート</value></data>
+  <data name="Matches" xml:space="preserve"><value>一致</value></data>
+  <data name="Line" xml:space="preserve"><value>行</value></data>
+  <data name="Context" xml:space="preserve"><value>前後の内容</value></data>
+  <data name="Ready" xml:space="preserve"><value>準備完了</value></data>
+  <data name="ConnectingWorker" xml:space="preserve"><value>読み取り専用ワーカーに接続しています…</value></data>
+  <data name="WorkerConnected" xml:space="preserve"><value>読み取り専用ワーカーに接続しました (プロトコル {0})。</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>CDMW Archive Lite を起動できませんでした</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>読み取り専用アプリケーションを起動できませんでした。\n\n{0}</value></data>
+  <data name="Closing" xml:space="preserve"><value>バックグラウンド処理を停止しています…</value></data>
+  <data name="FoldersView" xml:space="preserve"><value>フォルダー</value></data>
+  <data name="CategoriesView" xml:space="preserve"><value>カテゴリ</value></data>
+  <data name="CategoriesFoldersView" xml:space="preserve"><value>カテゴリ + フォルダー</value></data>
+  <data name="FlatView" xml:space="preserve"><value>フラット</value></data>
+  <data name="FolderFilter" xml:space="preserve"><value>フォルダー</value></data>
+  <data name="SortBy" xml:space="preserve"><value>並べ替え</value></data>
+  <data name="Descending" xml:space="preserve"><value>降順</value></data>
+  <data name="Folders" xml:space="preserve"><value>フォルダー</value></data>
+  <data name="Categories" xml:space="preserve"><value>カテゴリ</value></data>
+  <data name="PreviousPage" xml:space="preserve"><value>前へ</value></data>
+  <data name="NextPage" xml:space="preserve"><value>次へ</value></data>
+  <data name="Metadata" xml:space="preserve"><value>メタデータ</value></data>
+  <data name="Language" xml:space="preserve"><value>言語</value></data>
+  <data name="Theme" xml:space="preserve"><value>テーマ</value></data>
+  <data name="ThemeGraphite" xml:space="preserve"><value>グラファイト</value></data>
+  <data name="ThemeMidnight" xml:space="preserve"><value>ミッドナイト</value></data>
+  <data name="ThemeNord" xml:space="preserve"><value>ノルド</value></data>
+  <data name="ThemeEmber" xml:space="preserve"><value>エンバー</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>ライト</value></data>
+  <data name="ThemeFrost" xml:space="preserve"><value>フロスト</value></data>
+  <data name="ThemeApplied" xml:space="preserve"><value>テーマを適用しました。</value></data>
+  <data name="FontSize" xml:space="preserve"><value>文字サイズ</value></data>
+  <data name="FontSizeSmall" xml:space="preserve"><value>小</value></data>
+  <data name="FontSizeMedium" xml:space="preserve"><value>中</value></data>
+  <data name="FontSizeLarge" xml:space="preserve"><value>大</value></data>
+  <data name="FontSizeExtraLarge" xml:space="preserve"><value>特大</value></data>
+  <data name="FontSizeApplied" xml:space="preserve"><value>文字サイズを適用しました。</value></data>
+  <data name="LayoutDensity" xml:space="preserve"><value>表示の密度</value></data>
+  <data name="LayoutCompact" xml:space="preserve"><value>高密度</value></data>
+  <data name="LayoutComfortable" xml:space="preserve"><value>標準</value></data>
+  <data name="LayoutSpacious" xml:space="preserve"><value>ゆったり</value></data>
+  <data name="LayoutApplied" xml:space="preserve"><value>表示の密度を適用しました。</value></data>
+  <data name="LanguageApplied" xml:space="preserve"><value>言語を適用しました。</value></data>
+  <data name="CollisionPolicy" xml:space="preserve"><value>ファイルが既にある場合</value></data>
+  <data name="ManifestFormat" xml:space="preserve"><value>マニフェスト形式</value></data>
+  <data name="RoleOther" xml:space="preserve"><value>その他</value></data>
+  <data name="RoleModel" xml:space="preserve"><value>モデル</value></data>
+  <data name="RoleAnimation" xml:space="preserve"><value>アニメーション</value></data>
+  <data name="RolePhysics" xml:space="preserve"><value>物理</value></data>
+  <data name="RoleMetadata" xml:space="preserve"><value>メタデータ</value></data>
+  <data name="RoleVideo" xml:space="preserve"><value>動画</value></data>
+  <data name="RoleAudio" xml:space="preserve"><value>音声</value></data>
+  <data name="RoleUserInterface" xml:space="preserve"><value>ユーザーインターフェイス</value></data>
+  <data name="RoleImpostor" xml:space="preserve"><value>インポスター</value></data>
+  <data name="RoleNormal" xml:space="preserve"><value>法線マップ</value></data>
+  <data name="RoleMaterial" xml:space="preserve"><value>マテリアル</value></data>
+  <data name="RoleImage" xml:space="preserve"><value>画像</value></data>
+  <data name="RoleText" xml:space="preserve"><value>テキスト</value></data>
+  <data name="FileTypeOther" xml:space="preserve"><value>その他</value></data>
+  <data name="FileTypeModel" xml:space="preserve"><value>モデル</value></data>
+  <data name="FileTypeAnimation" xml:space="preserve"><value>アニメーション</value></data>
+  <data name="FileTypePhysics" xml:space="preserve"><value>物理</value></data>
+  <data name="FileTypeMetadata" xml:space="preserve"><value>メタデータ</value></data>
+  <data name="FileTypeVideo" xml:space="preserve"><value>動画</value></data>
+  <data name="FileTypeAudio" xml:space="preserve"><value>音声</value></data>
+  <data name="FileTypeUserInterface" xml:space="preserve"><value>ユーザーインターフェイス</value></data>
+  <data name="FileTypeTexture" xml:space="preserve"><value>テクスチャ</value></data>
+  <data name="FileTypeImage" xml:space="preserve"><value>画像</value></data>
+  <data name="FileTypeText" xml:space="preserve"><value>テキスト</value></data>
+  <data name="TextureUsageUnknown" xml:space="preserve"><value>不明</value></data>
+  <data name="TextureUsageColor" xml:space="preserve"><value>カラー</value></data>
+  <data name="TextureUsageNormalMap" xml:space="preserve"><value>法線マップ</value></data>
+  <data name="TextureUsageMaterialMap" xml:space="preserve"><value>マテリアルマップ</value></data>
+  <data name="SortPath" xml:space="preserve"><value>パス</value></data>
+  <data name="SortName" xml:space="preserve"><value>名前</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>判明した名前</value></data>
+  <data name="SortNameEvidence" xml:space="preserve"><value>名前の根拠</value></data>
+  <data name="SortExtension" xml:space="preserve"><value>拡張子</value></data>
+  <data name="SortPackage" xml:space="preserve"><value>パッケージ</value></data>
+  <data name="SortOriginalSize" xml:space="preserve"><value>元のサイズ</value></data>
+  <data name="SortStoredSize" xml:space="preserve"><value>格納サイズ</value></data>
+  <data name="SortCompression" xml:space="preserve"><value>圧縮</value></data>
+  <data name="SortRole" xml:space="preserve"><value>役割</value></data>
+  <data name="SortFileType" xml:space="preserve"><value>ファイルの種類</value></data>
+  <data name="SortTextureUsage" xml:space="preserve"><value>テクスチャの用途</value></data>
+  <data name="CollisionSkip" xml:space="preserve"><value>スキップ</value></data>
+  <data name="CollisionOverwrite" xml:space="preserve"><value>上書き</value></data>
+  <data name="CollisionCancel" xml:space="preserve"><value>エクスポートを中止</value></data>
+  <data name="ManifestNone" xml:space="preserve"><value>なし</value></data>
+  <data name="ManifestJson" xml:space="preserve"><value>JSON</value></data>
+  <data name="ManifestCsv" xml:space="preserve"><value>CSV</value></data>
+  <data name="ManifestText" xml:space="preserve"><value>テキスト</value></data>
+  <data name="EntriesCount" xml:space="preserve"><value>{0:N0} 件</value></data>
+  <data name="OpeningArchive" xml:space="preserve"><value>{0} を開いています…</value></data>
+  <data name="OpenedEntries" xml:space="preserve"><value>アーカイブのエントリ {0:N0} 件を開きました。</value></data>
+  <data name="ShowingEntries" xml:space="preserve"><value>アーカイブのエントリ {0} 件を表示しています。</value></data>
+  <data name="ExportSummary" xml:space="preserve"><value>エクスポート {0:N0} 件、スキップ {1:N0} 件、失敗 {2:N0} 件。</value></data>
+  <data name="SearchSummary" xml:space="preserve"><value>{1:N0} 個のファイルで {0:N0} 件の一致が見つかりました。</value></data>
+  <data name="SearchExportSummary" xml:space="preserve"><value>検索結果のファイル {0:N0} 件をエクスポートしました。</value></data>
+  <data name="OpenArchiveFirst" xml:space="preserve"><value>アーカイブ閲覧で現在開いているアーカイブを使用します。</value></data>
+  <data name="ProgressDiscovering" xml:space="preserve"><value>アーカイブファイルを探しています...</value></data>
+  <data name="ProgressFingerprinting" xml:space="preserve"><value>アーカイブの同一性を確認しています...</value></data>
+  <data name="ProgressOpeningIndex" xml:space="preserve"><value>キャッシュされたインデックスを開いています...</value></data>
+  <data name="ProgressBuildingIndex" xml:space="preserve"><value>アーカイブのインデックスを作成しています...</value></data>
+  <data name="ProgressParsingPackages" xml:space="preserve"><value>アーカイブのカタログを読み込んでいます...</value></data>
+  <data name="ProgressSortingIndex" xml:space="preserve"><value>アーカイブのエントリを並べ替えています...</value></data>
+  <data name="ProgressWritingIndex" xml:space="preserve"><value>アーカイブのインデックスを書き込んでいます...</value></data>
+  <data name="ProgressPublishingIndex" xml:space="preserve"><value>アーカイブのインデックスを反映しています...</value></data>
+  <data name="ProgressValidating" xml:space="preserve"><value>パッケージの参照を確認しています...</value></data>
+  <data name="ProgressLoadingEntries" xml:space="preserve"><value>エントリを読み込んでいます...</value></data>
+  <data name="ProgressExporting" xml:space="preserve"><value>エクスポートしています...</value></data>
+  <data name="ProgressPreparingMesh" xml:space="preserve"><value>メッシュデータを準備しています...</value></data>
+  <data name="ProgressWritingMesh" xml:space="preserve"><value>メッシュファイルを書き込んでいます...</value></data>
+  <data name="ProgressFinishing" xml:space="preserve"><value>仕上げています...</value></data>
+  <data name="ProgressWorking" xml:space="preserve"><value>処理しています...</value></data>
+  <data name="PreviewProgressPreparing" xml:space="preserve"><value>プレビューを準備しています...</value></data>
+  <data name="PreviewProgressNative" xml:space="preserve"><value>ネイティブ PAC ジオメトリを準備しています...</value></data>
+  <data name="PreviewProgressAdapting" xml:space="preserve"><value>読み取り専用の .NET シーンを準備しています...</value></data>
+  <data name="PreviewProgressDecodingTexture" xml:space="preserve"><value>テクスチャをデコードしています... {1} 秒中 {0} 秒</value></data>
+  <data name="RendererStarting" xml:space="preserve"><value>.NET/Vortice プレビューアーを起動しています...</value></data>
+  <data name="RendererLoading" xml:space="preserve"><value>メッシュを読み込み、最初のフレームを描画しています...</value></data>
+  <data name="RendererReady" xml:space="preserve"><value>.NET/Vortice プレビューの準備ができました。</value></data>
+  <data name="RendererFailed" xml:space="preserve"><value>.NET プレビューを利用できません: {0}</value></data>
+  <data name="RendererUnknownError" xml:space="preserve"><value>.NET プレビューアーが不明なエラーを報告しました。</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>すべてのファイル</value></data>
+  <data name="ExtensionGroupAll" xml:space="preserve"><value>すべて</value></data>
+  <data name="ExtensionGroupModelMeshPhysics" xml:space="preserve"><value>モデル / メッシュ / 物理</value></data>
+  <data name="ExtensionGroupTextureImage" xml:space="preserve"><value>テクスチャ / 画像</value></data>
+  <data name="ExtensionGroupMaterialMetadata" xml:space="preserve"><value>マテリアル / メタデータ</value></data>
+  <data name="ExtensionGroupAnimationScene" xml:space="preserve"><value>アニメーション / シーン</value></data>
+  <data name="ExtensionGroupAudioVideo" xml:space="preserve"><value>音声 / 動画</value></data>
+  <data name="ExtensionGroupUserInterfaceText" xml:space="preserve"><value>UI / テキスト</value></data>
+  <data name="ExtensionGroupOther" xml:space="preserve"><value>その他</value></data>
+  <data name="ExtensionCatalogLoading" xml:space="preserve"><value>カテゴリ別の拡張子を読み込んでいます...</value></data>
+  <data name="ExtensionCatalogProgress" xml:space="preserve"><value>拡張子をインデックス化中: {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexLoading" xml:space="preserve"><value>判明したゲーム内名称とアイテム検索のカタログを読み込んでいます...</value></data>
+  <data name="NameIndexScanProgress" xml:space="preserve"><value>名前のソースをインデックス化中: {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexExtracting" xml:space="preserve"><value>名前のソースを読み込み中: {0}</value></data>
+  <data name="NameIndexResolving" xml:space="preserve"><value>判明した名称と関連する手がかりを解決しています...</value></data>
+  <data name="NameIndexPublishing" xml:space="preserve"><value>名前インデックスを保存しています...</value></data>
+  <data name="NameIndexReady" xml:space="preserve"><value>カタログの準備完了: 完全一致 {0:N0} 件、関連する手がかり {1:N0} 件、アイテム検索の行 {2:N0} 件</value></data>
+  <data name="NameIndexUnavailable" xml:space="preserve"><value>このアーカイブでは判明したゲーム内名称を利用できません。</value></data>
+  <data name="NameIndexFailed" xml:space="preserve"><value>名前インデックスを利用できません: {0}</value></data>
+  <data name="ProductSubtitle" xml:space="preserve"><value>閲覧・プレビュー・検索・エクスポート</value></data>
+  <data name="ReadOnlyPill" xml:space="preserve"><value>読み取り専用ワークスペース</value></data>
+  <data name="DetectGame" xml:space="preserve"><value>ゲームを検出</value></data>
+  <data name="DetectingGame" xml:space="preserve"><value>Crimson Desert のインストール先を検出しています...</value></data>
+  <data name="GameDetected" xml:space="preserve"><value>ゲームフォルダーを検出しました: {0}</value></data>
+  <data name="GameNotFound" xml:space="preserve"><value>Crimson Desert を自動的に見つけられませんでした。ゲームフォルダーを選択してください。</value></data>
+  <data name="GameFolderReady" xml:space="preserve"><value>選択したゲームフォルダー: {0}</value></data>
+  <data name="CacheNotChecked" xml:space="preserve"><value>キャッシュ未確認</value></data>
+  <data name="CacheChecking" xml:space="preserve"><value>キャッシュを確認中</value></data>
+  <data name="CacheCurrent" xml:space="preserve"><value>キャッシュは最新</value></data>
+  <data name="CacheSessionOnly" xml:space="preserve"><value>今回限りのセッション</value></data>
+  <data name="CacheMissing" xml:space="preserve"><value>キャッシュなし</value></data>
+  <data name="CacheStale" xml:space="preserve"><value>キャッシュが古い</value></data>
+  <data name="CacheRefreshRecommended" xml:space="preserve"><value>ゲームのアーカイブファイルが変更されました。「更新」でキャッシュを再作成してください。</value></data>
+  <data name="CacheInvalid" xml:space="preserve"><value>無効なフォルダー</value></data>
+  <data name="CacheReused" xml:space="preserve"><value>検証済みのアーカイブインデックスを再利用しました。</value></data>
+  <data name="CacheRebuilt" xml:space="preserve"><value>アーカイブインデックスを再作成し、キャッシュのメタデータは最新です。</value></data>
+  <data name="CacheSessionOnlyLoaded" xml:space="preserve"><value>このセッション用にアーカイブを新規にインデックス化しました。永続的なアーカイブインデックスは作成も変更もされていません。</value></data>
+  <data name="CacheChoiceTitle" xml:space="preserve"><value>アーカイブの読み込み</value></data>
+  <data name="CacheChoiceHeading" xml:space="preserve"><value>アーカイブの読み込み方法を選択</value></data>
+  <data name="CacheChoiceIntro" xml:space="preserve"><value>Archive Lite にはゲームファイルのインデックスが必要です。そのインデックスを再利用可能にするか、このセッション限りにするかを選んでください。</value></data>
+  <data name="CacheChoiceSourceLabel" xml:space="preserve"><value>フォルダー</value></data>
+  <data name="CacheChoiceRecommended" xml:space="preserve"><value>推奨</value></data>
+  <data name="CacheChoicePersistentTitle" xml:space="preserve"><value>永続キャッシュを使う</value></data>
+  <data name="CacheChoicePersistentBody" xml:space="preserve"><value>可能な場合は検証済みのインデックスを再利用します。存在しないか古い場合は、Archive Lite が作成してローカルに保存するため、次回以降の読み込みが大幅に速くなります。ローカルディスクを少し使用します。</value></data>
+  <data name="CacheChoicePersistentRefreshTitle" xml:space="preserve"><value>永続キャッシュを再作成</value></data>
+  <data name="CacheChoicePersistentRefreshBody" xml:space="preserve"><value>アーカイブを再スキャンし、保存済みのインデックスを安全に置き換えます。次回以降は更新されたキャッシュを再利用できます。</value></data>
+  <data name="CacheChoiceSessionTitle" xml:space="preserve"><value>今回だけ読み込む</value></data>
+  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>このセッション用に一時的なアーカイブ一覧インデックスを作成します。再利用可能なインデックスキャッシュには追加されず、Archive Lite を閉じると削除されるため、次回は「読み込み」または「更新」で再スキャンされます。</value></data>
+  <data name="CacheChoiceTimeNotice" xml:space="preserve"><value>大規模なインストールでは初回のスキャンに数分かかることがあります。どちらのモードでもアーカイブは読み取り専用のままです。</value></data>
+  <data name="EnterToSearch" xml:space="preserve"><value>Enter キーで検索</value></data>
+  <data name="Minimize" xml:space="preserve"><value>最小化</value></data>
+  <data name="Maximize" xml:space="preserve"><value>最大化または元に戻す</value></data>
+  <data name="Close" xml:space="preserve"><value>閉じる</value></data>
+  <data name="ReadOnlyFooter" xml:space="preserve"><value>読み取り専用のアーカイブ作業領域</value></data>
+  <data name="All" xml:space="preserve"><value>すべて</value></data>
+  <data name="FindInFile" xml:space="preserve"><value>ファイル内を検索</value></data>
+  <data name="FindPrevious" xml:space="preserve"><value>前を検索 (Shift+Enter)</value></data>
+  <data name="FindNext" xml:space="preserve"><value>次を検索 (Enter)</value></data>
+  <data name="ExportSelectedHint" xml:space="preserve"><value>選択したファイルをエクスポートします。単一の PAC モデルは GLB、OBJ、FBX、または元のアーカイブ形式で保存できます。</value></data>
+  <data name="ExportFamilyHint" xml:space="preserve"><value>選択したファイルを関連アセットと一緒に探してエクスポートします。</value></data>
+  <data name="ExportChoiceTitle" xml:space="preserve"><value>選択項目をエクスポート</value></data>
+  <data name="ExportChoiceHeading" xml:space="preserve"><value>エクスポートする内容を選択</value></data>
+  <data name="ExportChoiceIntro" xml:space="preserve"><value>選択した {0:N0} 件のファイルの出力構成を選んでください。</value></data>
+  <data name="ExportChoiceFilesOnlyTitle" xml:space="preserve"><value>ファイルのみ</value></data>
+  <data name="ExportChoiceFilesOnlyBody" xml:space="preserve"><value>アーカイブ内のフォルダー構成を再現せず、選択したファイルを出力先に直接書き出します。</value></data>
+  <data name="ExportChoiceStructureTitle" xml:space="preserve"><value>フォルダー構成をすべて再現</value></data>
+  <data name="ExportChoiceStructureBody" xml:space="preserve"><value>パッケージと仮想アーカイブパスを、アーカイブ閲覧での表示どおりに保持します。</value></data>
+  <data name="ExportChoiceFamilyTitle" xml:space="preserve"><value>関連アセットファミリー</value></data>
+  <data name="ExportChoiceFamilyBody" xml:space="preserve"><value>対象のファイルに加えて、関連するマテリアル、テクスチャ、記述子、その他の解決済みアセットを探してエクスポートします。</value></data>
+  <data name="ExportChoiceFormat" xml:space="preserve"><value>ファイル形式</value></data>
+  <data name="ExportChoiceOriginal" xml:space="preserve"><value>元のアーカイブ形式</value></data>
+  <data name="ExportChoiceGlb" xml:space="preserve"><value>glTF Binary (.glb)</value></data>
+  <data name="ExportChoiceObj" xml:space="preserve"><value>Wavefront OBJ (.obj)</value></data>
+  <data name="ExportChoiceFbx" xml:space="preserve"><value>Autodesk FBX (.fbx)</value></data>
+  <data name="ExportChoiceAction" xml:space="preserve"><value>続行</value></data>
+  <data name="SelectedModelExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx|元のアーカイブファイル (*{0})|*{0}</value></data>
+  <data name="Play" xml:space="preserve"><value>再生</value></data>
+  <data name="Pause" xml:space="preserve"><value>一時停止</value></data>
+  <data name="Stop" xml:space="preserve"><value>停止</value></data>
+  <data name="Clear" xml:space="preserve"><value>クリア</value></data>
+  <data name="None" xml:space="preserve"><value>なし</value></data>
+  <data name="ItemFinderTitle" xml:space="preserve"><value>アイテム検索</value></data>
+  <data name="ItemFinderNavigation" xml:space="preserve"><value>アイテム</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>復元された名称、インベントリアイコン、モデルのリンク、マテリアルの根拠</value></data>
+  <data name="ItemFinderIntro" xml:space="preserve"><value>CDMW Full と同じネイティブのアイテムカタログを閲覧できます。表示中のアイコンから先に読み込まれ、残りのインベントリサムネイルはバックグラウンドで用意され、永続キャッシュから再利用されます。</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>表示名、内部名、アイテム ID、カテゴリ、モデル、アイコンのパス、ローカライズ名、マテリアルタグで検索します</value></data>
+  <data name="ItemFinderButtonHint" xml:space="preserve"><value>永続的に先読みされたインベントリアイコン付きで、復元されたゲーム内アイテムを閲覧します。</value></data>
+  <data name="ItemFinderOpenArchive" xml:space="preserve"><value>アイテム検索を開く前にアーカイブを読み込んでください。</value></data>
+  <data name="ItemFinderReady" xml:space="preserve"><value>アイテム検索の準備ができました。</value></data>
+  <data name="ItemFinderLoading" xml:space="preserve"><value>アイテム検索を読み込んでいます...</value></data>
+  <data name="ItemFinderNoMatches" xml:space="preserve"><value>一致するアイテムはありません。</value></data>
+  <data name="ItemFinderPageSummary" xml:space="preserve"><value>一致した {2:N0} 件のアイテムのうち {0:N0}-{1:N0} 件を表示</value></data>
+  <data name="ItemFinderFailed" xml:space="preserve"><value>アイテム検索に失敗しました: {0}</value></data>
+  <data name="ItemFinderAllCategories" xml:space="preserve"><value>すべてのカテゴリ</value></data>
+  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>すべてのマテリアルタグ</value></data>
+  <data name="ItemFinderIconFailed" xml:space="preserve"><value>一部のインベントリアイコンを用意できませんでした: {0}</value></data>
+  <data name="ItemFinderIconWarmup" xml:space="preserve"><value>インベントリアイコンを先読み中: {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>インベントリアイコンの永続キャッシュを準備しています...</value></data>
+  <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>インベントリアイコンの永続キャッシュの準備完了: {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>モデルのリンク {0:N0} 件、アイコンのパス {1:N0} 件、バリアント {2:N0} 件</value></data>
+  <data name="ItemFinderEvidence" xml:space="preserve"><value>根拠</value></data>
+  <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>ローカライズ名</value></data>
+  <data name="ItemFinderMaterials" xml:space="preserve"><value>マテリアルタグ</value></data>
+  <data name="ItemFinderModels" xml:space="preserve"><value>リンクされたモデル</value></data>
+  <data name="ItemFinderIcons" xml:space="preserve"><value>インベントリアイコンのパス</value></data>
+  <data name="ItemFinderShowExact" xml:space="preserve"><value>完全一致のリンクを表示</value></data>
+  <data name="ItemFinderShowExactHint" xml:space="preserve"><value>アイテム検索を閉じ、直接復元されたモデルとアイコンのファイルだけをアーカイブ閲覧に表示します。</value></data>
+  <data name="ItemFinderShowRelated" xml:space="preserve"><value>関連セットを表示</value></data>
+  <data name="ItemFinderShowRelatedHint" xml:space="preserve"><value>アイテム検索を閉じ、直接のリンクに加えて、インデックス化されたマテリアル、テクスチャ、メタデータ、スケルトン、アニメーションも表示します。</value></data>
+  <data name="ItemFinderScopeLoading" xml:space="preserve"><value>アイテム検索のリンクを解決しています...</value></data>
+  <data name="ItemFinderExactScopeApplied" xml:space="preserve"><value>アイテム検索: {0} - 完全一致のリンクファイル {1:N0} 件</value></data>
+  <data name="ItemFinderRelatedScopeApplied" xml:space="preserve"><value>アイテム検索: {0} - 関連ファイル {1:N0} 件 (うち直接のリンク {2:N0} 件)</value></data>
+  <data name="ClearItemScope" xml:space="preserve"><value>アイテムセットをクリア</value></data>
+  <data name="MostCommonExtensions" xml:space="preserve"><value>よく使われる拡張子</value></data>
+  <data name="MostCommonExtensionsHint" xml:space="preserve"><value>有効なアーカイブまたはアイテム検索のセットで最もよく使われる拡張子を表示します。</value></data>
+</root>

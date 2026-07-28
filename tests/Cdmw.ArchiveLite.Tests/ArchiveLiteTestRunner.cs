@@ -27,7 +27,7 @@ internal static class ArchiveLiteTestRunner
         var tests = new (string Name, Func<Task> Run)[]
         {
             ("protocol serializes snake-case messages", TestProtocolAsync),
-            ("English, German, and Spanish resources have identical keys", TestLocalizationResourcesAsync),
+            ("every shipped language has complete, format-compatible resources", TestLocalizationResourcesAsync),
             ("compiled localization persists across later UI work", TestCompiledLocalizationAsync),
             ("read-only WPF text bindings are explicitly one-way", TestReadOnlyWpfBindingsAsync),
             ("fatal diagnostics are written to portable log and crash folders", TestFatalDiagnosticsAsync),
@@ -178,21 +178,88 @@ internal static class ArchiveLiteTestRunner
             "src",
             "Cdmw.ArchiveLite.App",
             "Resources");
-        var resources = new[] { "Strings.resx", "Strings.de.resx", "Strings.es.resx" }
-            .Select(filename => System.Xml.Linq.XDocument.Load(Path.Combine(resourceRoot, filename)))
-            .Select(document => document.Root!.Elements("data").ToDictionary(
-                element => (string)element.Attribute("name")!,
-                element => (string?)element.Element("value") ?? string.Empty,
-                StringComparer.Ordinal))
+        var neutral = ReadResource(Path.Combine(resourceRoot, "Strings.resx"));
+        var expectedKeys = neutral.Keys.Order(StringComparer.Ordinal).ToArray();
+
+        // The catalog is the single source of truth, so a language cannot ship a picker entry with no
+        // resource file, or a resource file the picker never offers.
+        var shippedCodes = LanguageCatalog.Languages
+            .Select(static language => language.Code)
+            .Where(static code => !string.Equals(code, "en", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
             .ToArray();
-        var expected = resources[0].Keys.Order(StringComparer.Ordinal).ToArray();
-        foreach (var resource in resources)
+        var presentCodes = Directory
+            .EnumerateFiles(resourceRoot, "Strings.*.resx")
+            .Select(static path => Path.GetFileNameWithoutExtension(path)["Strings.".Length..])
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Require(
+            presentCodes.SequenceEqual(shippedCodes, StringComparer.Ordinal),
+            $"shipped languages and resource files disagree: catalog has [{string.Join(", ", shippedCodes)}], disk has [{string.Join(", ", presentCodes)}]");
+
+        foreach (var code in shippedCodes)
         {
-            Require(resource.Keys.Order(StringComparer.Ordinal).SequenceEqual(expected), "localized resource keys do not match");
-            Require(resource.Values.All(static value => !string.IsNullOrWhiteSpace(value)), "localized resource contains an empty value");
+            var resource = ReadResource(Path.Combine(resourceRoot, $"Strings.{code}.resx"));
+            Require(resource.Count > 0, $"{code} resources are empty");
+            Require(
+                resource.Values.All(static value => !string.IsNullOrWhiteSpace(value)),
+                $"{code} resources contain an empty value");
+            Require(
+                resource.Keys.All(key => neutral.ContainsKey(key)),
+                $"{code} resources define a key the neutral resources do not have");
+
+            // A region file whose parent language also ships is an intentional delta: .NET falls back
+            // through the parent, so it only carries the strings that genuinely differ. Everything
+            // else must translate every key.
+            if (HasShippedParent(code))
+            {
+                Require(
+                    resource.Count < neutral.Count,
+                    $"{code} duplicates its parent language instead of overriding only what differs");
+            }
+            else
+            {
+                Require(
+                    resource.Keys.Order(StringComparer.Ordinal).SequenceEqual(expectedKeys, StringComparer.Ordinal),
+                    $"{code} resources do not cover every key");
+            }
+
+            // A translation that drops or invents a placeholder throws FormatException at runtime,
+            // and only on the code path that happens to use that string.
+            foreach (var (key, value) in resource)
+            {
+                Require(
+                    FormatPlaceholders(value).SetEquals(FormatPlaceholders(neutral[key])),
+                    $"{code} resource '{key}' does not use the same format placeholders as English");
+            }
         }
+
         return Task.CompletedTask;
     }
+
+    private static Dictionary<string, string> ReadResource(string path) =>
+        System.Xml.Linq.XDocument.Load(path).Root!.Elements("data").ToDictionary(
+            element => (string)element.Attribute("name")!,
+            element => (string?)element.Element("value") ?? string.Empty,
+            StringComparer.Ordinal);
+
+    private static bool HasShippedParent(string code)
+    {
+        var separator = code.IndexOf('-');
+        return separator > 0
+            && LanguageCatalog.Languages.Any(language =>
+                string.Equals(language.Code, code[..separator], StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Collects the argument indexes a format string consumes, ignoring alignment and format
+    /// specifiers so that a translation may localize <c>{0:N0}</c> spacing without tripping the check.
+    /// </summary>
+    private static HashSet<string> FormatPlaceholders(string value) =>
+        System.Text.RegularExpressions.Regex
+            .Matches(value, @"\{(\d+)(?:[,:][^}]*)?\}")
+            .Select(static match => match.Groups[1].Value)
+            .ToHashSet(StringComparer.Ordinal);
 
     private static Task TestCompiledLocalizationAsync()
     {
@@ -239,6 +306,42 @@ internal static class ArchiveLiteTestRunner
                     $"compiled {expectation.Language} resources drifted with a later async culture context");
             }
             Require(refreshCount >= expectations.Length, "live localized bindings were not refreshed for each culture change");
+
+            // Spot-checking three languages by hand does not prove the other eleven satellites were
+            // built and are reachable. A language whose resources silently fell back to English would
+            // still render a usable window, so assert the text actually changed.
+            LocalizationManager.ApplyCulture("en");
+            var english = LocalizationManager.Get("CacheChoiceTitle");
+            foreach (var language in LanguageCatalog.Languages)
+            {
+                LocalizationManager.ApplyCulture(language.Code);
+                var translated = LocalizationManager.Get("CacheChoiceTitle");
+                Require(
+                    !string.IsNullOrWhiteSpace(translated) && !translated.StartsWith('['),
+                    $"{language.Code} did not resolve a compiled resource");
+                Require(
+                    string.Equals(language.Code, "en", StringComparison.Ordinal)
+                        || !string.Equals(translated, english, StringComparison.Ordinal),
+                    $"{language.Code} fell back to the English resources");
+            }
+
+            // Regional and legacy culture names must land on a shipped language rather than reverting
+            // to English, so an existing settings file or a zh-CN machine keeps its wording.
+            var aliases = new[]
+            {
+                ("pt-PT", "pt-BR"),
+                ("zh-CN", "zh-Hans"),
+                ("zh-TW", "zh-Hant"),
+                ("es-MX", "es-419"),
+                ("fr-CA", "fr"),
+                ("nl-NL", "en"),
+            };
+            foreach (var (requested, expected) in aliases)
+            {
+                Require(
+                    string.Equals(LanguageCatalog.Resolve(requested).Code, expected, StringComparison.Ordinal),
+                    $"culture {requested} did not resolve to {expected}");
+            }
 
             var locExtensionSource = File.ReadAllText(Path.Combine(
                 FindRepositoryRoot(),

@@ -70,7 +70,7 @@
                         Orientation="Horizontal"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <ToggleButton x:Name="ArchiveBrowserNavigationButton"
-                              Width="136"
+                              MinWidth="136"
                               Padding="8,6"
                               IsChecked="True"
                               Style="{StaticResource WorkspaceNavigationButtonStyle}"
@@ -78,7 +78,7 @@
                               Content="{infra:Loc Key=ArchiveBrowserTab}"
                               Click="OnWorkspaceNavigationClick" />
                 <ToggleButton x:Name="TextSearchNavigationButton"
-                              Width="108"
+                              MinWidth="108"
                               Padding="8,6"
                               Margin="6,0,0,0"
                               Style="{StaticResource WorkspaceNavigationButtonStyle}"
@@ -86,7 +86,7 @@
                               Content="{infra:Loc Key=TextSearchTab}"
                               Click="OnWorkspaceNavigationClick" />
                 <Button x:Name="ItemFinderNavigationButton"
-                        Width="106"
+                        MinWidth="106"
                         Margin="6,0,0,0"
                         Padding="8,6"
                         Style="{StaticResource TopNavigationActionButtonStyle}"
@@ -99,7 +99,7 @@
                     Background="Transparent"
                     MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown" />
             <ComboBox Grid.Column="3"
-                      Width="126"
+                      MinWidth="126"
                       Margin="0,0,8,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=Theme}"
@@ -107,7 +107,7 @@
                       SelectedItem="{Binding SelectedTheme}"
                       shell:WindowChrome.IsHitTestVisibleInChrome="True" />
             <ComboBox Grid.Column="4"
-                      Width="126"
+                      MinWidth="126"
                       Margin="0,0,8,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=FontSize}"
@@ -115,7 +115,7 @@
                       SelectedItem="{Binding SelectedFontSize}"
                       shell:WindowChrome.IsHitTestVisibleInChrome="True" />
             <ComboBox Grid.Column="5"
-                      Width="140"
+                      MinWidth="140"
                       Margin="0,0,8,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=LayoutDensity}"
@@ -123,7 +123,7 @@
                       SelectedItem="{Binding SelectedLayoutDensity}"
                       shell:WindowChrome.IsHitTestVisibleInChrome="True" />
             <ComboBox Grid.Column="6"
-                      Width="110"
+                      MinWidth="110"
                       Margin="0,0,10,0"
                       Style="{StaticResource TopBarComboBoxStyle}"
                       ToolTip="{infra:Loc Key=Language}"
@@ -836,7 +836,7 @@
                                                                IsReadOnly="True"
                                                                ShowLineNumbers="True"
                                                                WordWrap="False"
-                                                               FontFamily="Consolas"
+                                                               FontFamily="{DynamicResource MonoFontFamily}"
                                                                 FontSize="{DynamicResource EditorFontSize}"
                                                                Background="{DynamicResource InputBackgroundBrush}"
                                                                Foreground="{DynamicResource TextBrush}"
