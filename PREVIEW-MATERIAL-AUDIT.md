@@ -22,6 +22,13 @@ run **1.174x their source saturation** and **0.986x their value**. Match the val
 never the saturation. Chasing the icons' saturation paints on a look the assets do
 not carry.
 
+**Channel layouts differ by shader family.** An `_sp` map does not mean the same
+thing everywhere. Equipment pins red at a constant 1.0 and carries roughness in
+green, metalness in blue. Hair carries only roughness. Skin uses red for
+subsurface and leaves blue saturated, so reading blue as metalness there makes
+every face fully metallic. Check what a channel holds for the family before
+decoding it.
+
 **Pair every render with an unlit one.** A lit/unlit pair on identical framing
 isolates the lighting stage from the albedo pipeline and is the only cheap way to
 tell "the source is dark" from "the renderer darkens it". Across 728 weapons and

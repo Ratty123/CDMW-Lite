@@ -555,6 +555,20 @@ static const NativePbdSidecarHint* best_native_pbd_hint_for_binding(
 // opaque and never carries data; nothing may read it.
 static std::string material_response_channel_layout(const std::string& shader_rule) {
     if (shader_rule == "hair") return "g=roughness";
+    // Skin packs its `_sp` differently and blue is not metal there. On equipment
+    // the red channel is a constant 1.0 filler and blue is metalness, varying by
+    // material -- cd_phm_03_handle_0004_sp measures B 0.005 and
+    // cd_phm_03_shield_0090_sp measures 0.877. A skin map does neither:
+    // cd_phm_00_head_0001_sp measures R 0.770, the subsurface term the skin
+    // shaders sample, and B 0.997 flat across the whole face.
+    //
+    // Read as metalness that says a face is 100% metal, which is what it did:
+    // 24 of 72 sampled heads classified metal rather than skin, and a metal
+    // classification takes the lower ambient floor and the cut diffuse, so the
+    // face rendered at 0.45 of the brightness its own albedo carries. Declaring
+    // only what the channel actually holds keeps the classifier, and the
+    // renderer, from reading a number that is not there.
+    if (shader_rule == "skin") return "g=roughness";
     return "g=roughness,b=metalness";
 }
 
