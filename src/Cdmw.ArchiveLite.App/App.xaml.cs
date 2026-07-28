@@ -91,6 +91,16 @@ public partial class App : Application
                     ValidateHiddenLayout(window, size, $"appearance {fontSize.Id}/{density.Id}");
                 }
             }
+            // The title row packs fixed chrome next to translated labels. German and Russian run long
+            // and CJK swaps in a different font stack, so sweep every shipped language at the
+            // narrowest supported width rather than trusting that English fits for all of them.
+            UiPreferencesManager.Apply("small", "compact");
+            foreach (var language in LanguageCatalog.Languages)
+            {
+                LocalizationManager.ApplyCulture(language.Code);
+                ValidateHiddenLayout(window, new Size(1200, 720), $"language {language.Code}");
+            }
+            LocalizationManager.ApplyCulture("en");
             await _worker.ShutdownAsync().ConfigureAwait(true);
             Shutdown(0);
         }

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Latin-American Spanish is a delta over Strings.es.resx, not a copy of it. .NET resource
+    fallback walks es-419 to es to neutral, so this file carries only the strings that genuinely
+    differ from Iberian Spanish: "video" without the accent, tuteo in place of the usted
+    imperatives, and the regional verb and preposition choices. Every other string is inherited,
+    which is why the parity test allows a region file to be a subset of its parent.
+  -->
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="RoleVideo" xml:space="preserve"><value>Video</value></data>
+  <data name="AssociatedCategoryAudioVideo" xml:space="preserve"><value>Audio / video</value></data>
+  <data name="ExtensionGroupAudioVideo" xml:space="preserve"><value>Audio / Video</value></data>
+  <data name="Browse" xml:space="preserve"><value>Explorar…</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>Resuelve y muestra las texturas del modelo cuando se necesitan. Déjala sin marcar para seleccionar PAC con mayor rapidez.</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>Controles de cámara .NET/Vortice: arrastra con el botón izquierdo para orbitar; con el central, el derecho o Mayús+izquierdo para desplazar; la rueda acerca o aleja.</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>Elige el color que se dibuja detrás de la vista previa. Las texturas oscuras se leen mejor sobre un fondo claro y las claras sobre uno oscuro; el magenta revela los píxeles transparentes.</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>Color hexadecimal como #204060. Solo se usa cuando eliges "Personalizado".</value></data>
+  <data name="AssociatedAssetsSelectFile" xml:space="preserve"><value>Selecciona un archivo para buscar sus recursos relacionados.</value></data>
+  <data name="AssociatedAssetsNotLoaded" xml:space="preserve"><value>Haz clic en Buscar recursos para revisar las referencias y los archivos de la misma familia.</value></data>
+  <data name="PreviewEmpty" xml:space="preserve"><value>Selecciona un archivo para verlo en la vista previa.</value></data>
+  <data name="RendererUnknownError" xml:space="preserve"><value>El visor .NET informó un error desconocido.</value></data>
+  <data name="EnterToSearch" xml:space="preserve"><value>Presiona Enter para buscar</value></data>
+  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>Crea un índice temporal de la lista del archivo para esta sesión. No se agrega a la caché de índices reutilizable y se elimina al cerrar Archive Lite, así que Cargar o Actualizar volverá a examinar la próxima vez.</value></data>
+  <data name="CacheChoiceTimeNotice" xml:space="preserve"><value>El primer examen puede demorar varios minutos en instalaciones grandes. Los archivos de origen permanecen en modo de solo lectura.</value></data>
+  <data name="ItemFinderIntro" xml:space="preserve"><value>Explora el mismo catálogo nativo de objetos que CDMW Full. Los iconos visibles se cargan primero; las demás miniaturas se preparan en segundo plano y se reutilizan desde la caché persistente.</value></data>
+  <data name="ItemFinderNoMatches" xml:space="preserve"><value>No hay objetos que coincidan.</value></data>
+  <data name="ItemFinderPageSummary" xml:space="preserve"><value>Mostrando {0:N0}-{1:N0} de {2:N0} objetos que coinciden</value></data>
+  <data name="MostCommonExtensionsHint" xml:space="preserve"><value>Muestra las extensiones más comunes del archivo activo o del conjunto de Item Finder.</value></data>
+</root>

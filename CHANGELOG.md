@@ -4,7 +4,20 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- The language picker now offers all fourteen interface languages Crimson Desert itself ships, up from three: English, French, Italian, German, Spanish, Latin-American Spanish, Brazilian Portuguese, Polish, Russian, Turkish, Japanese, Korean, Simplified Chinese and Traditional Chinese. The picker sits where it always has, beside Theme and Font size, and still switches live without a restart. None of the fourteen are right-to-left, so the shell needs no bidirectional layout. Translations are complete but have not been reviewed by native speakers; the terminology is technical and worth a pass before release.
+
+### Changed
+
+- The shipped languages are now declared once, in `LanguageCatalog`, which the picker, the culture resolver, the font stacks and the resource-parity test all read. A language can no longer be half-added — a picker entry with no resource file, or a file the picker never offers, fails the test.
+- The shell's font is now chosen per language rather than hardcoded to Segoe UI, which carries no CJK glyphs. Japanese, Korean and both Chinese locales name their own fallback stack, so a run of text keeps one face instead of being substituted glyph by glyph at inconsistent metrics. The same applies to the Consolas text and hex panes, whose content can itself be CJK.
+- The stored language is now resolved through the catalog, so a regional or legacy culture name lands on the language that covers it — `pt-PT` on Brazilian Portuguese, `zh-CN` on Simplified, `es-MX` on Latin-American Spanish — instead of silently reverting to English.
+- Title-row controls size to their content instead of to fixed pixel widths. The workspace buttons and the four dropdowns were sized for English, and Russian, Polish and German labels would have been clipped inside them.
+
 ### Fixed
+
+- Sixteen Spanish strings had their accents stripped — `instalacion`, `indice`, `sesion`, `anade`, `Mayus`, and the cache-status badges — and now read correctly.
 
 - Faces are no longer classified as metal. Skin packs its `_sp` map differently from equipment: on a shield or a blade the red channel is a constant 1.0 filler and blue is metalness, but a skin map puts the subsurface term in red and leaves blue saturated — `cd_phm_00_head_0001_sp` measures R 0.770 and B 0.997 flat across the whole face. Read as metalness that made every face 100% metal, and 24 of 72 sampled heads classified metal rather than skin. A metal classification takes the lower ambient floor and the cut diffuse, so a face rendered at 0.45 of the brightness its own albedo carries, grey and waxy. The declared channel layout for a skin surface map now says only what the channel holds, as it already did for hair. Across 1,195 assets the share rendering below half their albedo falls from 1.51% to 0.08%, heads recover from 0.958 to 0.999 of their albedo, and nothing renders worse.
 - Metal detail on a part that is not classified as metal no longer loses its light. Where the source supplies a metal map the diffuse term is cut, because a conductor has no diffuse lobe, and the reflection about the reflection vector is meant to replace it. The cut was conditioned on the map and the replacement on the material category, so a part carrying real metalness that classified as something else — a metal boss on a leather shield, studs read as generic — gave up its diffuse and got nothing back. Measured over 1,200 assets against their own unlit albedo, 35% of that group rendered below half the brightness their albedo carries, against 0% for metal that is also classified metal. Both sides now answer to the same condition, weighted by the metal fraction itself, so a mostly-cloth part only takes the reflection where its map says metal. Corpus-wide this halves the share of assets rendering below half their albedo from 4% to 2%; a teal planked shield recovers from 0.20 to 0.84 of its albedo, a woven straw hat from 0.18 to 0.65.

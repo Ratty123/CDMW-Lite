@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ProductName" xml:space="preserve"><value>CDMW Archive Lite</value></data>
+  <data name="ArchiveBrowserTab" xml:space="preserve"><value>封存瀏覽器</value></data>
+  <data name="TextSearchTab" xml:space="preserve"><value>文字搜尋</value></data>
+  <data name="ArchiveRoot" xml:space="preserve"><value>封存根目錄</value></data>
+  <data name="Browse" xml:space="preserve"><value>瀏覽…</value></data>
+  <data name="OpenArchive" xml:space="preserve"><value>開啟封存</value></data>
+  <data name="Refresh" xml:space="preserve"><value>重新整理</value></data>
+  <data name="Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="Filters" xml:space="preserve"><value>篩選</value></data>
+  <data name="PathFilter" xml:space="preserve"><value>路徑包含</value></data>
+  <data name="ExtensionFilter" xml:space="preserve"><value>副檔名</value></data>
+  <data name="PackageFilter" xml:space="preserve"><value>封包</value></data>
+  <data name="RoleFilter" xml:space="preserve"><value>用途</value></data>
+  <data name="MinimumSize" xml:space="preserve"><value>最小大小</value></data>
+  <data name="PreviewableOnly" xml:space="preserve"><value>僅可預覽項目</value></data>
+  <data name="ViewMode" xml:space="preserve"><value>檢視</value></data>
+  <data name="ReadOnlyTools" xml:space="preserve"><value>匯出選項</value></data>
+  <data name="ReadOnlyCaption" xml:space="preserve"><value>封存來源以唯讀方式開啟，絕不會被修改。</value></data>
+  <data name="ReadOnlyBadge" xml:space="preserve"><value>唯讀</value></data>
+  <data name="ItemFinder" xml:space="preserve"><value>物品搜尋器</value></data>
+  <data name="MaterialFinder" xml:space="preserve"><value>材質搜尋器</value></data>
+  <data name="AssetFamily" xml:space="preserve"><value>資產系列</value></data>
+  <data name="AssociatedAssets" xml:space="preserve"><value>關聯資產</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>顯示貼圖</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>依需求解析並顯示模型貼圖。若想以最快速度選擇 PAC，請保持不勾選。</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>預覽設定</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>攝影機操作</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>.NET/Vortice 攝影機操作：左鍵拖曳環繞；中鍵、右鍵或 Shift+左鍵拖曳平移；滾輪縮放。</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>環繞靈敏度</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>平移靈敏度</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>反轉環繞 X</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>反轉環繞 Y</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>反轉平移 X</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>反轉平移 Y</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>這些設定只會改變預覽的瀏覽方式，絕不會編輯或匯出資產。</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>重設攝影機操作</value></data>
+  <data name="PreviewAppearance" xml:space="preserve"><value>外觀</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>選擇繪製在預覽後方的顏色。深色貼圖在淺色背景上較易辨識，淺色貼圖則適合深色背景；洋紅色可顯露透明像素。</value></data>
+  <data name="PreviewBackground" xml:space="preserve"><value>背景</value></data>
+  <data name="PreviewBackgroundTheme" xml:space="preserve"><value>佈景主題預設</value></data>
+  <data name="PreviewBackgroundBlack" xml:space="preserve"><value>黑色</value></data>
+  <data name="PreviewBackgroundCharcoal" xml:space="preserve"><value>炭灰</value></data>
+  <data name="PreviewBackgroundMidGray" xml:space="preserve"><value>中灰</value></data>
+  <data name="PreviewBackgroundLightGray" xml:space="preserve"><value>淺灰</value></data>
+  <data name="PreviewBackgroundWhite" xml:space="preserve"><value>白色</value></data>
+  <data name="PreviewBackgroundMagenta" xml:space="preserve"><value>洋紅</value></data>
+  <data name="PreviewBackgroundCustom" xml:space="preserve"><value>自訂</value></data>
+  <data name="PreviewBackgroundCustomColor" xml:space="preserve"><value>自訂顏色</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>十六進位顏色，例如 #204060。僅在選擇「自訂」時生效。</value></data>
+  <data name="PreviewBackgroundHint" xml:space="preserve"><value>背景適用於貼圖與模型預覽，絕不會改變資產或由其匯出的任何內容。</value></data>
+  <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>關聯資產（{0:N0}）</value></data>
+  <data name="FindAssociatedAssets" xml:space="preserve"><value>尋找資產</value></data>
+  <data name="ShowAssociatedAsset" xml:space="preserve"><value>在瀏覽器中顯示</value></data>
+  <data name="AssociatedAssetsSelectFile" xml:space="preserve"><value>請選擇一個檔案以尋找其相關資產。</value></data>
+  <data name="AssociatedAssetsNotLoaded" xml:space="preserve"><value>按一下「尋找資產」即可檢視封存中的參照與同系列檔案。</value></data>
+  <data name="AssociatedAssetsSearching" xml:space="preserve"><value>正在尋找關聯資產...</value></data>
+  <data name="AssociatedAssetsScanningProgress" xml:space="preserve"><value>正在掃描封存名稱：{0:N0} / {1:N0}</value></data>
+  <data name="AssociatedAssetsFound" xml:space="preserve"><value>找到 {0:N0} 個關聯資產。</value></data>
+  <data name="AssociatedAssetsFoundTruncated" xml:space="preserve"><value>正在顯示前 {0:N0} 個關聯資產。</value></data>
+  <data name="AssociatedAssetsNone" xml:space="preserve"><value>找不到關聯資產。</value></data>
+  <data name="AssociatedAssetsFailed" xml:space="preserve"><value>關聯資產搜尋失敗：{0}</value></data>
+  <data name="AssociatedAssetNotLocated" xml:space="preserve"><value>該關聯資產已不在目前的封存檢視中。</value></data>
+  <data name="AssociatedCategoryModel" xml:space="preserve"><value>模型</value></data>
+  <data name="AssociatedCategoryMaterial" xml:space="preserve"><value>材質</value></data>
+  <data name="AssociatedCategoryTexture" xml:space="preserve"><value>貼圖</value></data>
+  <data name="AssociatedCategoryPhysics" xml:space="preserve"><value>物理</value></data>
+  <data name="AssociatedCategoryMeshMetadata" xml:space="preserve"><value>網格中繼資料</value></data>
+  <data name="AssociatedCategoryPrefabMetadata" xml:space="preserve"><value>預製物件 / 中繼資料</value></data>
+  <data name="AssociatedCategorySkeletonRig" xml:space="preserve"><value>骨架 / 綁定</value></data>
+  <data name="AssociatedCategoryAnimationMotion" xml:space="preserve"><value>動畫 / 動作</value></data>
+  <data name="AssociatedCategoryAudioVideo" xml:space="preserve"><value>音訊 / 影片</value></data>
+  <data name="AssociatedCategoryUserInterface" xml:space="preserve"><value>使用者介面</value></data>
+  <data name="AssociatedCategoryOther" xml:space="preserve"><value>其他</value></data>
+  <data name="AssociationEvidenceExplicitReference" xml:space="preserve"><value>明確參照</value></data>
+  <data name="AssociationEvidenceExactCompanion" xml:space="preserve"><value>預期的搭配檔案</value></data>
+  <data name="AssociationEvidenceSameStem" xml:space="preserve"><value>同名系列</value></data>
+  <data name="AssociationEvidenceCachedFamily" xml:space="preserve"><value>已解析的系列</value></data>
+  <data name="AssociationReasonExplicitReference" xml:space="preserve"><value>由 {0} 參照。</value></data>
+  <data name="AssociationReasonExactCompanion" xml:space="preserve"><value>{0} 的預期搭配檔案。</value></data>
+  <data name="AssociationReasonSameStem" xml:space="preserve"><value>與 {0} 共用同一資產系列名稱。</value></data>
+  <data name="AssociationReasonCachedFamily" xml:space="preserve"><value>與 {0} 解析為同一資產系列。</value></data>
+  <data name="ExportMesh" xml:space="preserve"><value>匯出網格...</value></data>
+  <data name="ExportMeshHint" xml:space="preserve"><value>將選取的 PAC/PAM 網格匯出，供 Blender 或其他 3D 工具使用。</value></data>
+  <data name="MeshExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx</value></data>
+  <data name="MeshExportUnsupportedExtension" xml:space="preserve"><value>請選擇 .glb、.obj 或 .fbx 輸出檔案。</value></data>
+  <data name="ExportSelected" xml:space="preserve"><value>匯出選取項目</value></data>
+  <data name="ExportFolder" xml:space="preserve"><value>匯出資料夾</value></data>
+  <data name="ExportFiltered" xml:space="preserve"><value>匯出篩選結果</value></data>
+  <data name="ExportAssociatedSelected" xml:space="preserve"><value>匯出選取的資產</value></data>
+  <data name="ExportAssociatedFamily" xml:space="preserve"><value>匯出資產系列</value></data>
+  <data name="Path" xml:space="preserve"><value>路徑</value></data>
+  <data name="Name" xml:space="preserve"><value>名稱</value></data>
+  <data name="KnownName" xml:space="preserve"><value>已知名稱</value></data>
+  <data name="NameEvidence" xml:space="preserve"><value>名稱依據</value></data>
+  <data name="Extension" xml:space="preserve"><value>副檔名</value></data>
+  <data name="Type" xml:space="preserve"><value>類型</value></data>
+  <data name="FileType" xml:space="preserve"><value>檔案類型</value></data>
+  <data name="Usage" xml:space="preserve"><value>用途</value></data>
+  <data name="Size" xml:space="preserve"><value>大小</value></data>
+  <data name="StoredSize" xml:space="preserve"><value>儲存大小</value></data>
+  <data name="Compression" xml:space="preserve"><value>壓縮</value></data>
+  <data name="Package" xml:space="preserve"><value>封包</value></data>
+  <data name="Columns" xml:space="preserve"><value>欄</value></data>
+  <data name="ChooseColumns" xml:space="preserve"><value>選擇顯示的欄</value></data>
+  <data name="ShowAllColumns" xml:space="preserve"><value>顯示所有欄</value></data>
+  <data name="Preview" xml:space="preserve"><value>預覽</value></data>
+  <data name="PreviewEmpty" xml:space="preserve"><value>請選擇一個檔案以進行預覽。</value></data>
+  <data name="SearchSource" xml:space="preserve"><value>搜尋來源</value></data>
+  <data name="Archive" xml:space="preserve"><value>封存</value></data>
+  <data name="LooseFolder" xml:space="preserve"><value>一般資料夾</value></data>
+  <data name="Query" xml:space="preserve"><value>查詢</value></data>
+  <data name="RegularExpression" xml:space="preserve"><value>規則運算式</value></data>
+  <data name="CaseSensitive" xml:space="preserve"><value>區分大小寫</value></data>
+  <data name="Extensions" xml:space="preserve"><value>副檔名</value></data>
+  <data name="Search" xml:space="preserve"><value>搜尋</value></data>
+  <data name="ExportResults" xml:space="preserve"><value>匯出結果</value></data>
+  <data name="Matches" xml:space="preserve"><value>相符項目</value></data>
+  <data name="Line" xml:space="preserve"><value>行</value></data>
+  <data name="Context" xml:space="preserve"><value>上下文</value></data>
+  <data name="Ready" xml:space="preserve"><value>就緒</value></data>
+  <data name="ConnectingWorker" xml:space="preserve"><value>正在連線至唯讀工作處理程序…</value></data>
+  <data name="WorkerConnected" xml:space="preserve"><value>唯讀工作處理程序已連線（通訊協定 {0}）。</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>無法啟動 CDMW Archive Lite</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>無法啟動唯讀應用程式。\n\n{0}</value></data>
+  <data name="Closing" xml:space="preserve"><value>正在停止背景工作…</value></data>
+  <data name="FoldersView" xml:space="preserve"><value>資料夾</value></data>
+  <data name="CategoriesView" xml:space="preserve"><value>分類</value></data>
+  <data name="CategoriesFoldersView" xml:space="preserve"><value>分類 + 資料夾</value></data>
+  <data name="FlatView" xml:space="preserve"><value>平面</value></data>
+  <data name="FolderFilter" xml:space="preserve"><value>資料夾</value></data>
+  <data name="SortBy" xml:space="preserve"><value>排序方式</value></data>
+  <data name="Descending" xml:space="preserve"><value>遞減</value></data>
+  <data name="Folders" xml:space="preserve"><value>資料夾</value></data>
+  <data name="Categories" xml:space="preserve"><value>分類</value></data>
+  <data name="PreviousPage" xml:space="preserve"><value>上一頁</value></data>
+  <data name="NextPage" xml:space="preserve"><value>下一頁</value></data>
+  <data name="Metadata" xml:space="preserve"><value>中繼資料</value></data>
+  <data name="Language" xml:space="preserve"><value>語言</value></data>
+  <data name="Theme" xml:space="preserve"><value>佈景主題</value></data>
+  <data name="ThemeGraphite" xml:space="preserve"><value>石墨</value></data>
+  <data name="ThemeMidnight" xml:space="preserve"><value>午夜</value></data>
+  <data name="ThemeNord" xml:space="preserve"><value>北歐</value></data>
+  <data name="ThemeEmber" xml:space="preserve"><value>餘燼</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>淺色</value></data>
+  <data name="ThemeFrost" xml:space="preserve"><value>霜白</value></data>
+  <data name="ThemeApplied" xml:space="preserve"><value>已套用佈景主題。</value></data>
+  <data name="FontSize" xml:space="preserve"><value>字型大小</value></data>
+  <data name="FontSizeSmall" xml:space="preserve"><value>小</value></data>
+  <data name="FontSizeMedium" xml:space="preserve"><value>中</value></data>
+  <data name="FontSizeLarge" xml:space="preserve"><value>大</value></data>
+  <data name="FontSizeExtraLarge" xml:space="preserve"><value>特大</value></data>
+  <data name="FontSizeApplied" xml:space="preserve"><value>已套用字型大小。</value></data>
+  <data name="LayoutDensity" xml:space="preserve"><value>版面密度</value></data>
+  <data name="LayoutCompact" xml:space="preserve"><value>緊湊</value></data>
+  <data name="LayoutComfortable" xml:space="preserve"><value>適中</value></data>
+  <data name="LayoutSpacious" xml:space="preserve"><value>寬鬆</value></data>
+  <data name="LayoutApplied" xml:space="preserve"><value>已套用版面密度。</value></data>
+  <data name="LanguageApplied" xml:space="preserve"><value>已套用語言。</value></data>
+  <data name="CollisionPolicy" xml:space="preserve"><value>當檔案已存在時</value></data>
+  <data name="ManifestFormat" xml:space="preserve"><value>資訊清單格式</value></data>
+  <data name="RoleOther" xml:space="preserve"><value>其他</value></data>
+  <data name="RoleModel" xml:space="preserve"><value>模型</value></data>
+  <data name="RoleAnimation" xml:space="preserve"><value>動畫</value></data>
+  <data name="RolePhysics" xml:space="preserve"><value>物理</value></data>
+  <data name="RoleMetadata" xml:space="preserve"><value>中繼資料</value></data>
+  <data name="RoleVideo" xml:space="preserve"><value>影片</value></data>
+  <data name="RoleAudio" xml:space="preserve"><value>音訊</value></data>
+  <data name="RoleUserInterface" xml:space="preserve"><value>使用者介面</value></data>
+  <data name="RoleImpostor" xml:space="preserve"><value>替代面片</value></data>
+  <data name="RoleNormal" xml:space="preserve"><value>法線貼圖</value></data>
+  <data name="RoleMaterial" xml:space="preserve"><value>材質</value></data>
+  <data name="RoleImage" xml:space="preserve"><value>影像</value></data>
+  <data name="RoleText" xml:space="preserve"><value>文字</value></data>
+  <data name="FileTypeOther" xml:space="preserve"><value>其他</value></data>
+  <data name="FileTypeModel" xml:space="preserve"><value>模型</value></data>
+  <data name="FileTypeAnimation" xml:space="preserve"><value>動畫</value></data>
+  <data name="FileTypePhysics" xml:space="preserve"><value>物理</value></data>
+  <data name="FileTypeMetadata" xml:space="preserve"><value>中繼資料</value></data>
+  <data name="FileTypeVideo" xml:space="preserve"><value>影片</value></data>
+  <data name="FileTypeAudio" xml:space="preserve"><value>音訊</value></data>
+  <data name="FileTypeUserInterface" xml:space="preserve"><value>使用者介面</value></data>
+  <data name="FileTypeTexture" xml:space="preserve"><value>貼圖</value></data>
+  <data name="FileTypeImage" xml:space="preserve"><value>影像</value></data>
+  <data name="FileTypeText" xml:space="preserve"><value>文字</value></data>
+  <data name="TextureUsageUnknown" xml:space="preserve"><value>未知</value></data>
+  <data name="TextureUsageColor" xml:space="preserve"><value>顏色</value></data>
+  <data name="TextureUsageNormalMap" xml:space="preserve"><value>法線貼圖</value></data>
+  <data name="TextureUsageMaterialMap" xml:space="preserve"><value>材質貼圖</value></data>
+  <data name="SortPath" xml:space="preserve"><value>路徑</value></data>
+  <data name="SortName" xml:space="preserve"><value>名稱</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>已知名稱</value></data>
+  <data name="SortNameEvidence" xml:space="preserve"><value>名稱依據</value></data>
+  <data name="SortExtension" xml:space="preserve"><value>副檔名</value></data>
+  <data name="SortPackage" xml:space="preserve"><value>封包</value></data>
+  <data name="SortOriginalSize" xml:space="preserve"><value>原始大小</value></data>
+  <data name="SortStoredSize" xml:space="preserve"><value>儲存大小</value></data>
+  <data name="SortCompression" xml:space="preserve"><value>壓縮</value></data>
+  <data name="SortRole" xml:space="preserve"><value>用途</value></data>
+  <data name="SortFileType" xml:space="preserve"><value>檔案類型</value></data>
+  <data name="SortTextureUsage" xml:space="preserve"><value>貼圖用途</value></data>
+  <data name="CollisionSkip" xml:space="preserve"><value>略過</value></data>
+  <data name="CollisionOverwrite" xml:space="preserve"><value>覆寫</value></data>
+  <data name="CollisionCancel" xml:space="preserve"><value>取消匯出</value></data>
+  <data name="ManifestNone" xml:space="preserve"><value>無</value></data>
+  <data name="ManifestJson" xml:space="preserve"><value>JSON</value></data>
+  <data name="ManifestCsv" xml:space="preserve"><value>CSV</value></data>
+  <data name="ManifestText" xml:space="preserve"><value>文字</value></data>
+  <data name="EntriesCount" xml:space="preserve"><value>{0:N0} 個項目</value></data>
+  <data name="OpeningArchive" xml:space="preserve"><value>正在開啟 {0}…</value></data>
+  <data name="OpenedEntries" xml:space="preserve"><value>已開啟 {0:N0} 個封存項目。</value></data>
+  <data name="ShowingEntries" xml:space="preserve"><value>正在顯示 {0} 個封存項目。</value></data>
+  <data name="ExportSummary" xml:space="preserve"><value>已匯出 {0:N0} 個；略過 {1:N0} 個；失敗 {2:N0} 個。</value></data>
+  <data name="SearchSummary" xml:space="preserve"><value>在 {1:N0} 個檔案中找到 {0:N0} 處相符。</value></data>
+  <data name="SearchExportSummary" xml:space="preserve"><value>已匯出 {0:N0} 個搜尋結果檔案。</value></data>
+  <data name="OpenArchiveFirst" xml:space="preserve"><value>使用封存瀏覽器中目前開啟的封存。</value></data>
+  <data name="ProgressDiscovering" xml:space="preserve"><value>正在尋找封存檔案...</value></data>
+  <data name="ProgressFingerprinting" xml:space="preserve"><value>正在驗證封存的一致性...</value></data>
+  <data name="ProgressOpeningIndex" xml:space="preserve"><value>正在開啟快取的索引...</value></data>
+  <data name="ProgressBuildingIndex" xml:space="preserve"><value>正在建立封存索引...</value></data>
+  <data name="ProgressParsingPackages" xml:space="preserve"><value>正在讀取封存目錄...</value></data>
+  <data name="ProgressSortingIndex" xml:space="preserve"><value>正在排序封存項目...</value></data>
+  <data name="ProgressWritingIndex" xml:space="preserve"><value>正在寫入封存索引...</value></data>
+  <data name="ProgressPublishingIndex" xml:space="preserve"><value>正在發佈封存索引...</value></data>
+  <data name="ProgressValidating" xml:space="preserve"><value>正在檢查封包參照...</value></data>
+  <data name="ProgressLoadingEntries" xml:space="preserve"><value>正在載入項目...</value></data>
+  <data name="ProgressExporting" xml:space="preserve"><value>正在匯出...</value></data>
+  <data name="ProgressPreparingMesh" xml:space="preserve"><value>正在準備網格資料...</value></data>
+  <data name="ProgressWritingMesh" xml:space="preserve"><value>正在寫入網格檔案...</value></data>
+  <data name="ProgressFinishing" xml:space="preserve"><value>正在收尾...</value></data>
+  <data name="ProgressWorking" xml:space="preserve"><value>正在處理...</value></data>
+  <data name="PreviewProgressPreparing" xml:space="preserve"><value>正在準備預覽...</value></data>
+  <data name="PreviewProgressNative" xml:space="preserve"><value>正在準備原生 PAC 幾何...</value></data>
+  <data name="PreviewProgressAdapting" xml:space="preserve"><value>正在準備唯讀的 .NET 場景...</value></data>
+  <data name="PreviewProgressDecodingTexture" xml:space="preserve"><value>正在解碼貼圖... 已用 {0} 秒 / 共 {1} 秒</value></data>
+  <data name="RendererStarting" xml:space="preserve"><value>正在啟動 .NET/Vortice 預覽器...</value></data>
+  <data name="RendererLoading" xml:space="preserve"><value>正在載入網格並繪製第一個影格...</value></data>
+  <data name="RendererReady" xml:space="preserve"><value>.NET/Vortice 預覽已就緒。</value></data>
+  <data name="RendererFailed" xml:space="preserve"><value>.NET 預覽無法使用：{0}</value></data>
+  <data name="RendererUnknownError" xml:space="preserve"><value>.NET 預覽器回報了未知錯誤。</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>所有檔案</value></data>
+  <data name="ExtensionGroupAll" xml:space="preserve"><value>全部</value></data>
+  <data name="ExtensionGroupModelMeshPhysics" xml:space="preserve"><value>模型 / 網格 / 物理</value></data>
+  <data name="ExtensionGroupTextureImage" xml:space="preserve"><value>貼圖 / 影像</value></data>
+  <data name="ExtensionGroupMaterialMetadata" xml:space="preserve"><value>材質 / 中繼資料</value></data>
+  <data name="ExtensionGroupAnimationScene" xml:space="preserve"><value>動畫 / 場景</value></data>
+  <data name="ExtensionGroupAudioVideo" xml:space="preserve"><value>音訊 / 影片</value></data>
+  <data name="ExtensionGroupUserInterfaceText" xml:space="preserve"><value>介面 / 文字</value></data>
+  <data name="ExtensionGroupOther" xml:space="preserve"><value>其他</value></data>
+  <data name="ExtensionCatalogLoading" xml:space="preserve"><value>正在載入分類副檔名...</value></data>
+  <data name="ExtensionCatalogProgress" xml:space="preserve"><value>正在索引副檔名：{0:N0} / {1:N0}</value></data>
+  <data name="NameIndexLoading" xml:space="preserve"><value>正在載入已知的遊戲內名稱與物品搜尋器目錄...</value></data>
+  <data name="NameIndexScanProgress" xml:space="preserve"><value>正在索引名稱來源：{0:N0} / {1:N0}</value></data>
+  <data name="NameIndexExtracting" xml:space="preserve"><value>正在讀取名稱來源：{0}</value></data>
+  <data name="NameIndexResolving" xml:space="preserve"><value>正在解析已知名稱與相關線索...</value></data>
+  <data name="NameIndexPublishing" xml:space="preserve"><value>正在儲存名稱索引...</value></data>
+  <data name="NameIndexReady" xml:space="preserve"><value>目錄已就緒：精確名稱 {0:N0} 筆，相關線索 {1:N0} 筆，物品搜尋器資料 {2:N0} 列</value></data>
+  <data name="NameIndexUnavailable" xml:space="preserve"><value>此封存沒有可用的已知遊戲內名稱。</value></data>
+  <data name="NameIndexFailed" xml:space="preserve"><value>名稱索引無法使用：{0}</value></data>
+  <data name="ProductSubtitle" xml:space="preserve"><value>瀏覽、預覽、搜尋與匯出</value></data>
+  <data name="ReadOnlyPill" xml:space="preserve"><value>唯讀工作區</value></data>
+  <data name="DetectGame" xml:space="preserve"><value>偵測遊戲</value></data>
+  <data name="DetectingGame" xml:space="preserve"><value>正在偵測 Crimson Desert 的安裝位置...</value></data>
+  <data name="GameDetected" xml:space="preserve"><value>已偵測到遊戲資料夾：{0}</value></data>
+  <data name="GameNotFound" xml:space="preserve"><value>未能自動找到 Crimson Desert。請選擇遊戲資料夾。</value></data>
+  <data name="GameFolderReady" xml:space="preserve"><value>已選擇的遊戲資料夾：{0}</value></data>
+  <data name="CacheNotChecked" xml:space="preserve"><value>快取未驗證</value></data>
+  <data name="CacheChecking" xml:space="preserve"><value>正在驗證快取</value></data>
+  <data name="CacheCurrent" xml:space="preserve"><value>快取為最新</value></data>
+  <data name="CacheSessionOnly" xml:space="preserve"><value>僅限本次工作階段</value></data>
+  <data name="CacheMissing" xml:space="preserve"><value>缺少快取</value></data>
+  <data name="CacheStale" xml:space="preserve"><value>快取已過期</value></data>
+  <data name="CacheRefreshRecommended" xml:space="preserve"><value>遊戲封存檔案已變更。請使用「重新整理」重建快取。</value></data>
+  <data name="CacheInvalid" xml:space="preserve"><value>資料夾無效</value></data>
+  <data name="CacheReused" xml:space="preserve"><value>已重複使用經驗證的封存索引。</value></data>
+  <data name="CacheRebuilt" xml:space="preserve"><value>封存索引已重建，其快取中繼資料為最新。</value></data>
+  <data name="CacheSessionOnlyLoaded" xml:space="preserve"><value>已為本次工作階段重新索引該封存。未建立或變更任何持續性封存索引。</value></data>
+  <data name="CacheChoiceTitle" xml:space="preserve"><value>載入封存</value></data>
+  <data name="CacheChoiceHeading" xml:space="preserve"><value>選擇載入封存的方式</value></data>
+  <data name="CacheChoiceIntro" xml:space="preserve"><value>Archive Lite 需要一份遊戲檔案的索引。請選擇該索引要能重複使用，或只在本次工作階段中有效。</value></data>
+  <data name="CacheChoiceSourceLabel" xml:space="preserve"><value>資料夾</value></data>
+  <data name="CacheChoiceRecommended" xml:space="preserve"><value>建議</value></data>
+  <data name="CacheChoicePersistentTitle" xml:space="preserve"><value>使用持續性快取</value></data>
+  <data name="CacheChoicePersistentBody" xml:space="preserve"><value>盡可能重複使用經驗證的索引。若索引不存在或已過期，Archive Lite 會建立並儲存在本機，使日後載入快上許多。這會占用一些本機磁碟空間。</value></data>
+  <data name="CacheChoicePersistentRefreshTitle" xml:space="preserve"><value>重建持續性快取</value></data>
+  <data name="CacheChoicePersistentRefreshBody" xml:space="preserve"><value>重新掃描封存並安全地取代已儲存的索引。日後載入可重複使用更新後的快取。</value></data>
+  <data name="CacheChoiceSessionTitle" xml:space="preserve"><value>只載入這一次</value></data>
+  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>為本次工作階段建立暫時的封存清單索引。它不會加入可重複使用的索引快取，並會在 Archive Lite 關閉時移除，因此下次「載入」或「重新整理」會再次掃描。</value></data>
+  <data name="CacheChoiceTimeNotice" xml:space="preserve"><value>在大型安裝上，第一次掃描可能需要數分鐘。兩種模式下封存來源都維持唯讀。</value></data>
+  <data name="EnterToSearch" xml:space="preserve"><value>按 Enter 鍵搜尋</value></data>
+  <data name="Minimize" xml:space="preserve"><value>最小化</value></data>
+  <data name="Maximize" xml:space="preserve"><value>最大化或還原</value></data>
+  <data name="Close" xml:space="preserve"><value>關閉</value></data>
+  <data name="ReadOnlyFooter" xml:space="preserve"><value>唯讀封存工作區</value></data>
+  <data name="All" xml:space="preserve"><value>全部</value></data>
+  <data name="FindInFile" xml:space="preserve"><value>在檔案中尋找</value></data>
+  <data name="FindPrevious" xml:space="preserve"><value>尋找上一個（Shift+Enter）</value></data>
+  <data name="FindNext" xml:space="preserve"><value>尋找下一個（Enter）</value></data>
+  <data name="ExportSelectedHint" xml:space="preserve"><value>匯出選取的檔案。單一 PAC 模型可儲存為 GLB、OBJ、FBX 或其原始封存格式。</value></data>
+  <data name="ExportFamilyHint" xml:space="preserve"><value>尋找並匯出選取的檔案及其關聯資產。</value></data>
+  <data name="ExportChoiceTitle" xml:space="preserve"><value>匯出選取項目</value></data>
+  <data name="ExportChoiceHeading" xml:space="preserve"><value>選擇要匯出的內容</value></data>
+  <data name="ExportChoiceIntro" xml:space="preserve"><value>為選取的 {0:N0} 個檔案選擇輸出結構。</value></data>
+  <data name="ExportChoiceFilesOnlyTitle" xml:space="preserve"><value>僅檔案</value></data>
+  <data name="ExportChoiceFilesOnlyBody" xml:space="preserve"><value>直接將選取的檔案寫入目的地，不重建其在封存中的資料夾結構。</value></data>
+  <data name="ExportChoiceStructureTitle" xml:space="preserve"><value>完整資料夾結構</value></data>
+  <data name="ExportChoiceStructureBody" xml:space="preserve"><value>完全依照封存瀏覽器中顯示的樣子保留封包與虛擬封存路徑。</value></data>
+  <data name="ExportChoiceFamilyTitle" xml:space="preserve"><value>關聯資產系列</value></data>
+  <data name="ExportChoiceFamilyBody" xml:space="preserve"><value>尋找並匯出目前的檔案，以及相關的材質、貼圖、描述檔和其他已解析的資產。</value></data>
+  <data name="ExportChoiceFormat" xml:space="preserve"><value>檔案格式</value></data>
+  <data name="ExportChoiceOriginal" xml:space="preserve"><value>原始封存格式</value></data>
+  <data name="ExportChoiceGlb" xml:space="preserve"><value>glTF Binary (.glb)</value></data>
+  <data name="ExportChoiceObj" xml:space="preserve"><value>Wavefront OBJ (.obj)</value></data>
+  <data name="ExportChoiceFbx" xml:space="preserve"><value>Autodesk FBX (.fbx)</value></data>
+  <data name="ExportChoiceAction" xml:space="preserve"><value>繼續</value></data>
+  <data name="SelectedModelExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx|原始封存檔案 (*{0})|*{0}</value></data>
+  <data name="Play" xml:space="preserve"><value>播放</value></data>
+  <data name="Pause" xml:space="preserve"><value>暫停</value></data>
+  <data name="Stop" xml:space="preserve"><value>停止</value></data>
+  <data name="Clear" xml:space="preserve"><value>清除</value></data>
+  <data name="None" xml:space="preserve"><value>無</value></data>
+  <data name="ItemFinderTitle" xml:space="preserve"><value>物品搜尋器</value></data>
+  <data name="ItemFinderNavigation" xml:space="preserve"><value>物品</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>已復原的名稱、背包圖示、模型連結與材質依據</value></data>
+  <data name="ItemFinderIntro" xml:space="preserve"><value>瀏覽與 CDMW Full 相同的原生物品目錄。可見圖示會優先載入；其餘背包縮圖在背景準備，並從持續性快取中重複使用。</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>可依顯示名稱、內部名稱、物品 ID、分類、模型、圖示路徑、本地化名稱或材質標籤搜尋</value></data>
+  <data name="ItemFinderButtonHint" xml:space="preserve"><value>瀏覽已復原的遊戲物品，背包圖示已持續預先載入。</value></data>
+  <data name="ItemFinderOpenArchive" xml:space="preserve"><value>請先載入封存，再開啟物品搜尋器。</value></data>
+  <data name="ItemFinderReady" xml:space="preserve"><value>物品搜尋器已就緒。</value></data>
+  <data name="ItemFinderLoading" xml:space="preserve"><value>正在載入物品搜尋器...</value></data>
+  <data name="ItemFinderNoMatches" xml:space="preserve"><value>沒有相符的物品。</value></data>
+  <data name="ItemFinderPageSummary" xml:space="preserve"><value>正在顯示第 {0:N0}-{1:N0} 項，共 {2:N0} 個相符物品</value></data>
+  <data name="ItemFinderFailed" xml:space="preserve"><value>物品搜尋器失敗：{0}</value></data>
+  <data name="ItemFinderAllCategories" xml:space="preserve"><value>所有分類</value></data>
+  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>所有材質標籤</value></data>
+  <data name="ItemFinderIconFailed" xml:space="preserve"><value>部分背包圖示無法準備：{0}</value></data>
+  <data name="ItemFinderIconWarmup" xml:space="preserve"><value>正在預先載入背包圖示：{0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>正在準備持續性的背包圖示快取...</value></data>
+  <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>持續性背包圖示快取已就緒：{0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>模型連結 {0:N0} 個，圖示路徑 {1:N0} 個，變體 {2:N0} 個</value></data>
+  <data name="ItemFinderEvidence" xml:space="preserve"><value>依據</value></data>
+  <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>本地化名稱</value></data>
+  <data name="ItemFinderMaterials" xml:space="preserve"><value>材質標籤</value></data>
+  <data name="ItemFinderModels" xml:space="preserve"><value>連結的模型</value></data>
+  <data name="ItemFinderIcons" xml:space="preserve"><value>背包圖示路徑</value></data>
+  <data name="ItemFinderShowExact" xml:space="preserve"><value>顯示精確連結</value></data>
+  <data name="ItemFinderShowExactHint" xml:space="preserve"><value>關閉物品搜尋器，僅在封存瀏覽器中顯示直接復原的模型與圖示檔案。</value></data>
+  <data name="ItemFinderShowRelated" xml:space="preserve"><value>顯示關聯集合</value></data>
+  <data name="ItemFinderShowRelatedHint" xml:space="preserve"><value>關閉物品搜尋器，並顯示直接連結以及已索引的材質、貼圖、中繼資料、骨架與動畫等搭配檔案。</value></data>
+  <data name="ItemFinderScopeLoading" xml:space="preserve"><value>正在解析物品搜尋器的連結...</value></data>
+  <data name="ItemFinderExactScopeApplied" xml:space="preserve"><value>物品搜尋器：{0} - 精確連結檔案 {1:N0} 個</value></data>
+  <data name="ItemFinderRelatedScopeApplied" xml:space="preserve"><value>物品搜尋器：{0} - 關聯檔案 {1:N0} 個，其中直接連結 {2:N0} 個</value></data>
+  <data name="ClearItemScope" xml:space="preserve"><value>清除物品集合</value></data>
+  <data name="MostCommonExtensions" xml:space="preserve"><value>最常見</value></data>
+  <data name="MostCommonExtensionsHint" xml:space="preserve"><value>顯示目前封存或物品搜尋器集合中最常見的副檔名。</value></data>
+</root>

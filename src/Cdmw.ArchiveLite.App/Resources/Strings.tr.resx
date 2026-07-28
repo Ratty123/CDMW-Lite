@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ProductName" xml:space="preserve"><value>CDMW Archive Lite</value></data>
+  <data name="ArchiveBrowserTab" xml:space="preserve"><value>Arşiv gezgini</value></data>
+  <data name="TextSearchTab" xml:space="preserve"><value>Metin arama</value></data>
+  <data name="ArchiveRoot" xml:space="preserve"><value>Arşiv kökü</value></data>
+  <data name="Browse" xml:space="preserve"><value>Gözat…</value></data>
+  <data name="OpenArchive" xml:space="preserve"><value>Arşivi aç</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Yenile</value></data>
+  <data name="Cancel" xml:space="preserve"><value>İptal</value></data>
+  <data name="Filters" xml:space="preserve"><value>Filtreler</value></data>
+  <data name="PathFilter" xml:space="preserve"><value>Yol şunu içerir</value></data>
+  <data name="ExtensionFilter" xml:space="preserve"><value>Uzantı</value></data>
+  <data name="PackageFilter" xml:space="preserve"><value>Paket</value></data>
+  <data name="RoleFilter" xml:space="preserve"><value>Rol</value></data>
+  <data name="MinimumSize" xml:space="preserve"><value>En küçük boyut</value></data>
+  <data name="PreviewableOnly" xml:space="preserve"><value>Yalnızca önizlenebilir</value></data>
+  <data name="ViewMode" xml:space="preserve"><value>Görünüm</value></data>
+  <data name="ReadOnlyTools" xml:space="preserve"><value>Dışa aktarma seçenekleri</value></data>
+  <data name="ReadOnlyCaption" xml:space="preserve"><value>Arşiv kaynakları salt okunur açılır ve hiçbir zaman değiştirilmez.</value></data>
+  <data name="ReadOnlyBadge" xml:space="preserve"><value>SALT OKUNUR</value></data>
+  <data name="ItemFinder" xml:space="preserve"><value>Eşya bulucu</value></data>
+  <data name="MaterialFinder" xml:space="preserve"><value>Malzeme bulucu</value></data>
+  <data name="AssetFamily" xml:space="preserve"><value>Varlık ailesi</value></data>
+  <data name="AssociatedAssets" xml:space="preserve"><value>İlişkili varlıklar</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>Dokuları göster</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>Model dokularını istendiğinde çözümleyip gösterir. En hızlı PAC seçimi için işaretsiz bırakın.</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>Önizleme ayarları</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>Kamera denetimi</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>.NET/Vortice kamera denetimleri: sol tuşla sürükleme döndürür; orta tuş, sağ tuş veya Shift+sol tuş kaydırır; fare tekerleği yakınlaştırır.</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>Döndürme hassasiyeti</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>Kaydırma hassasiyeti</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>Döndürme X'i ters çevir</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>Döndürme Y'yi ters çevir</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>Kaydırma X'i ters çevir</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>Kaydırma Y'yi ters çevir</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>Bu ayarlar yalnızca önizleme gezinmesini değiştirir; varlığı asla düzenlemez veya dışa aktarmaz.</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>Kamera denetimini sıfırla</value></data>
+  <data name="PreviewAppearance" xml:space="preserve"><value>Görünüm</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>Önizlemenin arkasına çizilecek rengi seçin. Koyu dokular açık zeminde, açık dokular koyu zeminde daha iyi okunur; macenta saydam pikselleri ortaya çıkarır.</value></data>
+  <data name="PreviewBackground" xml:space="preserve"><value>Arka plan</value></data>
+  <data name="PreviewBackgroundTheme" xml:space="preserve"><value>Tema varsayılanı</value></data>
+  <data name="PreviewBackgroundBlack" xml:space="preserve"><value>Siyah</value></data>
+  <data name="PreviewBackgroundCharcoal" xml:space="preserve"><value>Kömür grisi</value></data>
+  <data name="PreviewBackgroundMidGray" xml:space="preserve"><value>Orta gri</value></data>
+  <data name="PreviewBackgroundLightGray" xml:space="preserve"><value>Açık gri</value></data>
+  <data name="PreviewBackgroundWhite" xml:space="preserve"><value>Beyaz</value></data>
+  <data name="PreviewBackgroundMagenta" xml:space="preserve"><value>Macenta</value></data>
+  <data name="PreviewBackgroundCustom" xml:space="preserve"><value>Özel</value></data>
+  <data name="PreviewBackgroundCustomColor" xml:space="preserve"><value>Özel renk</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>#204060 gibi onaltılık renk. Yalnızca Özel seçiliyken kullanılır.</value></data>
+  <data name="PreviewBackgroundHint" xml:space="preserve"><value>Arka plan doku ve model önizlemelerine uygulanır. Varlığı veya ondan dışa aktarılanı asla değiştirmez.</value></data>
+  <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>İlişkili varlıklar ({0:N0})</value></data>
+  <data name="FindAssociatedAssets" xml:space="preserve"><value>Varlıkları bul</value></data>
+  <data name="ShowAssociatedAsset" xml:space="preserve"><value>Gezginde göster</value></data>
+  <data name="AssociatedAssetsSelectFile" xml:space="preserve"><value>İlgili varlıklarını bulmak için bir dosya seçin.</value></data>
+  <data name="AssociatedAssetsNotLoaded" xml:space="preserve"><value>Arşiv başvurularını ve aynı aileden dosyaları incelemek için Varlıkları bul'a tıklayın.</value></data>
+  <data name="AssociatedAssetsSearching" xml:space="preserve"><value>İlişkili varlıklar aranıyor...</value></data>
+  <data name="AssociatedAssetsScanningProgress" xml:space="preserve"><value>Arşiv adları taranıyor: {0:N0} / {1:N0}</value></data>
+  <data name="AssociatedAssetsFound" xml:space="preserve"><value>{0:N0} ilişkili varlık bulundu.</value></data>
+  <data name="AssociatedAssetsFoundTruncated" xml:space="preserve"><value>İlk {0:N0} ilişkili varlık gösteriliyor.</value></data>
+  <data name="AssociatedAssetsNone" xml:space="preserve"><value>İlişkili varlık bulunamadı.</value></data>
+  <data name="AssociatedAssetsFailed" xml:space="preserve"><value>İlişkili varlık araması başarısız oldu: {0}</value></data>
+  <data name="AssociatedAssetNotLocated" xml:space="preserve"><value>İlişkili varlık artık geçerli arşiv görünümünde bulunmuyor.</value></data>
+  <data name="AssociatedCategoryModel" xml:space="preserve"><value>Modeller</value></data>
+  <data name="AssociatedCategoryMaterial" xml:space="preserve"><value>Malzeme</value></data>
+  <data name="AssociatedCategoryTexture" xml:space="preserve"><value>Dokular</value></data>
+  <data name="AssociatedCategoryPhysics" xml:space="preserve"><value>Fizik</value></data>
+  <data name="AssociatedCategoryMeshMetadata" xml:space="preserve"><value>Örgü meta verisi</value></data>
+  <data name="AssociatedCategoryPrefabMetadata" xml:space="preserve"><value>Prefab / meta veri</value></data>
+  <data name="AssociatedCategorySkeletonRig" xml:space="preserve"><value>İskelet / rig</value></data>
+  <data name="AssociatedCategoryAnimationMotion" xml:space="preserve"><value>Animasyon / hareket</value></data>
+  <data name="AssociatedCategoryAudioVideo" xml:space="preserve"><value>Ses / video</value></data>
+  <data name="AssociatedCategoryUserInterface" xml:space="preserve"><value>Kullanıcı arayüzü</value></data>
+  <data name="AssociatedCategoryOther" xml:space="preserve"><value>Diğer</value></data>
+  <data name="AssociationEvidenceExplicitReference" xml:space="preserve"><value>Açık başvuru</value></data>
+  <data name="AssociationEvidenceExactCompanion" xml:space="preserve"><value>Beklenen eşlik eden dosya</value></data>
+  <data name="AssociationEvidenceSameStem" xml:space="preserve"><value>Aynı ad ailesi</value></data>
+  <data name="AssociationEvidenceCachedFamily" xml:space="preserve"><value>Çözümlenmiş aile</value></data>
+  <data name="AssociationReasonExplicitReference" xml:space="preserve"><value>{0} tarafından başvuruluyor.</value></data>
+  <data name="AssociationReasonExactCompanion" xml:space="preserve"><value>{0} için beklenen eşlik eden dosya.</value></data>
+  <data name="AssociationReasonSameStem" xml:space="preserve"><value>{0} ile aynı varlık ailesi adını paylaşıyor.</value></data>
+  <data name="AssociationReasonCachedFamily" xml:space="preserve"><value>{0} ile aynı varlık ailesinde çözümlendi.</value></data>
+  <data name="ExportMesh" xml:space="preserve"><value>Örgüyü dışa aktar...</value></data>
+  <data name="ExportMeshHint" xml:space="preserve"><value>Seçili PAC/PAM örgüsünü Blender veya başka bir 3B araç için dışa aktarın.</value></data>
+  <data name="MeshExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx</value></data>
+  <data name="MeshExportUnsupportedExtension" xml:space="preserve"><value>.glb, .obj veya .fbx bir çıktı dosyası seçin.</value></data>
+  <data name="ExportSelected" xml:space="preserve"><value>Seçilenleri dışa aktar</value></data>
+  <data name="ExportFolder" xml:space="preserve"><value>Dışa aktarma klasörü</value></data>
+  <data name="ExportFiltered" xml:space="preserve"><value>Filtrelenenleri dışa aktar</value></data>
+  <data name="ExportAssociatedSelected" xml:space="preserve"><value>Seçili varlığı dışa aktar</value></data>
+  <data name="ExportAssociatedFamily" xml:space="preserve"><value>Aileyi dışa aktar</value></data>
+  <data name="Path" xml:space="preserve"><value>Yol</value></data>
+  <data name="Name" xml:space="preserve"><value>Ad</value></data>
+  <data name="KnownName" xml:space="preserve"><value>Bilinen ad</value></data>
+  <data name="NameEvidence" xml:space="preserve"><value>Ad kanıtı</value></data>
+  <data name="Extension" xml:space="preserve"><value>Uzantı</value></data>
+  <data name="Type" xml:space="preserve"><value>Tür</value></data>
+  <data name="FileType" xml:space="preserve"><value>Dosya türü</value></data>
+  <data name="Usage" xml:space="preserve"><value>Kullanım</value></data>
+  <data name="Size" xml:space="preserve"><value>Boyut</value></data>
+  <data name="StoredSize" xml:space="preserve"><value>Depolanan</value></data>
+  <data name="Compression" xml:space="preserve"><value>Sıkıştırma</value></data>
+  <data name="Package" xml:space="preserve"><value>Paket</value></data>
+  <data name="Columns" xml:space="preserve"><value>Sütunlar</value></data>
+  <data name="ChooseColumns" xml:space="preserve"><value>Görünür sütunları seç</value></data>
+  <data name="ShowAllColumns" xml:space="preserve"><value>Tüm sütunları göster</value></data>
+  <data name="Preview" xml:space="preserve"><value>Önizleme</value></data>
+  <data name="PreviewEmpty" xml:space="preserve"><value>Önizlemek için bir dosya seçin.</value></data>
+  <data name="SearchSource" xml:space="preserve"><value>Arama kaynağı</value></data>
+  <data name="Archive" xml:space="preserve"><value>Arşiv</value></data>
+  <data name="LooseFolder" xml:space="preserve"><value>Serbest klasör</value></data>
+  <data name="Query" xml:space="preserve"><value>Sorgu</value></data>
+  <data name="RegularExpression" xml:space="preserve"><value>Düzenli ifade</value></data>
+  <data name="CaseSensitive" xml:space="preserve"><value>Büyük/küçük harfe duyarlı</value></data>
+  <data name="Extensions" xml:space="preserve"><value>Uzantılar</value></data>
+  <data name="Search" xml:space="preserve"><value>Ara</value></data>
+  <data name="ExportResults" xml:space="preserve"><value>Sonuçları dışa aktar</value></data>
+  <data name="Matches" xml:space="preserve"><value>Eşleşmeler</value></data>
+  <data name="Line" xml:space="preserve"><value>Satır</value></data>
+  <data name="Context" xml:space="preserve"><value>Bağlam</value></data>
+  <data name="Ready" xml:space="preserve"><value>Hazır</value></data>
+  <data name="ConnectingWorker" xml:space="preserve"><value>Salt okunur işleme bağlanılıyor…</value></data>
+  <data name="WorkerConnected" xml:space="preserve"><value>Salt okunur işlem bağlandı (protokol {0}).</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>CDMW Archive Lite başlatılamadı</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>Salt okunur uygulama başlatılamadı.\n\n{0}</value></data>
+  <data name="Closing" xml:space="preserve"><value>Arka plan işleri durduruluyor…</value></data>
+  <data name="FoldersView" xml:space="preserve"><value>Klasörler</value></data>
+  <data name="CategoriesView" xml:space="preserve"><value>Kategoriler</value></data>
+  <data name="CategoriesFoldersView" xml:space="preserve"><value>Kategoriler + klasörler</value></data>
+  <data name="FlatView" xml:space="preserve"><value>Düz</value></data>
+  <data name="FolderFilter" xml:space="preserve"><value>Klasör</value></data>
+  <data name="SortBy" xml:space="preserve"><value>Sıralama ölçütü</value></data>
+  <data name="Descending" xml:space="preserve"><value>Azalan</value></data>
+  <data name="Folders" xml:space="preserve"><value>Klasörler</value></data>
+  <data name="Categories" xml:space="preserve"><value>Kategoriler</value></data>
+  <data name="PreviousPage" xml:space="preserve"><value>Önceki</value></data>
+  <data name="NextPage" xml:space="preserve"><value>Sonraki</value></data>
+  <data name="Metadata" xml:space="preserve"><value>Meta veri</value></data>
+  <data name="Language" xml:space="preserve"><value>Dil</value></data>
+  <data name="Theme" xml:space="preserve"><value>Tema</value></data>
+  <data name="ThemeGraphite" xml:space="preserve"><value>Grafit</value></data>
+  <data name="ThemeMidnight" xml:space="preserve"><value>Geceyarısı</value></data>
+  <data name="ThemeNord" xml:space="preserve"><value>Nord</value></data>
+  <data name="ThemeEmber" xml:space="preserve"><value>Kor</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>Açık</value></data>
+  <data name="ThemeFrost" xml:space="preserve"><value>Kırağı</value></data>
+  <data name="ThemeApplied" xml:space="preserve"><value>Tema uygulandı.</value></data>
+  <data name="FontSize" xml:space="preserve"><value>Yazı boyutu</value></data>
+  <data name="FontSizeSmall" xml:space="preserve"><value>Küçük</value></data>
+  <data name="FontSizeMedium" xml:space="preserve"><value>Orta</value></data>
+  <data name="FontSizeLarge" xml:space="preserve"><value>Büyük</value></data>
+  <data name="FontSizeExtraLarge" xml:space="preserve"><value>Çok büyük</value></data>
+  <data name="FontSizeApplied" xml:space="preserve"><value>Yazı boyutu uygulandı.</value></data>
+  <data name="LayoutDensity" xml:space="preserve"><value>Yerleşim yoğunluğu</value></data>
+  <data name="LayoutCompact" xml:space="preserve"><value>Sıkı</value></data>
+  <data name="LayoutComfortable" xml:space="preserve"><value>Rahat</value></data>
+  <data name="LayoutSpacious" xml:space="preserve"><value>Ferah</value></data>
+  <data name="LayoutApplied" xml:space="preserve"><value>Yerleşim yoğunluğu uygulandı.</value></data>
+  <data name="LanguageApplied" xml:space="preserve"><value>Dil uygulandı.</value></data>
+  <data name="CollisionPolicy" xml:space="preserve"><value>Dosya zaten varsa</value></data>
+  <data name="ManifestFormat" xml:space="preserve"><value>Bildirim biçimi</value></data>
+  <data name="RoleOther" xml:space="preserve"><value>Diğer</value></data>
+  <data name="RoleModel" xml:space="preserve"><value>Model</value></data>
+  <data name="RoleAnimation" xml:space="preserve"><value>Animasyon</value></data>
+  <data name="RolePhysics" xml:space="preserve"><value>Fizik</value></data>
+  <data name="RoleMetadata" xml:space="preserve"><value>Meta veri</value></data>
+  <data name="RoleVideo" xml:space="preserve"><value>Video</value></data>
+  <data name="RoleAudio" xml:space="preserve"><value>Ses</value></data>
+  <data name="RoleUserInterface" xml:space="preserve"><value>Kullanıcı arayüzü</value></data>
+  <data name="RoleImpostor" xml:space="preserve"><value>Impostor</value></data>
+  <data name="RoleNormal" xml:space="preserve"><value>Normal haritası</value></data>
+  <data name="RoleMaterial" xml:space="preserve"><value>Malzeme</value></data>
+  <data name="RoleImage" xml:space="preserve"><value>Görüntü</value></data>
+  <data name="RoleText" xml:space="preserve"><value>Metin</value></data>
+  <data name="FileTypeOther" xml:space="preserve"><value>Diğer</value></data>
+  <data name="FileTypeModel" xml:space="preserve"><value>Model</value></data>
+  <data name="FileTypeAnimation" xml:space="preserve"><value>Animasyon</value></data>
+  <data name="FileTypePhysics" xml:space="preserve"><value>Fizik</value></data>
+  <data name="FileTypeMetadata" xml:space="preserve"><value>Meta veri</value></data>
+  <data name="FileTypeVideo" xml:space="preserve"><value>Video</value></data>
+  <data name="FileTypeAudio" xml:space="preserve"><value>Ses</value></data>
+  <data name="FileTypeUserInterface" xml:space="preserve"><value>Kullanıcı arayüzü</value></data>
+  <data name="FileTypeTexture" xml:space="preserve"><value>Doku</value></data>
+  <data name="FileTypeImage" xml:space="preserve"><value>Görüntü</value></data>
+  <data name="FileTypeText" xml:space="preserve"><value>Metin</value></data>
+  <data name="TextureUsageUnknown" xml:space="preserve"><value>Bilinmiyor</value></data>
+  <data name="TextureUsageColor" xml:space="preserve"><value>Renk</value></data>
+  <data name="TextureUsageNormalMap" xml:space="preserve"><value>Normal haritası</value></data>
+  <data name="TextureUsageMaterialMap" xml:space="preserve"><value>Malzeme haritası</value></data>
+  <data name="SortPath" xml:space="preserve"><value>Yol</value></data>
+  <data name="SortName" xml:space="preserve"><value>Ad</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>Bilinen ad</value></data>
+  <data name="SortNameEvidence" xml:space="preserve"><value>Ad kanıtı</value></data>
+  <data name="SortExtension" xml:space="preserve"><value>Uzantı</value></data>
+  <data name="SortPackage" xml:space="preserve"><value>Paket</value></data>
+  <data name="SortOriginalSize" xml:space="preserve"><value>Özgün boyut</value></data>
+  <data name="SortStoredSize" xml:space="preserve"><value>Depolanan boyut</value></data>
+  <data name="SortCompression" xml:space="preserve"><value>Sıkıştırma</value></data>
+  <data name="SortRole" xml:space="preserve"><value>Rol</value></data>
+  <data name="SortFileType" xml:space="preserve"><value>Dosya türü</value></data>
+  <data name="SortTextureUsage" xml:space="preserve"><value>Doku kullanımı</value></data>
+  <data name="CollisionSkip" xml:space="preserve"><value>Atla</value></data>
+  <data name="CollisionOverwrite" xml:space="preserve"><value>Üzerine yaz</value></data>
+  <data name="CollisionCancel" xml:space="preserve"><value>Dışa aktarmayı iptal et</value></data>
+  <data name="ManifestNone" xml:space="preserve"><value>Yok</value></data>
+  <data name="ManifestJson" xml:space="preserve"><value>JSON</value></data>
+  <data name="ManifestCsv" xml:space="preserve"><value>CSV</value></data>
+  <data name="ManifestText" xml:space="preserve"><value>Metin</value></data>
+  <data name="EntriesCount" xml:space="preserve"><value>{0:N0} girdi</value></data>
+  <data name="OpeningArchive" xml:space="preserve"><value>{0} açılıyor…</value></data>
+  <data name="OpenedEntries" xml:space="preserve"><value>{0:N0} arşiv girdisi açıldı.</value></data>
+  <data name="ShowingEntries" xml:space="preserve"><value>{0} arşiv girdisi gösteriliyor.</value></data>
+  <data name="ExportSummary" xml:space="preserve"><value>Dışa aktarılan: {0:N0}; atlanan: {1:N0}; başarısız: {2:N0}.</value></data>
+  <data name="SearchSummary" xml:space="preserve"><value>{1:N0} dosyada {0:N0} eşleşme bulundu.</value></data>
+  <data name="SearchExportSummary" xml:space="preserve"><value>{0:N0} arama sonucu dosyası dışa aktarıldı.</value></data>
+  <data name="OpenArchiveFirst" xml:space="preserve"><value>Arşiv gezgininde şu anda açık olan arşivi kullanır.</value></data>
+  <data name="ProgressDiscovering" xml:space="preserve"><value>Arşiv dosyaları bulunuyor...</value></data>
+  <data name="ProgressFingerprinting" xml:space="preserve"><value>Arşiv kimliği denetleniyor...</value></data>
+  <data name="ProgressOpeningIndex" xml:space="preserve"><value>Önbellekteki dizin açılıyor...</value></data>
+  <data name="ProgressBuildingIndex" xml:space="preserve"><value>Arşiv dizini oluşturuluyor...</value></data>
+  <data name="ProgressParsingPackages" xml:space="preserve"><value>Arşiv katalogları okunuyor...</value></data>
+  <data name="ProgressSortingIndex" xml:space="preserve"><value>Arşiv girdileri sıralanıyor...</value></data>
+  <data name="ProgressWritingIndex" xml:space="preserve"><value>Arşiv dizini yazılıyor...</value></data>
+  <data name="ProgressPublishingIndex" xml:space="preserve"><value>Arşiv dizini yayımlanıyor...</value></data>
+  <data name="ProgressValidating" xml:space="preserve"><value>Paket başvuruları denetleniyor...</value></data>
+  <data name="ProgressLoadingEntries" xml:space="preserve"><value>Girdiler yükleniyor...</value></data>
+  <data name="ProgressExporting" xml:space="preserve"><value>Dışa aktarılıyor...</value></data>
+  <data name="ProgressPreparingMesh" xml:space="preserve"><value>Örgü verileri hazırlanıyor...</value></data>
+  <data name="ProgressWritingMesh" xml:space="preserve"><value>Örgü dosyası yazılıyor...</value></data>
+  <data name="ProgressFinishing" xml:space="preserve"><value>Tamamlanıyor...</value></data>
+  <data name="ProgressWorking" xml:space="preserve"><value>İşleniyor...</value></data>
+  <data name="PreviewProgressPreparing" xml:space="preserve"><value>Önizleme hazırlanıyor...</value></data>
+  <data name="PreviewProgressNative" xml:space="preserve"><value>Yerel PAC geometrisi hazırlanıyor...</value></data>
+  <data name="PreviewProgressAdapting" xml:space="preserve"><value>Salt okunur .NET sahnesi hazırlanıyor...</value></data>
+  <data name="PreviewProgressDecodingTexture" xml:space="preserve"><value>Doku çözülüyor... {1} sn içinde {0} sn</value></data>
+  <data name="RendererStarting" xml:space="preserve"><value>.NET/Vortice önizleyicisi başlatılıyor...</value></data>
+  <data name="RendererLoading" xml:space="preserve"><value>Örgü yükleniyor ve ilk kare çiziliyor...</value></data>
+  <data name="RendererReady" xml:space="preserve"><value>.NET/Vortice önizlemesi hazır.</value></data>
+  <data name="RendererFailed" xml:space="preserve"><value>.NET önizlemesi kullanılamıyor: {0}</value></data>
+  <data name="RendererUnknownError" xml:space="preserve"><value>.NET önizleyicisi bilinmeyen bir hata bildirdi.</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>Tüm dosyalar</value></data>
+  <data name="ExtensionGroupAll" xml:space="preserve"><value>Tümü</value></data>
+  <data name="ExtensionGroupModelMeshPhysics" xml:space="preserve"><value>Model / Örgü / Fizik</value></data>
+  <data name="ExtensionGroupTextureImage" xml:space="preserve"><value>Doku / Görüntü</value></data>
+  <data name="ExtensionGroupMaterialMetadata" xml:space="preserve"><value>Malzeme / Meta veri</value></data>
+  <data name="ExtensionGroupAnimationScene" xml:space="preserve"><value>Animasyon / Sahne</value></data>
+  <data name="ExtensionGroupAudioVideo" xml:space="preserve"><value>Ses / Video</value></data>
+  <data name="ExtensionGroupUserInterfaceText" xml:space="preserve"><value>Arayüz / Metin</value></data>
+  <data name="ExtensionGroupOther" xml:space="preserve"><value>Diğer</value></data>
+  <data name="ExtensionCatalogLoading" xml:space="preserve"><value>Kategorilere ayrılmış uzantılar yükleniyor...</value></data>
+  <data name="ExtensionCatalogProgress" xml:space="preserve"><value>Uzantılar dizinleniyor: {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexLoading" xml:space="preserve"><value>Bilinen oyun adları ve Eşya bulucu kataloğu yükleniyor...</value></data>
+  <data name="NameIndexScanProgress" xml:space="preserve"><value>Ad kaynakları dizinleniyor: {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexExtracting" xml:space="preserve"><value>Ad kaynağı okunuyor: {0}</value></data>
+  <data name="NameIndexResolving" xml:space="preserve"><value>Bilinen adlar ve ilgili ipuçları çözümleniyor...</value></data>
+  <data name="NameIndexPublishing" xml:space="preserve"><value>Ad dizini kaydediliyor...</value></data>
+  <data name="NameIndexReady" xml:space="preserve"><value>Katalog hazır: {0:N0} tam ad, {1:N0} ilgili ipucu, {2:N0} Eşya bulucu satırı</value></data>
+  <data name="NameIndexUnavailable" xml:space="preserve"><value>Bu arşiv için bilinen oyun adları kullanılamıyor.</value></data>
+  <data name="NameIndexFailed" xml:space="preserve"><value>Ad dizini kullanılamıyor: {0}</value></data>
+  <data name="ProductSubtitle" xml:space="preserve"><value>Gözat, önizle, ara ve dışa aktar</value></data>
+  <data name="ReadOnlyPill" xml:space="preserve"><value>SALT OKUNUR ÇALIŞMA ALANI</value></data>
+  <data name="DetectGame" xml:space="preserve"><value>Oyunu algıla</value></data>
+  <data name="DetectingGame" xml:space="preserve"><value>Crimson Desert kurulumu algılanıyor...</value></data>
+  <data name="GameDetected" xml:space="preserve"><value>Oyun klasörü algılandı: {0}</value></data>
+  <data name="GameNotFound" xml:space="preserve"><value>Crimson Desert otomatik olarak bulunamadı. Oyun klasörünü seçin.</value></data>
+  <data name="GameFolderReady" xml:space="preserve"><value>Seçilen oyun klasörü: {0}</value></data>
+  <data name="CacheNotChecked" xml:space="preserve"><value>ÖNBELLEK DENETLENMEDİ</value></data>
+  <data name="CacheChecking" xml:space="preserve"><value>ÖNBELLEK DENETLENİYOR</value></data>
+  <data name="CacheCurrent" xml:space="preserve"><value>ÖNBELLEK GÜNCEL</value></data>
+  <data name="CacheSessionOnly" xml:space="preserve"><value>TEK SEFERLİK OTURUM</value></data>
+  <data name="CacheMissing" xml:space="preserve"><value>ÖNBELLEK YOK</value></data>
+  <data name="CacheStale" xml:space="preserve"><value>ÖNBELLEK ESKİMİŞ</value></data>
+  <data name="CacheRefreshRecommended" xml:space="preserve"><value>Oyunun arşiv dosyaları değişti. Önbelleği yeniden oluşturmak için Yenile'yi kullanın.</value></data>
+  <data name="CacheInvalid" xml:space="preserve"><value>GEÇERSİZ KLASÖR</value></data>
+  <data name="CacheReused" xml:space="preserve"><value>Doğrulanmış arşiv dizini yeniden kullanıldı.</value></data>
+  <data name="CacheRebuilt" xml:space="preserve"><value>Arşiv dizini yeniden oluşturuldu ve önbellek meta verisi güncel.</value></data>
+  <data name="CacheSessionOnlyLoaded" xml:space="preserve"><value>Arşiv bu oturum için sıfırdan dizinlendi. Kalıcı bir arşiv dizini oluşturulmadı veya değiştirilmedi.</value></data>
+  <data name="CacheChoiceTitle" xml:space="preserve"><value>Arşiv yükleme</value></data>
+  <data name="CacheChoiceHeading" xml:space="preserve"><value>Arşivin nasıl yükleneceğini seçin</value></data>
+  <data name="CacheChoiceIntro" xml:space="preserve"><value>Archive Lite'ın oyun dosyalarının bir dizinine ihtiyacı var. Bu dizinin yeniden kullanılabilir mi yoksa yalnızca bu oturum boyunca mı geçerli olacağını seçin.</value></data>
+  <data name="CacheChoiceSourceLabel" xml:space="preserve"><value>Klasör</value></data>
+  <data name="CacheChoiceRecommended" xml:space="preserve"><value>ÖNERİLEN</value></data>
+  <data name="CacheChoicePersistentTitle" xml:space="preserve"><value>Kalıcı önbelleği kullan</value></data>
+  <data name="CacheChoicePersistentBody" xml:space="preserve"><value>Mümkün olduğunda doğrulanmış bir dizini yeniden kullanır. Dizin yoksa veya eskimişse Archive Lite onu oluşturup yerel olarak saklar; böylece sonraki yüklemeler çok daha hızlı olur. Bu, bir miktar yerel disk alanı kullanır.</value></data>
+  <data name="CacheChoicePersistentRefreshTitle" xml:space="preserve"><value>Kalıcı önbelleği yeniden oluştur</value></data>
+  <data name="CacheChoicePersistentRefreshBody" xml:space="preserve"><value>Arşivi yeniden tarar ve kayıtlı dizini güvenle değiştirir. Sonraki yüklemeler yenilenen önbelleği kullanabilir.</value></data>
+  <data name="CacheChoiceSessionTitle" xml:space="preserve"><value>Yalnızca bu seferlik yükle</value></data>
+  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>Bu oturum için geçici bir arşiv listesi dizini oluşturur. Yeniden kullanılabilir dizin önbelleğine eklenmez ve Archive Lite kapandığında silinir; bu nedenle bir sonraki sefer Yükle veya Yenile yeniden tarama yapar.</value></data>
+  <data name="CacheChoiceTimeNotice" xml:space="preserve"><value>Büyük kurulumlarda ilk tarama birkaç dakika sürebilir. Her iki modda da arşiv kaynakları salt okunur kalır.</value></data>
+  <data name="EnterToSearch" xml:space="preserve"><value>Aramak için Enter'a basın</value></data>
+  <data name="Minimize" xml:space="preserve"><value>Simge durumuna küçült</value></data>
+  <data name="Maximize" xml:space="preserve"><value>Büyüt veya geri yükle</value></data>
+  <data name="Close" xml:space="preserve"><value>Kapat</value></data>
+  <data name="ReadOnlyFooter" xml:space="preserve"><value>Salt okunur arşiv çalışma alanı</value></data>
+  <data name="All" xml:space="preserve"><value>Tümü</value></data>
+  <data name="FindInFile" xml:space="preserve"><value>Dosyada bul</value></data>
+  <data name="FindPrevious" xml:space="preserve"><value>Öncekini bul (Shift+Enter)</value></data>
+  <data name="FindNext" xml:space="preserve"><value>Sonrakini bul (Enter)</value></data>
+  <data name="ExportSelectedHint" xml:space="preserve"><value>Seçili dosyaları dışa aktarın. Tek bir PAC modeli GLB, OBJ, FBX veya özgün arşiv biçiminde kaydedilebilir.</value></data>
+  <data name="ExportFamilyHint" xml:space="preserve"><value>Seçili dosyayı ilişkili varlıklarıyla birlikte bulun ve dışa aktarın.</value></data>
+  <data name="ExportChoiceTitle" xml:space="preserve"><value>Seçilenleri dışa aktar</value></data>
+  <data name="ExportChoiceHeading" xml:space="preserve"><value>Neyin dışa aktarılacağını seçin</value></data>
+  <data name="ExportChoiceIntro" xml:space="preserve"><value>Seçili {0:N0} dosya için çıktı düzenini seçin.</value></data>
+  <data name="ExportChoiceFilesOnlyTitle" xml:space="preserve"><value>Yalnızca dosya</value></data>
+  <data name="ExportChoiceFilesOnlyBody" xml:space="preserve"><value>Seçili dosyayı, arşiv klasörlerini yeniden oluşturmadan doğrudan hedefe yazar.</value></data>
+  <data name="ExportChoiceStructureTitle" xml:space="preserve"><value>Eksiksiz klasör yapısı</value></data>
+  <data name="ExportChoiceStructureBody" xml:space="preserve"><value>Paketi ve sanal arşiv yolunu Arşiv gezgininde göründüğü gibi korur.</value></data>
+  <data name="ExportChoiceFamilyTitle" xml:space="preserve"><value>İlişkili varlık ailesi</value></data>
+  <data name="ExportChoiceFamilyBody" xml:space="preserve"><value>Odaklanılan dosyayı; ilgili malzemeleri, dokuları, tanımlayıcıları ve çözümlenmiş diğer varlıkları bulup dışa aktarır.</value></data>
+  <data name="ExportChoiceFormat" xml:space="preserve"><value>Dosya biçimi</value></data>
+  <data name="ExportChoiceOriginal" xml:space="preserve"><value>Özgün arşiv biçimi</value></data>
+  <data name="ExportChoiceGlb" xml:space="preserve"><value>glTF Binary (.glb)</value></data>
+  <data name="ExportChoiceObj" xml:space="preserve"><value>Wavefront OBJ (.obj)</value></data>
+  <data name="ExportChoiceFbx" xml:space="preserve"><value>Autodesk FBX (.fbx)</value></data>
+  <data name="ExportChoiceAction" xml:space="preserve"><value>Devam</value></data>
+  <data name="SelectedModelExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx|Özgün arşiv dosyası (*{0})|*{0}</value></data>
+  <data name="Play" xml:space="preserve"><value>Oynat</value></data>
+  <data name="Pause" xml:space="preserve"><value>Duraklat</value></data>
+  <data name="Stop" xml:space="preserve"><value>Durdur</value></data>
+  <data name="Clear" xml:space="preserve"><value>Temizle</value></data>
+  <data name="None" xml:space="preserve"><value>Yok</value></data>
+  <data name="ItemFinderTitle" xml:space="preserve"><value>Eşya bulucu</value></data>
+  <data name="ItemFinderNavigation" xml:space="preserve"><value>Eşyalar</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Kurtarılan adlar, envanter simgeleri, model bağlantıları ve malzeme kanıtları</value></data>
+  <data name="ItemFinderIntro" xml:space="preserve"><value>CDMW Full'ün kullandığı yerel eşya kataloğunun aynısına gözatın. Görünür simgeler önce yüklenir; kalan envanter küçük resimleri arka planda hazırlanır ve kalıcı önbellekten yeniden kullanılır.</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Görünen ad, iç ad, eşya kimliği, kategori, model, simge yolu, yerelleştirilmiş ad veya malzeme etiketiyle arayın</value></data>
+  <data name="ItemFinderButtonHint" xml:space="preserve"><value>Kalıcı olarak önceden yüklenmiş envanter simgeleriyle kurtarılan oyun eşyalarına gözatın.</value></data>
+  <data name="ItemFinderOpenArchive" xml:space="preserve"><value>Eşya bulucuyu açmadan önce bir arşiv yükleyin.</value></data>
+  <data name="ItemFinderReady" xml:space="preserve"><value>Eşya bulucu hazır.</value></data>
+  <data name="ItemFinderLoading" xml:space="preserve"><value>Eşya bulucu yükleniyor...</value></data>
+  <data name="ItemFinderNoMatches" xml:space="preserve"><value>Eşleşen eşya yok.</value></data>
+  <data name="ItemFinderPageSummary" xml:space="preserve"><value>Eşleşen {2:N0} eşyadan {0:N0}-{1:N0} arası gösteriliyor</value></data>
+  <data name="ItemFinderFailed" xml:space="preserve"><value>Eşya bulucu başarısız oldu: {0}</value></data>
+  <data name="ItemFinderAllCategories" xml:space="preserve"><value>Tüm kategoriler</value></data>
+  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>Tüm malzeme etiketleri</value></data>
+  <data name="ItemFinderIconFailed" xml:space="preserve"><value>Bazı envanter simgeleri hazırlanamadı: {0}</value></data>
+  <data name="ItemFinderIconWarmup" xml:space="preserve"><value>Envanter simgeleri önceden yükleniyor: {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Kalıcı envanter simgesi önbelleği hazırlanıyor...</value></data>
+  <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Kalıcı envanter simgesi önbelleği hazır: {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>{0:N0} model bağlantısı, {1:N0} simge yolu, {2:N0} varyant</value></data>
+  <data name="ItemFinderEvidence" xml:space="preserve"><value>Kanıt</value></data>
+  <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Yerelleştirilmiş adlar</value></data>
+  <data name="ItemFinderMaterials" xml:space="preserve"><value>Malzeme etiketleri</value></data>
+  <data name="ItemFinderModels" xml:space="preserve"><value>Bağlantılı modeller</value></data>
+  <data name="ItemFinderIcons" xml:space="preserve"><value>Envanter simgesi yolları</value></data>
+  <data name="ItemFinderShowExact" xml:space="preserve"><value>Tam bağlantıları göster</value></data>
+  <data name="ItemFinderShowExactHint" xml:space="preserve"><value>Eşya bulucuyu kapatır ve Arşiv gezgininde yalnızca doğrudan kurtarılan model ve simge dosyalarını gösterir.</value></data>
+  <data name="ItemFinderShowRelated" xml:space="preserve"><value>İlgili kümeyi göster</value></data>
+  <data name="ItemFinderShowRelatedHint" xml:space="preserve"><value>Eşya bulucuyu kapatır ve doğrudan bağlantıların yanı sıra dizinlenmiş malzeme, doku, meta veri, iskelet ve animasyon eşlerini gösterir.</value></data>
+  <data name="ItemFinderScopeLoading" xml:space="preserve"><value>Eşya bulucu bağlantıları çözümleniyor...</value></data>
+  <data name="ItemFinderExactScopeApplied" xml:space="preserve"><value>Eşya bulucu: {0} - {1:N0} tam bağlantılı dosya</value></data>
+  <data name="ItemFinderRelatedScopeApplied" xml:space="preserve"><value>Eşya bulucu: {0} - {1:N0} ilgili dosya, {2:N0} doğrudan bağlantı dahil</value></data>
+  <data name="ClearItemScope" xml:space="preserve"><value>Eşya kümesini temizle</value></data>
+  <data name="MostCommonExtensions" xml:space="preserve"><value>En yaygın</value></data>
+  <data name="MostCommonExtensionsHint" xml:space="preserve"><value>Etkin arşivdeki veya Eşya bulucu kümesindeki en yaygın uzantıları göster.</value></data>
+</root>

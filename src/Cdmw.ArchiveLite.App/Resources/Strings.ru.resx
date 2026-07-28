@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ProductName" xml:space="preserve"><value>CDMW Archive Lite</value></data>
+  <data name="ArchiveBrowserTab" xml:space="preserve"><value>Обзор архива</value></data>
+  <data name="TextSearchTab" xml:space="preserve"><value>Поиск текста</value></data>
+  <data name="ArchiveRoot" xml:space="preserve"><value>Корень архива</value></data>
+  <data name="Browse" xml:space="preserve"><value>Обзор…</value></data>
+  <data name="OpenArchive" xml:space="preserve"><value>Открыть архив</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Обновить</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Отмена</value></data>
+  <data name="Filters" xml:space="preserve"><value>Фильтры</value></data>
+  <data name="PathFilter" xml:space="preserve"><value>Путь содержит</value></data>
+  <data name="ExtensionFilter" xml:space="preserve"><value>Расширение</value></data>
+  <data name="PackageFilter" xml:space="preserve"><value>Пакет</value></data>
+  <data name="RoleFilter" xml:space="preserve"><value>Роль</value></data>
+  <data name="MinimumSize" xml:space="preserve"><value>Минимальный размер</value></data>
+  <data name="PreviewableOnly" xml:space="preserve"><value>Только с предпросмотром</value></data>
+  <data name="ViewMode" xml:space="preserve"><value>Вид</value></data>
+  <data name="ReadOnlyTools" xml:space="preserve"><value>Параметры экспорта</value></data>
+  <data name="ReadOnlyCaption" xml:space="preserve"><value>Источники архива открываются только для чтения и никогда не изменяются.</value></data>
+  <data name="ReadOnlyBadge" xml:space="preserve"><value>ТОЛЬКО ЧТЕНИЕ</value></data>
+  <data name="ItemFinder" xml:space="preserve"><value>Поиск предметов</value></data>
+  <data name="MaterialFinder" xml:space="preserve"><value>Поиск материалов</value></data>
+  <data name="AssetFamily" xml:space="preserve"><value>Семейство ресурсов</value></data>
+  <data name="AssociatedAssets" xml:space="preserve"><value>Связанные ресурсы</value></data>
+  <data name="DisplayModelTextures" xml:space="preserve"><value>Показывать текстуры</value></data>
+  <data name="DisplayModelTexturesHint" xml:space="preserve"><value>Находит и отображает текстуры модели по запросу. Оставьте флажок снятым для самого быстрого выбора PAC.</value></data>
+  <data name="PreviewSettings" xml:space="preserve"><value>Настройки предпросмотра</value></data>
+  <data name="CameraInput" xml:space="preserve"><value>Управление камерой</value></data>
+  <data name="PreviewCameraInstructions" xml:space="preserve"><value>Управление камерой .NET/Vortice: перетаскивание левой кнопкой вращает; средней, правой или Shift+левой — панорамирует; колесо мыши приближает.</value></data>
+  <data name="OrbitSensitivity" xml:space="preserve"><value>Чувствительность вращения</value></data>
+  <data name="PanSensitivity" xml:space="preserve"><value>Чувствительность панорамирования</value></data>
+  <data name="InvertOrbitX" xml:space="preserve"><value>Инвертировать вращение X</value></data>
+  <data name="InvertOrbitY" xml:space="preserve"><value>Инвертировать вращение Y</value></data>
+  <data name="InvertPanX" xml:space="preserve"><value>Инвертировать панорамирование X</value></data>
+  <data name="InvertPanY" xml:space="preserve"><value>Инвертировать панорамирование Y</value></data>
+  <data name="PreviewCameraInputHint" xml:space="preserve"><value>Эти настройки меняют только навигацию предпросмотра; они никогда не изменяют и не экспортируют ресурс.</value></data>
+  <data name="ResetCameraInput" xml:space="preserve"><value>Сбросить управление</value></data>
+  <data name="PreviewAppearance" xml:space="preserve"><value>Оформление</value></data>
+  <data name="PreviewBackgroundInstructions" xml:space="preserve"><value>Выберите цвет, отрисовываемый за предпросмотром. Тёмные текстуры лучше читаются на светлом фоне, а светлые — на тёмном; пурпурный выявляет прозрачные пиксели.</value></data>
+  <data name="PreviewBackground" xml:space="preserve"><value>Фон</value></data>
+  <data name="PreviewBackgroundTheme" xml:space="preserve"><value>По умолчанию из темы</value></data>
+  <data name="PreviewBackgroundBlack" xml:space="preserve"><value>Чёрный</value></data>
+  <data name="PreviewBackgroundCharcoal" xml:space="preserve"><value>Угольный</value></data>
+  <data name="PreviewBackgroundMidGray" xml:space="preserve"><value>Средне-серый</value></data>
+  <data name="PreviewBackgroundLightGray" xml:space="preserve"><value>Светло-серый</value></data>
+  <data name="PreviewBackgroundWhite" xml:space="preserve"><value>Белый</value></data>
+  <data name="PreviewBackgroundMagenta" xml:space="preserve"><value>Пурпурный</value></data>
+  <data name="PreviewBackgroundCustom" xml:space="preserve"><value>Свой</value></data>
+  <data name="PreviewBackgroundCustomColor" xml:space="preserve"><value>Свой цвет</value></data>
+  <data name="PreviewBackgroundCustomColorHint" xml:space="preserve"><value>Шестнадцатеричный цвет, например #204060. Используется только при выборе «Свой».</value></data>
+  <data name="PreviewBackgroundHint" xml:space="preserve"><value>Фон применяется к предпросмотру текстур и моделей. Он никогда не изменяет ресурс или то, что из него экспортируется.</value></data>
+  <data name="AssociatedAssetsHeaderCount" xml:space="preserve"><value>Связанные ресурсы ({0:N0})</value></data>
+  <data name="FindAssociatedAssets" xml:space="preserve"><value>Найти ресурсы</value></data>
+  <data name="ShowAssociatedAsset" xml:space="preserve"><value>Показать в обзоре</value></data>
+  <data name="AssociatedAssetsSelectFile" xml:space="preserve"><value>Выберите файл, чтобы найти связанные с ним ресурсы.</value></data>
+  <data name="AssociatedAssetsNotLoaded" xml:space="preserve"><value>Нажмите «Найти ресурсы», чтобы просмотреть ссылки архива и файлы того же семейства.</value></data>
+  <data name="AssociatedAssetsSearching" xml:space="preserve"><value>Поиск связанных ресурсов...</value></data>
+  <data name="AssociatedAssetsScanningProgress" xml:space="preserve"><value>Проверка имён в архиве: {0:N0} / {1:N0}</value></data>
+  <data name="AssociatedAssetsFound" xml:space="preserve"><value>Найдено связанных ресурсов: {0:N0}.</value></data>
+  <data name="AssociatedAssetsFoundTruncated" xml:space="preserve"><value>Показаны первые {0:N0} связанных ресурсов.</value></data>
+  <data name="AssociatedAssetsNone" xml:space="preserve"><value>Связанные ресурсы не найдены.</value></data>
+  <data name="AssociatedAssetsFailed" xml:space="preserve"><value>Не удалось выполнить поиск связанных ресурсов: {0}</value></data>
+  <data name="AssociatedAssetNotLocated" xml:space="preserve"><value>Связанного ресурса больше нет в текущем представлении архива.</value></data>
+  <data name="AssociatedCategoryModel" xml:space="preserve"><value>Модели</value></data>
+  <data name="AssociatedCategoryMaterial" xml:space="preserve"><value>Материал</value></data>
+  <data name="AssociatedCategoryTexture" xml:space="preserve"><value>Текстуры</value></data>
+  <data name="AssociatedCategoryPhysics" xml:space="preserve"><value>Физика</value></data>
+  <data name="AssociatedCategoryMeshMetadata" xml:space="preserve"><value>Метаданные меша</value></data>
+  <data name="AssociatedCategoryPrefabMetadata" xml:space="preserve"><value>Префаб / метаданные</value></data>
+  <data name="AssociatedCategorySkeletonRig" xml:space="preserve"><value>Скелет / риг</value></data>
+  <data name="AssociatedCategoryAnimationMotion" xml:space="preserve"><value>Анимация / движение</value></data>
+  <data name="AssociatedCategoryAudioVideo" xml:space="preserve"><value>Аудио / видео</value></data>
+  <data name="AssociatedCategoryUserInterface" xml:space="preserve"><value>Интерфейс</value></data>
+  <data name="AssociatedCategoryOther" xml:space="preserve"><value>Прочее</value></data>
+  <data name="AssociationEvidenceExplicitReference" xml:space="preserve"><value>Явная ссылка</value></data>
+  <data name="AssociationEvidenceExactCompanion" xml:space="preserve"><value>Ожидаемый сопутствующий файл</value></data>
+  <data name="AssociationEvidenceSameStem" xml:space="preserve"><value>То же семейство имён</value></data>
+  <data name="AssociationEvidenceCachedFamily" xml:space="preserve"><value>Определённое семейство</value></data>
+  <data name="AssociationReasonExplicitReference" xml:space="preserve"><value>На него ссылается {0}.</value></data>
+  <data name="AssociationReasonExactCompanion" xml:space="preserve"><value>Ожидаемый сопутствующий файл для {0}.</value></data>
+  <data name="AssociationReasonSameStem" xml:space="preserve"><value>Имеет то же имя семейства ресурсов, что и {0}.</value></data>
+  <data name="AssociationReasonCachedFamily" xml:space="preserve"><value>Определён в том же семействе ресурсов, что и {0}.</value></data>
+  <data name="ExportMesh" xml:space="preserve"><value>Экспорт меша...</value></data>
+  <data name="ExportMeshHint" xml:space="preserve"><value>Экспортируйте выбранный меш PAC/PAM для Blender или другого 3D-редактора.</value></data>
+  <data name="MeshExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx</value></data>
+  <data name="MeshExportUnsupportedExtension" xml:space="preserve"><value>Выберите выходной файл .glb, .obj или .fbx.</value></data>
+  <data name="ExportSelected" xml:space="preserve"><value>Экспорт выбранного</value></data>
+  <data name="ExportFolder" xml:space="preserve"><value>Папка экспорта</value></data>
+  <data name="ExportFiltered" xml:space="preserve"><value>Экспорт отфильтрованных</value></data>
+  <data name="ExportAssociatedSelected" xml:space="preserve"><value>Экспорт выбранного ресурса</value></data>
+  <data name="ExportAssociatedFamily" xml:space="preserve"><value>Экспорт семейства</value></data>
+  <data name="Path" xml:space="preserve"><value>Путь</value></data>
+  <data name="Name" xml:space="preserve"><value>Имя</value></data>
+  <data name="KnownName" xml:space="preserve"><value>Известное имя</value></data>
+  <data name="NameEvidence" xml:space="preserve"><value>Основание имени</value></data>
+  <data name="Extension" xml:space="preserve"><value>Расширение</value></data>
+  <data name="Type" xml:space="preserve"><value>Тип</value></data>
+  <data name="FileType" xml:space="preserve"><value>Тип файла</value></data>
+  <data name="Usage" xml:space="preserve"><value>Назначение</value></data>
+  <data name="Size" xml:space="preserve"><value>Размер</value></data>
+  <data name="StoredSize" xml:space="preserve"><value>В архиве</value></data>
+  <data name="Compression" xml:space="preserve"><value>Сжатие</value></data>
+  <data name="Package" xml:space="preserve"><value>Пакет</value></data>
+  <data name="Columns" xml:space="preserve"><value>Столбцы</value></data>
+  <data name="ChooseColumns" xml:space="preserve"><value>Выбрать видимые столбцы</value></data>
+  <data name="ShowAllColumns" xml:space="preserve"><value>Показать все столбцы</value></data>
+  <data name="Preview" xml:space="preserve"><value>Предпросмотр</value></data>
+  <data name="PreviewEmpty" xml:space="preserve"><value>Выберите файл для предпросмотра.</value></data>
+  <data name="SearchSource" xml:space="preserve"><value>Источник поиска</value></data>
+  <data name="Archive" xml:space="preserve"><value>Архив</value></data>
+  <data name="LooseFolder" xml:space="preserve"><value>Обычная папка</value></data>
+  <data name="Query" xml:space="preserve"><value>Запрос</value></data>
+  <data name="RegularExpression" xml:space="preserve"><value>Регулярное выражение</value></data>
+  <data name="CaseSensitive" xml:space="preserve"><value>Учитывать регистр</value></data>
+  <data name="Extensions" xml:space="preserve"><value>Расширения</value></data>
+  <data name="Search" xml:space="preserve"><value>Найти</value></data>
+  <data name="ExportResults" xml:space="preserve"><value>Экспорт результатов</value></data>
+  <data name="Matches" xml:space="preserve"><value>Совпадения</value></data>
+  <data name="Line" xml:space="preserve"><value>Строка</value></data>
+  <data name="Context" xml:space="preserve"><value>Контекст</value></data>
+  <data name="Ready" xml:space="preserve"><value>Готово</value></data>
+  <data name="ConnectingWorker" xml:space="preserve"><value>Подключение к процессу только для чтения…</value></data>
+  <data name="WorkerConnected" xml:space="preserve"><value>Процесс только для чтения подключён (протокол {0}).</value></data>
+  <data name="StartupFailureTitle" xml:space="preserve"><value>Не удалось запустить CDMW Archive Lite</value></data>
+  <data name="StartupFailureMessage" xml:space="preserve"><value>Не удалось запустить приложение, работающее только для чтения.\n\n{0}</value></data>
+  <data name="Closing" xml:space="preserve"><value>Остановка фоновых задач…</value></data>
+  <data name="FoldersView" xml:space="preserve"><value>Папки</value></data>
+  <data name="CategoriesView" xml:space="preserve"><value>Категории</value></data>
+  <data name="CategoriesFoldersView" xml:space="preserve"><value>Категории + папки</value></data>
+  <data name="FlatView" xml:space="preserve"><value>Плоский</value></data>
+  <data name="FolderFilter" xml:space="preserve"><value>Папка</value></data>
+  <data name="SortBy" xml:space="preserve"><value>Сортировать по</value></data>
+  <data name="Descending" xml:space="preserve"><value>По убыванию</value></data>
+  <data name="Folders" xml:space="preserve"><value>Папки</value></data>
+  <data name="Categories" xml:space="preserve"><value>Категории</value></data>
+  <data name="PreviousPage" xml:space="preserve"><value>Назад</value></data>
+  <data name="NextPage" xml:space="preserve"><value>Вперёд</value></data>
+  <data name="Metadata" xml:space="preserve"><value>Метаданные</value></data>
+  <data name="Language" xml:space="preserve"><value>Язык</value></data>
+  <data name="Theme" xml:space="preserve"><value>Тема</value></data>
+  <data name="ThemeGraphite" xml:space="preserve"><value>Графит</value></data>
+  <data name="ThemeMidnight" xml:space="preserve"><value>Полночь</value></data>
+  <data name="ThemeNord" xml:space="preserve"><value>Норд</value></data>
+  <data name="ThemeEmber" xml:space="preserve"><value>Уголь</value></data>
+  <data name="ThemeLight" xml:space="preserve"><value>Светлая</value></data>
+  <data name="ThemeFrost" xml:space="preserve"><value>Иней</value></data>
+  <data name="ThemeApplied" xml:space="preserve"><value>Тема применена.</value></data>
+  <data name="FontSize" xml:space="preserve"><value>Размер шрифта</value></data>
+  <data name="FontSizeSmall" xml:space="preserve"><value>Мелкий</value></data>
+  <data name="FontSizeMedium" xml:space="preserve"><value>Средний</value></data>
+  <data name="FontSizeLarge" xml:space="preserve"><value>Крупный</value></data>
+  <data name="FontSizeExtraLarge" xml:space="preserve"><value>Очень крупный</value></data>
+  <data name="FontSizeApplied" xml:space="preserve"><value>Размер шрифта применён.</value></data>
+  <data name="LayoutDensity" xml:space="preserve"><value>Плотность</value></data>
+  <data name="LayoutCompact" xml:space="preserve"><value>Компактно</value></data>
+  <data name="LayoutComfortable" xml:space="preserve"><value>Умеренно</value></data>
+  <data name="LayoutSpacious" xml:space="preserve"><value>Просторно</value></data>
+  <data name="LayoutApplied" xml:space="preserve"><value>Плотность применена.</value></data>
+  <data name="LanguageApplied" xml:space="preserve"><value>Язык применён.</value></data>
+  <data name="CollisionPolicy" xml:space="preserve"><value>Если файл уже есть</value></data>
+  <data name="ManifestFormat" xml:space="preserve"><value>Формат манифеста</value></data>
+  <data name="RoleOther" xml:space="preserve"><value>Прочее</value></data>
+  <data name="RoleModel" xml:space="preserve"><value>Модель</value></data>
+  <data name="RoleAnimation" xml:space="preserve"><value>Анимация</value></data>
+  <data name="RolePhysics" xml:space="preserve"><value>Физика</value></data>
+  <data name="RoleMetadata" xml:space="preserve"><value>Метаданные</value></data>
+  <data name="RoleVideo" xml:space="preserve"><value>Видео</value></data>
+  <data name="RoleAudio" xml:space="preserve"><value>Аудио</value></data>
+  <data name="RoleUserInterface" xml:space="preserve"><value>Интерфейс</value></data>
+  <data name="RoleImpostor" xml:space="preserve"><value>Импостор</value></data>
+  <data name="RoleNormal" xml:space="preserve"><value>Карта нормалей</value></data>
+  <data name="RoleMaterial" xml:space="preserve"><value>Материал</value></data>
+  <data name="RoleImage" xml:space="preserve"><value>Изображение</value></data>
+  <data name="RoleText" xml:space="preserve"><value>Текст</value></data>
+  <data name="FileTypeOther" xml:space="preserve"><value>Прочее</value></data>
+  <data name="FileTypeModel" xml:space="preserve"><value>Модель</value></data>
+  <data name="FileTypeAnimation" xml:space="preserve"><value>Анимация</value></data>
+  <data name="FileTypePhysics" xml:space="preserve"><value>Физика</value></data>
+  <data name="FileTypeMetadata" xml:space="preserve"><value>Метаданные</value></data>
+  <data name="FileTypeVideo" xml:space="preserve"><value>Видео</value></data>
+  <data name="FileTypeAudio" xml:space="preserve"><value>Аудио</value></data>
+  <data name="FileTypeUserInterface" xml:space="preserve"><value>Интерфейс</value></data>
+  <data name="FileTypeTexture" xml:space="preserve"><value>Текстура</value></data>
+  <data name="FileTypeImage" xml:space="preserve"><value>Изображение</value></data>
+  <data name="FileTypeText" xml:space="preserve"><value>Текст</value></data>
+  <data name="TextureUsageUnknown" xml:space="preserve"><value>Неизвестно</value></data>
+  <data name="TextureUsageColor" xml:space="preserve"><value>Цвет</value></data>
+  <data name="TextureUsageNormalMap" xml:space="preserve"><value>Карта нормалей</value></data>
+  <data name="TextureUsageMaterialMap" xml:space="preserve"><value>Карта материала</value></data>
+  <data name="SortPath" xml:space="preserve"><value>Путь</value></data>
+  <data name="SortName" xml:space="preserve"><value>Имя</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>Известное имя</value></data>
+  <data name="SortNameEvidence" xml:space="preserve"><value>Основание имени</value></data>
+  <data name="SortExtension" xml:space="preserve"><value>Расширение</value></data>
+  <data name="SortPackage" xml:space="preserve"><value>Пакет</value></data>
+  <data name="SortOriginalSize" xml:space="preserve"><value>Исходный размер</value></data>
+  <data name="SortStoredSize" xml:space="preserve"><value>Размер в архиве</value></data>
+  <data name="SortCompression" xml:space="preserve"><value>Сжатие</value></data>
+  <data name="SortRole" xml:space="preserve"><value>Роль</value></data>
+  <data name="SortFileType" xml:space="preserve"><value>Тип файла</value></data>
+  <data name="SortTextureUsage" xml:space="preserve"><value>Назначение текстуры</value></data>
+  <data name="CollisionSkip" xml:space="preserve"><value>Пропустить</value></data>
+  <data name="CollisionOverwrite" xml:space="preserve"><value>Перезаписать</value></data>
+  <data name="CollisionCancel" xml:space="preserve"><value>Отменить экспорт</value></data>
+  <data name="ManifestNone" xml:space="preserve"><value>Нет</value></data>
+  <data name="ManifestJson" xml:space="preserve"><value>JSON</value></data>
+  <data name="ManifestCsv" xml:space="preserve"><value>CSV</value></data>
+  <data name="ManifestText" xml:space="preserve"><value>Текст</value></data>
+  <data name="EntriesCount" xml:space="preserve"><value>Записей: {0:N0}</value></data>
+  <data name="OpeningArchive" xml:space="preserve"><value>Открытие {0}…</value></data>
+  <data name="OpenedEntries" xml:space="preserve"><value>Открыто записей архива: {0:N0}.</value></data>
+  <data name="ShowingEntries" xml:space="preserve"><value>Показано записей архива: {0}.</value></data>
+  <data name="ExportSummary" xml:space="preserve"><value>Экспортировано: {0:N0}; пропущено: {1:N0}; с ошибкой: {2:N0}.</value></data>
+  <data name="SearchSummary" xml:space="preserve"><value>Найдено совпадений: {0:N0} в {1:N0} файлах.</value></data>
+  <data name="SearchExportSummary" xml:space="preserve"><value>Экспортировано файлов с результатами: {0:N0}.</value></data>
+  <data name="OpenArchiveFirst" xml:space="preserve"><value>Используется архив, открытый сейчас в Обзоре архива.</value></data>
+  <data name="ProgressDiscovering" xml:space="preserve"><value>Поиск файлов архива...</value></data>
+  <data name="ProgressFingerprinting" xml:space="preserve"><value>Проверка идентичности архива...</value></data>
+  <data name="ProgressOpeningIndex" xml:space="preserve"><value>Открытие кэшированного индекса...</value></data>
+  <data name="ProgressBuildingIndex" xml:space="preserve"><value>Построение индекса архива...</value></data>
+  <data name="ProgressParsingPackages" xml:space="preserve"><value>Чтение каталогов архива...</value></data>
+  <data name="ProgressSortingIndex" xml:space="preserve"><value>Сортировка записей архива...</value></data>
+  <data name="ProgressWritingIndex" xml:space="preserve"><value>Запись индекса архива...</value></data>
+  <data name="ProgressPublishingIndex" xml:space="preserve"><value>Публикация индекса архива...</value></data>
+  <data name="ProgressValidating" xml:space="preserve"><value>Проверка ссылок пакетов...</value></data>
+  <data name="ProgressLoadingEntries" xml:space="preserve"><value>Загрузка записей...</value></data>
+  <data name="ProgressExporting" xml:space="preserve"><value>Экспорт...</value></data>
+  <data name="ProgressPreparingMesh" xml:space="preserve"><value>Подготовка данных меша...</value></data>
+  <data name="ProgressWritingMesh" xml:space="preserve"><value>Запись файла меша...</value></data>
+  <data name="ProgressFinishing" xml:space="preserve"><value>Завершение...</value></data>
+  <data name="ProgressWorking" xml:space="preserve"><value>Обработка...</value></data>
+  <data name="PreviewProgressPreparing" xml:space="preserve"><value>Подготовка предпросмотра...</value></data>
+  <data name="PreviewProgressNative" xml:space="preserve"><value>Подготовка нативной геометрии PAC...</value></data>
+  <data name="PreviewProgressAdapting" xml:space="preserve"><value>Подготовка сцены .NET только для чтения...</value></data>
+  <data name="PreviewProgressDecodingTexture" xml:space="preserve"><value>Декодирование текстуры... {0} с из {1} с</value></data>
+  <data name="RendererStarting" xml:space="preserve"><value>Запуск средства просмотра .NET/Vortice...</value></data>
+  <data name="RendererLoading" xml:space="preserve"><value>Загрузка меша и отрисовка первого кадра...</value></data>
+  <data name="RendererReady" xml:space="preserve"><value>Предпросмотр .NET/Vortice готов.</value></data>
+  <data name="RendererFailed" xml:space="preserve"><value>Предпросмотр .NET недоступен: {0}</value></data>
+  <data name="RendererUnknownError" xml:space="preserve"><value>Средство просмотра .NET сообщило о неизвестной ошибке.</value></data>
+  <data name="AllFiles" xml:space="preserve"><value>Все файлы</value></data>
+  <data name="ExtensionGroupAll" xml:space="preserve"><value>Все</value></data>
+  <data name="ExtensionGroupModelMeshPhysics" xml:space="preserve"><value>Модель / Меш / Физика</value></data>
+  <data name="ExtensionGroupTextureImage" xml:space="preserve"><value>Текстура / Изображение</value></data>
+  <data name="ExtensionGroupMaterialMetadata" xml:space="preserve"><value>Материал / Метаданные</value></data>
+  <data name="ExtensionGroupAnimationScene" xml:space="preserve"><value>Анимация / Сцена</value></data>
+  <data name="ExtensionGroupAudioVideo" xml:space="preserve"><value>Аудио / Видео</value></data>
+  <data name="ExtensionGroupUserInterfaceText" xml:space="preserve"><value>Интерфейс / Текст</value></data>
+  <data name="ExtensionGroupOther" xml:space="preserve"><value>Прочее</value></data>
+  <data name="ExtensionCatalogLoading" xml:space="preserve"><value>Загрузка расширений по категориям...</value></data>
+  <data name="ExtensionCatalogProgress" xml:space="preserve"><value>Индексирование расширений: {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexLoading" xml:space="preserve"><value>Загрузка известных игровых имён и каталога Поиска предметов...</value></data>
+  <data name="NameIndexScanProgress" xml:space="preserve"><value>Индексирование источников имён: {0:N0} / {1:N0}</value></data>
+  <data name="NameIndexExtracting" xml:space="preserve"><value>Чтение источника имён: {0}</value></data>
+  <data name="NameIndexResolving" xml:space="preserve"><value>Сопоставление известных имён и связанных подсказок...</value></data>
+  <data name="NameIndexPublishing" xml:space="preserve"><value>Сохранение индекса имён...</value></data>
+  <data name="NameIndexReady" xml:space="preserve"><value>Каталог готов: точных имён — {0:N0}, связанных подсказок — {1:N0}, строк Поиска предметов — {2:N0}</value></data>
+  <data name="NameIndexUnavailable" xml:space="preserve"><value>Известные игровые имена для этого архива недоступны.</value></data>
+  <data name="NameIndexFailed" xml:space="preserve"><value>Индекс имён недоступен: {0}</value></data>
+  <data name="ProductSubtitle" xml:space="preserve"><value>Просмотр, предпросмотр, поиск и экспорт</value></data>
+  <data name="ReadOnlyPill" xml:space="preserve"><value>РАБОЧАЯ ОБЛАСТЬ ТОЛЬКО ДЛЯ ЧТЕНИЯ</value></data>
+  <data name="DetectGame" xml:space="preserve"><value>Найти игру</value></data>
+  <data name="DetectingGame" xml:space="preserve"><value>Поиск установленной Crimson Desert...</value></data>
+  <data name="GameDetected" xml:space="preserve"><value>Найдена папка игры: {0}</value></data>
+  <data name="GameNotFound" xml:space="preserve"><value>Crimson Desert не найдена автоматически. Выберите папку игры.</value></data>
+  <data name="GameFolderReady" xml:space="preserve"><value>Выбрана папка игры: {0}</value></data>
+  <data name="CacheNotChecked" xml:space="preserve"><value>КЭШ НЕ ПРОВЕРЕН</value></data>
+  <data name="CacheChecking" xml:space="preserve"><value>ПРОВЕРКА КЭША</value></data>
+  <data name="CacheCurrent" xml:space="preserve"><value>КЭШ АКТУАЛЕН</value></data>
+  <data name="CacheSessionOnly" xml:space="preserve"><value>РАЗОВЫЙ СЕАНС</value></data>
+  <data name="CacheMissing" xml:space="preserve"><value>КЭШ ОТСУТСТВУЕТ</value></data>
+  <data name="CacheStale" xml:space="preserve"><value>КЭШ УСТАРЕЛ</value></data>
+  <data name="CacheRefreshRecommended" xml:space="preserve"><value>Файлы архива игры изменились. Нажмите «Обновить», чтобы перестроить кэш.</value></data>
+  <data name="CacheInvalid" xml:space="preserve"><value>НЕВЕРНАЯ ПАПКА</value></data>
+  <data name="CacheReused" xml:space="preserve"><value>Проверенный индекс архива использован повторно.</value></data>
+  <data name="CacheRebuilt" xml:space="preserve"><value>Индекс архива перестроен, а его метаданные кэша актуальны.</value></data>
+  <data name="CacheSessionOnlyLoaded" xml:space="preserve"><value>Архив был проиндексирован заново для этого сеанса. Постоянный индекс архива не создавался и не изменялся.</value></data>
+  <data name="CacheChoiceTitle" xml:space="preserve"><value>Загрузка архива</value></data>
+  <data name="CacheChoiceHeading" xml:space="preserve"><value>Выберите способ загрузки архива</value></data>
+  <data name="CacheChoiceIntro" xml:space="preserve"><value>Archive Lite нужен индекс файлов игры. Выберите, должен ли этот индекс быть многоразовым или существовать только в течение текущего сеанса.</value></data>
+  <data name="CacheChoiceSourceLabel" xml:space="preserve"><value>Папка</value></data>
+  <data name="CacheChoiceRecommended" xml:space="preserve"><value>РЕКОМЕНДУЕТСЯ</value></data>
+  <data name="CacheChoicePersistentTitle" xml:space="preserve"><value>Использовать постоянный кэш</value></data>
+  <data name="CacheChoicePersistentBody" xml:space="preserve"><value>По возможности повторно использует проверенный индекс. Если он отсутствует или устарел, Archive Lite строит его и сохраняет локально, поэтому последующие загрузки идут гораздо быстрее. Это занимает некоторое место на диске.</value></data>
+  <data name="CacheChoicePersistentRefreshTitle" xml:space="preserve"><value>Перестроить постоянный кэш</value></data>
+  <data name="CacheChoicePersistentRefreshBody" xml:space="preserve"><value>Заново сканирует архив и безопасно заменяет сохранённый индекс. Последующие загрузки смогут использовать обновлённый кэш.</value></data>
+  <data name="CacheChoiceSessionTitle" xml:space="preserve"><value>Загрузить только в этот раз</value></data>
+  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>Строит временный индекс списка архива на этот сеанс. Он не добавляется в многоразовый кэш индексов и удаляется при закрытии Archive Lite, поэтому в следующий раз «Загрузить» или «Обновить» выполнит сканирование заново.</value></data>
+  <data name="CacheChoiceTimeNotice" xml:space="preserve"><value>Первое сканирование больших установок может занять несколько минут. В обоих режимах источники архива остаются доступными только для чтения.</value></data>
+  <data name="EnterToSearch" xml:space="preserve"><value>Нажмите Enter для поиска</value></data>
+  <data name="Minimize" xml:space="preserve"><value>Свернуть</value></data>
+  <data name="Maximize" xml:space="preserve"><value>Развернуть или восстановить</value></data>
+  <data name="Close" xml:space="preserve"><value>Закрыть</value></data>
+  <data name="ReadOnlyFooter" xml:space="preserve"><value>Рабочая область архива только для чтения</value></data>
+  <data name="All" xml:space="preserve"><value>Все</value></data>
+  <data name="FindInFile" xml:space="preserve"><value>Найти в файле</value></data>
+  <data name="FindPrevious" xml:space="preserve"><value>Найти предыдущее (Shift+Enter)</value></data>
+  <data name="FindNext" xml:space="preserve"><value>Найти следующее (Enter)</value></data>
+  <data name="ExportSelectedHint" xml:space="preserve"><value>Экспортируйте выбранные файлы. Одну модель PAC можно сохранить как GLB, OBJ, FBX или в исходном формате архива.</value></data>
+  <data name="ExportFamilyHint" xml:space="preserve"><value>Найдите и экспортируйте выбранный файл вместе со связанными ресурсами.</value></data>
+  <data name="ExportChoiceTitle" xml:space="preserve"><value>Экспорт выбранного</value></data>
+  <data name="ExportChoiceHeading" xml:space="preserve"><value>Выберите, что экспортировать</value></data>
+  <data name="ExportChoiceIntro" xml:space="preserve"><value>Выберите структуру вывода для выбранных файлов: {0:N0}.</value></data>
+  <data name="ExportChoiceFilesOnlyTitle" xml:space="preserve"><value>Только файл</value></data>
+  <data name="ExportChoiceFilesOnlyBody" xml:space="preserve"><value>Записывает выбранный файл прямо в папку назначения, не воссоздавая его папки внутри архива.</value></data>
+  <data name="ExportChoiceStructureTitle" xml:space="preserve"><value>Полная структура папок</value></data>
+  <data name="ExportChoiceStructureBody" xml:space="preserve"><value>Сохраняет пакет и виртуальный путь архива ровно так, как они показаны в Обзоре архива.</value></data>
+  <data name="ExportChoiceFamilyTitle" xml:space="preserve"><value>Семейство связанных ресурсов</value></data>
+  <data name="ExportChoiceFamilyBody" xml:space="preserve"><value>Находит и экспортирует выбранный файл вместе со связанными материалами, текстурами, описателями и другими определёнными ресурсами.</value></data>
+  <data name="ExportChoiceFormat" xml:space="preserve"><value>Формат файла</value></data>
+  <data name="ExportChoiceOriginal" xml:space="preserve"><value>Исходный формат архива</value></data>
+  <data name="ExportChoiceGlb" xml:space="preserve"><value>glTF Binary (.glb)</value></data>
+  <data name="ExportChoiceObj" xml:space="preserve"><value>Wavefront OBJ (.obj)</value></data>
+  <data name="ExportChoiceFbx" xml:space="preserve"><value>Autodesk FBX (.fbx)</value></data>
+  <data name="ExportChoiceAction" xml:space="preserve"><value>Продолжить</value></data>
+  <data name="SelectedModelExportFilter" xml:space="preserve"><value>glTF Binary (*.glb)|*.glb|Wavefront OBJ (*.obj)|*.obj|Autodesk FBX (*.fbx)|*.fbx|Исходный файл архива (*{0})|*{0}</value></data>
+  <data name="Play" xml:space="preserve"><value>Воспроизвести</value></data>
+  <data name="Pause" xml:space="preserve"><value>Пауза</value></data>
+  <data name="Stop" xml:space="preserve"><value>Остановить</value></data>
+  <data name="Clear" xml:space="preserve"><value>Очистить</value></data>
+  <data name="None" xml:space="preserve"><value>Нет</value></data>
+  <data name="ItemFinderTitle" xml:space="preserve"><value>Поиск предметов</value></data>
+  <data name="ItemFinderNavigation" xml:space="preserve"><value>Предметы</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Восстановленные имена, значки инвентаря, ссылки на модели и признаки материалов</value></data>
+  <data name="ItemFinderIntro" xml:space="preserve"><value>Просматривайте тот же нативный каталог предметов, что и CDMW Full. Видимые значки загружаются первыми; остальные миниатюры инвентаря готовятся в фоне и берутся из постоянного кэша.</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Поиск по отображаемому имени, внутреннему имени, идентификатору, категории, модели, пути значка, локализованному имени или метке материала</value></data>
+  <data name="ItemFinderButtonHint" xml:space="preserve"><value>Просматривайте восстановленные игровые предметы с заранее загруженными значками инвентаря.</value></data>
+  <data name="ItemFinderOpenArchive" xml:space="preserve"><value>Загрузите архив, прежде чем открывать Поиск предметов.</value></data>
+  <data name="ItemFinderReady" xml:space="preserve"><value>Поиск предметов готов.</value></data>
+  <data name="ItemFinderLoading" xml:space="preserve"><value>Загрузка Поиска предметов...</value></data>
+  <data name="ItemFinderNoMatches" xml:space="preserve"><value>Подходящих предметов нет.</value></data>
+  <data name="ItemFinderPageSummary" xml:space="preserve"><value>Показаны {0:N0}-{1:N0} из {2:N0} подходящих предметов</value></data>
+  <data name="ItemFinderFailed" xml:space="preserve"><value>Сбой Поиска предметов: {0}</value></data>
+  <data name="ItemFinderAllCategories" xml:space="preserve"><value>Все категории</value></data>
+  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>Все метки материалов</value></data>
+  <data name="ItemFinderIconFailed" xml:space="preserve"><value>Некоторые значки инвентаря подготовить не удалось: {0}</value></data>
+  <data name="ItemFinderIconWarmup" xml:space="preserve"><value>Предзагрузка значков инвентаря: {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Подготовка постоянного кэша значков инвентаря...</value></data>
+  <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Постоянный кэш значков инвентаря готов: {0:N0}/{1:N0}</value></data>
+  <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>Ссылок на модели: {0:N0}, путей значков: {1:N0}, вариантов: {2:N0}</value></data>
+  <data name="ItemFinderEvidence" xml:space="preserve"><value>Признаки</value></data>
+  <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Локализованные имена</value></data>
+  <data name="ItemFinderMaterials" xml:space="preserve"><value>Метки материалов</value></data>
+  <data name="ItemFinderModels" xml:space="preserve"><value>Связанные модели</value></data>
+  <data name="ItemFinderIcons" xml:space="preserve"><value>Пути значков инвентаря</value></data>
+  <data name="ItemFinderShowExact" xml:space="preserve"><value>Показать точные ссылки</value></data>
+  <data name="ItemFinderShowExactHint" xml:space="preserve"><value>Закрывает Поиск предметов и показывает в Обзоре архива только напрямую восстановленные файлы моделей и значков.</value></data>
+  <data name="ItemFinderShowRelated" xml:space="preserve"><value>Показать связанный набор</value></data>
+  <data name="ItemFinderShowRelatedHint" xml:space="preserve"><value>Закрывает Поиск предметов и показывает прямые ссылки вместе с проиндексированными материалами, текстурами, метаданными, скелетами и анимациями.</value></data>
+  <data name="ItemFinderScopeLoading" xml:space="preserve"><value>Определение ссылок Поиска предметов...</value></data>
+  <data name="ItemFinderExactScopeApplied" xml:space="preserve"><value>Поиск предметов: {0} - точно связанных файлов: {1:N0}</value></data>
+  <data name="ItemFinderRelatedScopeApplied" xml:space="preserve"><value>Поиск предметов: {0} - связанных файлов: {1:N0}, включая прямых ссылок: {2:N0}</value></data>
+  <data name="ClearItemScope" xml:space="preserve"><value>Очистить набор предметов</value></data>
+  <data name="MostCommonExtensions" xml:space="preserve"><value>Самые частые</value></data>
+  <data name="MostCommonExtensionsHint" xml:space="preserve"><value>Показать самые частые расширения в активном архиве или наборе Поиска предметов.</value></data>
+</root>

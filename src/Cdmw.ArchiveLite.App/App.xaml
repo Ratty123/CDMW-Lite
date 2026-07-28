@@ -9,6 +9,10 @@
                 <ResourceDictionary Source="Themes/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+            <!-- Seeded so the shell resolves a face before a language is applied; UiFontManager
+                 replaces both keys with the stack the active language needs. -->
+            <FontFamily x:Key="UiFontFamily">Segoe UI</FontFamily>
+            <FontFamily x:Key="MonoFontFamily">Consolas</FontFamily>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

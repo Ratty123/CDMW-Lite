@@ -265,32 +265,32 @@
   <data name="ProductSubtitle" xml:space="preserve"><value>Explorar, previsualizar, buscar y exportar</value></data>
   <data name="ReadOnlyPill" xml:space="preserve"><value>ESPACIO DE SOLO LECTURA</value></data>
   <data name="DetectGame" xml:space="preserve"><value>Detectar juego</value></data>
-  <data name="DetectingGame" xml:space="preserve"><value>Buscando la instalacion de Crimson Desert...</value></data>
+  <data name="DetectingGame" xml:space="preserve"><value>Buscando la instalación de Crimson Desert...</value></data>
   <data name="GameDetected" xml:space="preserve"><value>Carpeta del juego detectada: {0}</value></data>
-  <data name="GameNotFound" xml:space="preserve"><value>No se encontro Crimson Desert automaticamente. Elige la carpeta del juego.</value></data>
+  <data name="GameNotFound" xml:space="preserve"><value>No se encontró Crimson Desert automáticamente. Elige la carpeta del juego.</value></data>
   <data name="GameFolderReady" xml:space="preserve"><value>Carpeta del juego seleccionada: {0}</value></data>
-  <data name="CacheNotChecked" xml:space="preserve"><value>CACHE SIN COMPROBAR</value></data>
-  <data name="CacheChecking" xml:space="preserve"><value>COMPROBANDO CACHE</value></data>
-  <data name="CacheCurrent" xml:space="preserve"><value>CACHE ACTUAL</value></data>
-  <data name="CacheSessionOnly" xml:space="preserve"><value>SESION DE UNA VEZ</value></data>
-  <data name="CacheMissing" xml:space="preserve"><value>FALTA CACHE</value></data>
-  <data name="CacheStale" xml:space="preserve"><value>CACHE OBSOLETA</value></data>
-  <data name="CacheRefreshRecommended" xml:space="preserve"><value>Los archivos del juego han cambiado. Usa Actualizar para reconstruir la cache.</value></data>
-  <data name="CacheInvalid" xml:space="preserve"><value>CARPETA NO VALIDA</value></data>
-  <data name="CacheReused" xml:space="preserve"><value>Se reutilizo el indice de archivo verificado.</value></data>
-  <data name="CacheRebuilt" xml:space="preserve"><value>Se reconstruyo el indice y los metadatos de cache estan actualizados.</value></data>
-  <data name="CacheSessionOnlyLoaded" xml:space="preserve"><value>El archivo se indexo de nuevo para esta sesion. No se creo ni cambio ningun indice de archivo persistente.</value></data>
+  <data name="CacheNotChecked" xml:space="preserve"><value>CACHÉ SIN COMPROBAR</value></data>
+  <data name="CacheChecking" xml:space="preserve"><value>COMPROBANDO CACHÉ</value></data>
+  <data name="CacheCurrent" xml:space="preserve"><value>CACHÉ ACTUAL</value></data>
+  <data name="CacheSessionOnly" xml:space="preserve"><value>SESIÓN DE UNA VEZ</value></data>
+  <data name="CacheMissing" xml:space="preserve"><value>FALTA LA CACHÉ</value></data>
+  <data name="CacheStale" xml:space="preserve"><value>CACHÉ OBSOLETA</value></data>
+  <data name="CacheRefreshRecommended" xml:space="preserve"><value>Los archivos del juego han cambiado. Usa Actualizar para reconstruir la caché.</value></data>
+  <data name="CacheInvalid" xml:space="preserve"><value>CARPETA NO VÁLIDA</value></data>
+  <data name="CacheReused" xml:space="preserve"><value>Se reutilizó el índice de archivo verificado.</value></data>
+  <data name="CacheRebuilt" xml:space="preserve"><value>Se reconstruyó el índice y los metadatos de caché están actualizados.</value></data>
+  <data name="CacheSessionOnlyLoaded" xml:space="preserve"><value>El archivo se indexó de nuevo para esta sesión. No se creó ni cambió ningún índice de archivo persistente.</value></data>
   <data name="CacheChoiceTitle" xml:space="preserve"><value>Carga del archivo</value></data>
-  <data name="CacheChoiceHeading" xml:space="preserve"><value>Elige como cargar el archivo</value></data>
-  <data name="CacheChoiceIntro" xml:space="preserve"><value>Archive Lite necesita un indice de los archivos del juego. Elige si se puede reutilizar o si solo debe durar durante esta sesion.</value></data>
+  <data name="CacheChoiceHeading" xml:space="preserve"><value>Elige cómo cargar el archivo</value></data>
+  <data name="CacheChoiceIntro" xml:space="preserve"><value>Archive Lite necesita un índice de los archivos del juego. Elige si se puede reutilizar o si solo debe durar durante esta sesión.</value></data>
   <data name="CacheChoiceSourceLabel" xml:space="preserve"><value>Carpeta</value></data>
   <data name="CacheChoiceRecommended" xml:space="preserve"><value>RECOMENDADO</value></data>
-  <data name="CacheChoicePersistentTitle" xml:space="preserve"><value>Usar cache persistente</value></data>
-  <data name="CacheChoicePersistentBody" xml:space="preserve"><value>Reutiliza un indice verificado cuando sea posible. Si falta o esta obsoleto, Archive Lite lo crea y lo guarda localmente para acelerar las cargas futuras. Usa algo de espacio local.</value></data>
-  <data name="CacheChoicePersistentRefreshTitle" xml:space="preserve"><value>Reconstruir cache persistente</value></data>
-  <data name="CacheChoicePersistentRefreshBody" xml:space="preserve"><value>Vuelve a examinar el archivo y sustituye de forma segura el indice guardado. Las cargas futuras pueden reutilizar la cache actualizada.</value></data>
+  <data name="CacheChoicePersistentTitle" xml:space="preserve"><value>Usar caché persistente</value></data>
+  <data name="CacheChoicePersistentBody" xml:space="preserve"><value>Reutiliza un índice verificado cuando sea posible. Si falta o está obsoleto, Archive Lite lo crea y lo guarda localmente para acelerar las cargas futuras. Usa algo de espacio local.</value></data>
+  <data name="CacheChoicePersistentRefreshTitle" xml:space="preserve"><value>Reconstruir la caché persistente</value></data>
+  <data name="CacheChoicePersistentRefreshBody" xml:space="preserve"><value>Vuelve a examinar el archivo y sustituye de forma segura el índice guardado. Las cargas futuras pueden reutilizar la caché actualizada.</value></data>
   <data name="CacheChoiceSessionTitle" xml:space="preserve"><value>Cargar solo esta vez</value></data>
-  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>Crea un indice temporal de la lista del archivo para esta sesion. No se anade a la cache de indices reutilizable y se elimina al cerrar Archive Lite, por lo que Cargar o Actualizar volvera a examinar la proxima vez.</value></data>
+  <data name="CacheChoiceSessionBody" xml:space="preserve"><value>Crea un índice temporal de la lista del archivo para esta sesión. No se añade a la caché de índices reutilizable y se elimina al cerrar Archive Lite, por lo que Cargar o Actualizar volverá a examinar la próxima vez.</value></data>
   <data name="CacheChoiceTimeNotice" xml:space="preserve"><value>El primer examen puede tardar varios minutos en instalaciones grandes. Los archivos de origen permanecen en modo de solo lectura.</value></data>
   <data name="EnterToSearch" xml:space="preserve"><value>Pulsa Enter para buscar</value></data>
   <data name="Minimize" xml:space="preserve"><value>Minimizar</value></data>
@@ -299,7 +299,7 @@
   <data name="ReadOnlyFooter" xml:space="preserve"><value>Espacio de archivo de solo lectura</value></data>
   <data name="All" xml:space="preserve"><value>Todo</value></data>
   <data name="FindInFile" xml:space="preserve"><value>Buscar en el archivo</value></data>
-  <data name="FindPrevious" xml:space="preserve"><value>Buscar anterior (Mayus+Enter)</value></data>
+  <data name="FindPrevious" xml:space="preserve"><value>Buscar anterior (Mayús+Enter)</value></data>
   <data name="FindNext" xml:space="preserve"><value>Buscar siguiente (Enter)</value></data>
   <data name="ExportSelectedHint" xml:space="preserve"><value>Exporta los archivos seleccionados. Un solo modelo PAC puede guardarse como GLB, OBJ, FBX o en su formato de archivo original.</value></data>
   <data name="ExportFamilyHint" xml:space="preserve"><value>Busca y exporta el archivo seleccionado junto con sus recursos asociados.</value></data>

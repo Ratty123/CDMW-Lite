@@ -24,13 +24,13 @@ public sealed class MainWindowViewModel : ObservableObject
     {
         _worker = worker;
         _settings = settings;
-        Languages =
-        [
-            new LanguageOption("en", "English"),
-            new LanguageOption("de", "Deutsch"),
-            new LanguageOption("es", "Español"),
-        ];
-        _selectedLanguage = Languages.FirstOrDefault(option => option.Code.Equals(settings.Language, StringComparison.OrdinalIgnoreCase)) ?? Languages[0];
+        Languages = LanguageCatalog.Languages
+            .Select(static language => new LanguageOption(language.Code, language.Endonym))
+            .ToArray();
+        // Resolve through the catalog so a stored regional code such as pt-PT or zh-CN selects the
+        // language that covers it instead of silently reverting to English.
+        var resolvedLanguage = LanguageCatalog.Resolve(settings.Language);
+        _selectedLanguage = Languages.First(option => option.Code.Equals(resolvedLanguage.Code, StringComparison.Ordinal));
         _themes = BuildThemeOptions();
         _selectedTheme = Themes.FirstOrDefault(option => option.Id.Equals(settings.Theme, StringComparison.OrdinalIgnoreCase)) ?? Themes[0];
         _fontSizes = BuildFontSizeOptions();
