@@ -4,6 +4,10 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- The preview now reproduces the brightness an asset's own albedo declares. Decoding the visible base textures of 130 weapons and measuring them against their render gave a value ratio of 0.850 — a piece rendered at 85% of the brightness its own texture carries, because the key, fill and ambient terms do not integrate to unity over a curved surface. The game's own item icons, rendered from these same assets by its own pipeline, sit at 0.986 of their source, which settles that reproducing the albedo is the intended target rather than a look. The tone gamma now closes most of that gap (0.850 to 0.931) and is applied to luminance rather than per channel: a per-channel power raises a low channel proportionally more than a high one and desaturates, which cost colour reproduction 0.958 to 0.747 when tried. An exposure was tried first and rejected — it scales the whole range and pushes the top into clipping, which the view-mode gate caught when the lit pass saturated to match its own base colour. The icons run 1.174x the source saturation; that is their grading and is deliberately not matched.
+
 ## [0.8.0] - 2026-07-28
 
 ### Added
