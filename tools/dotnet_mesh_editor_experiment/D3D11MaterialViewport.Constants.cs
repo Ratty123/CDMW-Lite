@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace Cdmw.MeshEditorExperiment;
@@ -33,7 +33,21 @@ internal sealed record D3D11PresentationSettings
     public float EmissiveGain { get; init; } = 2.2f;
     public float ToneExposure { get; init; } = 1.0f;
     public float ToneContrast { get; init; } = 1.08f;
-    public float ToneGamma { get; init; } = 1.0f;
+    // Calibrated against the assets themselves. Decoding the visible base
+    // textures of 130 weapons and comparing them with their render gave a value
+    // ratio of 0.850 -- the preview reproduced an asset at 85% of the brightness
+    // its own albedo declares, because the key, fill and ambient terms do not
+    // integrate to unity over a curved surface. The game's own item icons,
+    // rendered from these same assets, sit at 0.986 of their source, so
+    // reproducing the albedo is the intended target rather than a look.
+    //
+    // A gamma is the right instrument for that and an exposure is not: exposure
+    // scales the whole range and pushes the top into clipping, which the
+    // view-mode gate caught immediately when the lit pass saturated to match its
+    // own base colour. A gamma below one lifts the mid-tones and leaves 1.0
+    // fixed, so nothing new clips. The icons also run 1.17x the source
+    // saturation; that is their grading and is deliberately not matched.
+    public float ToneGamma { get; init; } = 0.88f;
     public int MaxAnisotropy { get; init; } = 16;
     public float MipLodBias { get; init; } = -2.0f;
     public string TextureAddressMode { get; init; } = "wrap";
