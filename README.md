@@ -167,3 +167,12 @@ These paths and all build outputs are excluded from version control.
 - [SECURITY.md](SECURITY.md) - supported versions and private reporting
 - [CHANGELOG.md](CHANGELOG.md) - notable version changes
 - [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) - bundled component notices
+
+## License
+
+[MIT](LICENSE). Bundled third-party components keep their own licences, listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+Archive Lite reads game files that it never ships. It contains no Crimson Desert content, and the
+archives it opens stay read-only. Whatever you export from your own installation remains subject to
+the game's own terms.

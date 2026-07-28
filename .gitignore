@@ -17,3 +17,6 @@ workspace/
 
 # Headless GPU soak run artifact
 dotnet-gpu-sparse-soak.json
+
+# Agent working notes, not part of the published project
+AGENTS.md
