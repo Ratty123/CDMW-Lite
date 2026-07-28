@@ -4,6 +4,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-07-28
+
 ### Added
 
 - The language picker now offers all fourteen interface languages Crimson Desert itself ships, up from three: English, French, Italian, German, Spanish, Latin-American Spanish, Brazilian Portuguese, Polish, Russian, Turkish, Japanese, Korean, Simplified Chinese and Traditional Chinese. The picker sits where it always has, beside Theme and Font size, and still switches live without a restart. None of the fourteen are right-to-left, so the shell needs no bidirectional layout. Translations are complete but have not been reviewed by native speakers; the terminology is technical and worth a pass before release.
@@ -17,6 +19,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- Switching language now re-localizes the file grid and the catalogue line, which previously kept whatever language was active when they were built. Grid cells resolve their labels through value converters bound to the row's own record, so nothing in the row signalled that the language moved, and the settled catalogue line was stored as already-formatted text. Cycling the picker therefore left, say, a Simplified Chinese `模型` in the File type column and a Traditional Chinese count line above a UI that was otherwise Japanese. The behaviour predates the fourteen-language work — English to German did the same — but was easy to miss with three languages and unmissable with fourteen. The catalogue line now keeps its resolver rather than its resolved text, and a language change refreshes the grid view so the converters re-run; the grid selection is preserved across that refresh.
 - Sixteen Spanish strings had their accents stripped — `instalacion`, `indice`, `sesion`, `anade`, `Mayus`, and the cache-status badges — and now read correctly.
 
 - Faces are no longer classified as metal. Skin packs its `_sp` map differently from equipment: on a shield or a blade the red channel is a constant 1.0 filler and blue is metalness, but a skin map puts the subsurface term in red and leaves blue saturated — `cd_phm_00_head_0001_sp` measures R 0.770 and B 0.997 flat across the whole face. Read as metalness that made every face 100% metal, and 24 of 72 sampled heads classified metal rather than skin. A metal classification takes the lower ambient floor and the cut diffuse, so a face rendered at 0.45 of the brightness its own albedo carries, grey and waxy. The declared channel layout for a skin surface map now says only what the channel holds, as it already did for hair. Across 1,195 assets the share rendering below half their albedo falls from 1.51% to 0.08%, heads recover from 0.958 to 0.999 of their albedo, and nothing renders worse.

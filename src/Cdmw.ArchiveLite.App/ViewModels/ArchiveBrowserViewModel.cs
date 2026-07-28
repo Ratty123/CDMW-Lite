@@ -38,6 +38,11 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private ArchiveRoleFilter _selectedRole = null!;
     private ArchiveCategoryCount? _selectedCategory;
     private ArchiveEntryDto? _selectedEntry;
+    /// <summary>
+    /// How to rebuild the settled catalogue line, kept so a later language change can re-resolve it.
+    /// Storing the formatted text alone left the counts frozen in whichever language produced them.
+    /// </summary>
+    private Func<string>? _catalogueStatusSource;
     private IReadOnlyList<long> _selectedEntryIds = [];
     private string _previewTitle = LocalizationManager.Get("Preview");
     private string _previewMetadata = string.Empty;
@@ -240,6 +245,22 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             CatalogueStatus = LocalizationManager.Get("NameIndexLoading");
         }
+        else if (_catalogueStatusSource is not null)
+        {
+            CatalogueStatus = _catalogueStatusSource();
+        }
+
+        // Grid cells resolve their labels through value converters bound to the row's own DTO, so
+        // nothing in the row tells them the language moved. Refreshing the view regenerates the
+        // rows and re-runs the converters; the selection survives because the items are the same
+        // instances.
+        var selectedEntry = SelectedEntry;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(Entries)?.Refresh();
+        if (selectedEntry is not null && Entries.Contains(selectedEntry))
+        {
+            SelectedEntry = selectedEntry;
+        }
+
         if (SelectedEntry is null)
         {
             PreviewTitle = LocalizationManager.Get("Preview");
@@ -403,7 +424,23 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     public string CatalogueStatus
     {
         get => _catalogueStatus;
-        private set => SetProperty(ref _catalogueStatus, value);
+        // Any direct assignment is a transient line (loading, progress, cleared) that a later
+        // language change must not overwrite with a settled result, so it drops the stored source.
+        private set
+        {
+            _catalogueStatusSource = null;
+            SetProperty(ref _catalogueStatus, value);
+        }
+    }
+
+    /// <summary>
+    /// Publishes a catalogue line that survives a language change, by keeping the resolver rather
+    /// than the resolved text.
+    /// </summary>
+    private void SetCatalogueStatus(Func<string> localized)
+    {
+        CatalogueStatus = localized();
+        _catalogueStatusSource = localized;
     }
 
     public string ItemScopeStatus
@@ -1352,9 +1389,13 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 return;
             }
 
-            CatalogueStatus = names.Available
-                ? LocalizationManager.Format("NameIndexReady", names.ExactNameCount, names.RelatedNameCount, names.ItemCount)
-                : names.Warning ?? LocalizationManager.Get("NameIndexUnavailable");
+            var exactNameCount = names.ExactNameCount;
+            var relatedNameCount = names.RelatedNameCount;
+            var itemCount = names.ItemCount;
+            var warning = names.Warning;
+            SetCatalogueStatus(names.Available
+                ? () => LocalizationManager.Format("NameIndexReady", exactNameCount, relatedNameCount, itemCount)
+                : () => warning ?? LocalizationManager.Get("NameIndexUnavailable"));
             IsNameIndexBusy = false;
             if (names.Available)
             {
@@ -1370,7 +1411,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             if (CatalogueIsCurrent(sessionId, generation))
             {
-                CatalogueStatus = LocalizationManager.Format("NameIndexFailed", exception.Message);
+                var reason = exception.Message;
+                SetCatalogueStatus(() => LocalizationManager.Format("NameIndexFailed", reason));
             }
         }
         finally
