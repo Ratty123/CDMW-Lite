@@ -29,6 +29,15 @@ subsurface and leaves blue saturated, so reading blue as metalness there makes
 every face fully metallic. Check what a channel holds for the family before
 decoding it.
 
+**Measure texture, greyness and flatness separately.** They have different
+causes and conflating them wastes a sweep. Chroma says grey; the light-to-shadow
+spread says flat; and whether a part is *textured at all* is high-frequency
+energy -- the mean absolute deviation of each pixel from its local
+neighbourhood. A bound albedo produces per-texel variation and a flat fill does
+not. Over 1,200 assets, 122 measured almost no texture detail and 104 of those
+were equally flat in the unlit pass, so the flatness was in the albedo and not
+in the renderer.
+
 **Pair every render with an unlit one.** A lit/unlit pair on identical framing
 isolates the lighting stage from the albedo pipeline and is the only cheap way to
 tell "the source is dark" from "the renderer darkens it". Across 728 weapons and
@@ -106,8 +115,48 @@ comfortable a conclusion. Some of that tail was a defect: 4% of assets rendered
 below half the brightness their own albedo carries, and correcting the metal
 compensation below halved it.
 
+## Open — diagnosed, not fixed
+
+**A colourless overlay can take a part's albedo from a coloured layer.** An `_o`
+overlay is a wear or paint wash laid over a colour, and the ones shipped here are
+authored achromatic. Where the overlay is the only candidate with sidecar
+authority it eliminates every colour-layer candidate, and the part renders the
+wash instead of the material.
+
+Scope, over 3,504 assets: **662 parts take an `_o` overlay as their base, 554 of
+those overlays carry no colour, and 527 of those have a coloured layer available**
+behind them.
+
+Worked example, `cd_phw_00_ub_00_0161`. Rendering its eleven parts in isolation
+identifies p3 as the sleeves, which the game shows as dark leather and the preview
+shows as flat pale grey. Its base is `cd_phw_00_ub_00_0145_o.dds`, decoding to RGB
+0.489 / 0.492 / 0.489 -- mean chroma 0.003, a pure grey wash. The layer behind it,
+`cd_texturelayer_002_0003`, measures 0.108 mean chroma, a real brown. Its torso,
+p9 and p10, is separately grey because it draws neutral library tiles with the
+authored tint at strength 0.
+
+The entry point is the `layer_diffuse_candidate` skip in
+`best_base_binding_for_mode`, which drops every layer candidate once
+`availability.authoritative_sidecar` is set.
+
+Three fixes were tried and none fired, so do not repeat them without
+instrumenting first:
+
+1. Penalising the overlay's scoring bonus. The overlay was not winning through
+   that bonus.
+2. Exempting coloured layers from the elimination rule. That only makes them
+   eligible; the overlay still outscores them.
+3. Both together. The chroma predicate never matched the binding at all.
+
+The untested suspicion is that `inspect_dds_channel_statistics` decodes only BC1
+and BC3, so a layer in another format returns invalid and a chroma test silently
+never sees it. Confirm that by logging what the selector actually considers
+before writing a fourth attempt.
+
 ## Coverage
 
-About 5,400 distinct assets have been prepared and rendered across the equipment
-set, plus four whole-corpus scans of all 12,340 equipment PACs. Every weapon and
-shield in the archive (735) has been reviewed on its correct camera.
+About 6,600 distinct assets have been prepared and rendered, plus four
+whole-corpus scans of all 12,340 equipment PACs. Every weapon and shield in the
+archive (735) has been reviewed on its correct camera, and a 1,200-asset sweep
+spanning equipment, monsters, NPCs and props has been screened for flat, grey and
+untextured output with a paired unlit render.
