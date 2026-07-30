@@ -118,6 +118,40 @@ internal static class ArchiveLiteTestRunner
             texturedPreviewJson.Contains("\"include_model_textures\":true", StringComparison.Ordinal)
             && new PreviewRequest("session", 17).IncludeModelTextures == false,
             "opt-in model texture intent is not snake case or no longer defaults off");
+        // The folder tree carries a filter across the protocol, and the filter record exposes
+        // computed members. Those go out as extra JSON that the worker has to ignore rather than
+        // reject, or every attempt to open a folder would fail with only a status line to show it.
+        var filteredTree = WorkerProtocol.Request(
+            Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            9,
+            WorkerProtocol.ArchiveFolderTree,
+            new ArchiveFolderTreeRequest(
+                "session",
+                "character/model",
+                Filter: new ArchiveEntryFilter(
+                    Extensions: [".pac"],
+                    Roles: [ArchiveEntryRole.Model])));
+        var filteredTreeJson = JsonSerializer.Serialize(filteredTree, WorkerProtocol.JsonOptions);
+        Require(
+            filteredTreeJson.Contains("\"previewable_only\":false", StringComparison.Ordinal)
+            && filteredTreeJson.Contains("\"model\"", StringComparison.Ordinal),
+            "the folder tree filter is not a snake-case protocol payload");
+        var readBack = WorkerProtocol.ReadPayload<ArchiveFolderTreeRequest>(filteredTree);
+        Require(
+            readBack?.Path == "character/model"
+            && readBack.Filter is { Extensions.Count: 1, Roles.Count: 1 }
+            && readBack.Filter.Extensions[0] == ".pac"
+            && readBack.Filter.Roles[0] == ArchiveEntryRole.Model,
+            "the folder tree filter did not round-trip across the protocol");
+        var filesRequest = WorkerProtocol.Request(
+            Guid.Parse("55555555-5555-5555-5555-555555555555"),
+            9,
+            WorkerProtocol.ArchiveFolderFiles,
+            new ArchiveFolderFilesRequest("session", "character/model", Filter: new ArchiveEntryFilter(PathText: "hero")));
+        Require(
+            WorkerProtocol.ReadPayload<ArchiveFolderFilesRequest>(filesRequest)?.Filter?.PathText == "hero",
+            "the folder file listing's filter did not round-trip across the protocol");
+
         var cachedOnlyMessage = WorkerProtocol.Request(
             Guid.Parse("23232323-2323-2323-2323-232323232323"),
             8,

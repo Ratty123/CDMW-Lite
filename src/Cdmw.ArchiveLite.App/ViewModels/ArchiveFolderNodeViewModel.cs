@@ -89,9 +89,7 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
     public bool IsFile => Entry is not null;
     public ObservableCollection<ArchiveFolderNodeViewModel> Children { get; } = [];
 
-    // A real folder always holds at least one file somewhere below it, so a zero count belongs to the
-    // synthetic "All" row, which names no folder and has nothing to count.
-    public string Label => IsPlaceholder || IsFile || TotalCount == 0 ? Name : $"{Name} ({TotalCount:N0})";
+    public string Label => IsPlaceholder || IsFile ? Name : $"{Name} ({TotalCount:N0})";
 
     public bool IsExpanded
     {
@@ -216,9 +214,12 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
     public static ArchiveFolderNodeViewModel CreateFile(ArchiveFolderTreeContext context, ArchiveEntryDto entry) =>
         new(context, entry, 0);
 
-    /// <summary>Creates the row that releases the folder filter, shown above the top-level folders.</summary>
-    public static ArchiveFolderNodeViewModel CreateAllFolders(ArchiveFolderTreeContext context) =>
-        new(context, LocalizationManager.Get("All"), string.Empty, 0, 0, hasChildren: false);
+    /// <summary>
+    /// Creates the row that releases the folder filter, shown above the top-level folders. It counts
+    /// everything the tree covers, which is the whole archive until a filter narrows it.
+    /// </summary>
+    public static ArchiveFolderNodeViewModel CreateAllFolders(ArchiveFolderTreeContext context, long totalCount) =>
+        new(context, LocalizationManager.Get("All"), string.Empty, 0, totalCount, hasChildren: false);
 }
 
 /// <summary>
