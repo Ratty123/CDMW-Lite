@@ -133,6 +133,7 @@
   <data name="FoldersView" xml:space="preserve"><value>文件夹</value></data>
   <data name="CategoriesView" xml:space="preserve"><value>分类</value></data>
   <data name="CategoriesFoldersView" xml:space="preserve"><value>分类 + 文件夹</value></data>
+  <data name="TreeView" xml:space="preserve"><value>树形</value></data>
   <data name="FlatView" xml:space="preserve"><value>平铺</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>文件夹</value></data>
   <data name="SortBy" xml:space="preserve"><value>排序方式</value></data>
@@ -140,6 +141,7 @@
   <data name="Folders" xml:space="preserve"><value>文件夹</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>正在加载文件夹...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>正在显示此层级的前 {0} 个文件夹。</value></data>
+  <data name="FolderFilesTruncated" xml:space="preserve"><value>正在显示此文件夹中 {1} 个文件的前 {0} 个。</value></data>
   <data name="Categories" xml:space="preserve"><value>分类</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>上一页</value></data>
   <data name="NextPage" xml:space="preserve"><value>下一页</value></data>

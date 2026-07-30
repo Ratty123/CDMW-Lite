@@ -133,6 +133,7 @@
   <data name="FoldersView" xml:space="preserve"><value>폴더</value></data>
   <data name="CategoriesView" xml:space="preserve"><value>범주</value></data>
   <data name="CategoriesFoldersView" xml:space="preserve"><value>범주 + 폴더</value></data>
+  <data name="TreeView" xml:space="preserve"><value>트리</value></data>
   <data name="FlatView" xml:space="preserve"><value>단순 목록</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>폴더</value></data>
   <data name="SortBy" xml:space="preserve"><value>정렬 기준</value></data>
@@ -140,6 +141,7 @@
   <data name="Folders" xml:space="preserve"><value>폴더</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>폴더를 불러오는 중...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>이 수준의 처음 {0}개 폴더를 표시합니다.</value></data>
+  <data name="FolderFilesTruncated" xml:space="preserve"><value>이 폴더의 파일 {1}개 중 {0}개를 표시합니다.</value></data>
   <data name="Categories" xml:space="preserve"><value>범주</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>이전</value></data>
   <data name="NextPage" xml:space="preserve"><value>다음</value></data>

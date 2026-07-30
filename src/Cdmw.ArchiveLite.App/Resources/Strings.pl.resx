@@ -133,6 +133,7 @@
   <data name="FoldersView" xml:space="preserve"><value>Foldery</value></data>
   <data name="CategoriesView" xml:space="preserve"><value>Kategorie</value></data>
   <data name="CategoriesFoldersView" xml:space="preserve"><value>Kategorie + foldery</value></data>
+  <data name="TreeView" xml:space="preserve"><value>Drzewo</value></data>
   <data name="FlatView" xml:space="preserve"><value>Płaski</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Folder</value></data>
   <data name="SortBy" xml:space="preserve"><value>Sortuj według</value></data>
@@ -140,6 +141,7 @@
   <data name="Folders" xml:space="preserve"><value>Foldery</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>Ładowanie folderów...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>Wyświetlanie pierwszych {0} folderów na tym poziomie.</value></data>
+  <data name="FolderFilesTruncated" xml:space="preserve"><value>Wyświetlanie {0} z {1} plików w tym folderze.</value></data>
   <data name="Categories" xml:space="preserve"><value>Kategorie</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>Poprzednia</value></data>
   <data name="NextPage" xml:space="preserve"><value>Następna</value></data>

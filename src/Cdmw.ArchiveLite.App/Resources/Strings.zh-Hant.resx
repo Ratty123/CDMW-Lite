@@ -133,6 +133,7 @@
   <data name="FoldersView" xml:space="preserve"><value>資料夾</value></data>
   <data name="CategoriesView" xml:space="preserve"><value>分類</value></data>
   <data name="CategoriesFoldersView" xml:space="preserve"><value>分類 + 資料夾</value></data>
+  <data name="TreeView" xml:space="preserve"><value>樹狀</value></data>
   <data name="FlatView" xml:space="preserve"><value>平面</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>資料夾</value></data>
   <data name="SortBy" xml:space="preserve"><value>排序方式</value></data>
@@ -140,6 +141,7 @@
   <data name="Folders" xml:space="preserve"><value>資料夾</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>正在載入資料夾...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>正在顯示此層級的前 {0} 個資料夾。</value></data>
+  <data name="FolderFilesTruncated" xml:space="preserve"><value>正在顯示此資料夾中 {1} 個檔案的前 {0} 個。</value></data>
   <data name="Categories" xml:space="preserve"><value>分類</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>上一頁</value></data>
   <data name="NextPage" xml:space="preserve"><value>下一頁</value></data>

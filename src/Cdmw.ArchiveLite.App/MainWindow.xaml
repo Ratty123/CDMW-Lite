@@ -280,7 +280,7 @@
                             <ColumnDefinition x:Name="ArchiveFilterColumn" Width="278" MinWidth="250" />
                             <ColumnDefinition Width="7" />
                             <ColumnDefinition x:Name="ArchiveFolderColumn" Width="240" MinWidth="170" />
-                            <ColumnDefinition Width="7" />
+                            <ColumnDefinition x:Name="ArchiveFolderSplitterColumn" Width="7" />
                             <ColumnDefinition x:Name="ArchiveResultsColumn" Width="1.5*" MinWidth="410" />
                             <ColumnDefinition Width="7" />
                             <ColumnDefinition x:Name="ArchivePreviewColumn" Width="0.85*" MinWidth="350" MaxWidth="1000" />
@@ -416,10 +416,6 @@
                                                   DisplayMemberPath="Label"
                                                   SelectedValuePath="Value"
                                                   SelectedValue="{Binding ArchiveBrowser.ViewMode}" />
-                                        <TextBlock Margin="0,0,0,5" Text="{infra:Loc Key=FolderFilter}" />
-                                        <ComboBox Margin="0,0,0,10"
-                                                  ItemsSource="{Binding ArchiveBrowser.Folders}"
-                                                  SelectedItem="{Binding ArchiveBrowser.SelectedFolder}" />
                                         <TextBlock Margin="0,0,0,5" Text="{infra:Loc Key=SortBy}" />
                                         <ComboBox Margin="0,0,0,7"
                                                   ItemsSource="{Binding ArchiveBrowser.SortFields}"
@@ -480,7 +476,9 @@
                                       DragStarted="OnWorkspaceSplitterDragStarted"
                                       DragCompleted="OnWorkspaceSplitterDragCompleted" />
 
-                        <GroupBox Grid.Column="2" Header="{infra:Loc Key=Folders}">
+                        <GroupBox Grid.Column="2"
+                                  Header="{infra:Loc Key=Folders}"
+                                  Visibility="{Binding ArchiveBrowser.ShowFolderNavigator, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <TreeView x:Name="ArchiveFolderTree"
                                       BorderThickness="0"
                                       Background="Transparent"
@@ -507,14 +505,19 @@
                             </TreeView>
                         </GroupBox>
 
-                        <GridSplitter Grid.Column="3"
+                        <GridSplitter x:Name="ArchiveFolderSplitter"
+                                      Grid.Column="3"
                                       Width="7"
                                       HorizontalAlignment="Stretch"
+                                      Visibility="{Binding ArchiveBrowser.ShowFolderNavigator, Converter={StaticResource BooleanToVisibilityConverter}}"
                                       DragStarted="OnWorkspaceSplitterDragStarted"
                                       DragCompleted="OnWorkspaceSplitterDragCompleted" />
 
                         <Border Grid.Column="4" Margin="10,0" Style="{StaticResource CardBorderStyle}" Padding="0">
-                            <Grid>
+                            <!-- The header strip and the paging row paint their own backgrounds to
+                                 the full width, so without this they square off the card's rounded
+                                 corners. The radius is the card's own less its one-pixel border. -->
+                            <Grid infra:RoundedClip.Radius="11">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
@@ -598,9 +601,39 @@
                                         </Popup>
                                     </Grid>
                                 </Border>
+                                <!-- The tree view replaces the grid rather than sitting beside it:
+                                     in that mode the tree is the entry list, folders opening onto
+                                     the files they hold. -->
+                                <TreeView x:Name="ArchiveEntryTree"
+                                          Grid.Row="1"
+                                          BorderThickness="0"
+                                          Background="Transparent"
+                                          ItemsSource="{Binding ArchiveBrowser.FolderTree}"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                          Visibility="{Binding ArchiveBrowser.ShowEntryTree, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                          PreviewMouseRightButtonDown="OnArchiveFolderTreeRightButtonDown">
+                                    <TreeView.ContextMenu>
+                                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                            <MenuItem Header="{infra:Loc Key=ExportFolder}"
+                                                      Command="{Binding ArchiveBrowser.ExportFolderCommand}" />
+                                        </ContextMenu>
+                                    </TreeView.ContextMenu>
+                                    <TreeView.ItemContainerStyle>
+                                        <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+                                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                        </Style>
+                                    </TreeView.ItemContainerStyle>
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                            <TextBlock Text="{Binding Label}" ToolTip="{Binding Path}" />
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
                                 <DataGrid x:Name="ArchiveGrid"
                                           Grid.Row="1"
                                           BorderThickness="0"
+                                          Visibility="{Binding ArchiveBrowser.ShowEntryGrid, Converter={StaticResource BooleanToVisibilityConverter}}"
                                           ItemsSource="{Binding ArchiveBrowser.Entries}"
                                           SelectedItem="{Binding ArchiveBrowser.SelectedEntry}"
                                           AutoGenerateColumns="False"

@@ -83,6 +83,8 @@ public enum ArchiveViewMode
     Categories,
     CategoriesAndFolders,
     Flat,
+    /// <summary>The entry list is itself the archive's tree, with files under their folders.</summary>
+    Tree,
 }
 
 public enum ArchiveSortField
