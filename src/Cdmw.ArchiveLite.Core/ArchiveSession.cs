@@ -12,7 +12,15 @@ public sealed class ArchiveSession : IDisposable
     private ArchiveItemNameIndex? _nameIndex;
     private ArchiveItemCatalog? _itemCatalog;
     private IReadOnlyList<ArchiveExtensionFacet>? _extensionFacets;
-    private ArchiveFolderTree? _folderTree;
+    /// <summary>
+    /// One resident folder tree per filter. The unfiltered tree is the expensive one and is kept for
+    /// the life of the session; the filtered ones are bounded because a user can type a great many
+    /// filters in one sitting and each tree holds an entry id for every file it covers.
+    /// </summary>
+    private readonly Dictionary<string, ArchiveFolderTree> _folderTrees = new(StringComparer.Ordinal);
+    private readonly Queue<string> _folderTreeOrder = new();
+    private const int MaximumFolderTrees = 4;
+    private static readonly string UnfilteredFolderTreeKey = new ArchiveEntryFilter().CacheKey;
     private readonly string? _ownedIndexPath;
     private readonly string? _ownedBasenameIndexPath;
     private readonly string? _ownedExtensionIndexPath;
@@ -118,21 +126,30 @@ public sealed class ArchiveSession : IDisposable
         }
     }
 
-    internal bool TryGetFolderTree(out ArchiveFolderTree? tree)
+    internal bool TryGetFolderTree(string filterKey, out ArchiveFolderTree? tree)
     {
         lock (_catalogueGate)
         {
-            tree = _folderTree;
-            return tree is not null;
+            return _folderTrees.TryGetValue(filterKey, out tree);
         }
     }
 
-    internal void SetFolderTree(ArchiveFolderTree tree)
+    internal void SetFolderTree(string filterKey, ArchiveFolderTree tree)
     {
         ArgumentNullException.ThrowIfNull(tree);
         lock (_catalogueGate)
         {
-            _folderTree = tree;
+            // The unfiltered tree costs a pass over every path in the archive and every filtered tree
+            // is cheaper than it, so it is never the one given up.
+            if (_folderTrees.TryAdd(filterKey, tree) && filterKey != UnfilteredFolderTreeKey)
+            {
+                _folderTreeOrder.Enqueue(filterKey);
+            }
+            while (_folderTreeOrder.Count > MaximumFolderTrees)
+            {
+                var evicted = _folderTreeOrder.Dequeue();
+                _folderTrees.Remove(evicted);
+            }
         }
     }
 

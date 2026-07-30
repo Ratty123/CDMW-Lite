@@ -29,7 +29,8 @@ public enum ArchiveExtensionCategory
 public sealed record ArchiveFolderTreeRequest(
     string SessionId,
     string? Path = null,
-    int Depth = 1);
+    int Depth = 1,
+    ArchiveEntryFilter? Filter = null);
 
 public sealed record ArchiveFolderTreeResult(
     string SessionId,
@@ -59,7 +60,8 @@ public sealed record ArchiveFolderFilesRequest(
     string SessionId,
     string? Path = null,
     int PageStart = 0,
-    int PageSize = 512);
+    int PageSize = 512,
+    ArchiveEntryFilter? Filter = null);
 
 public sealed record ArchiveFolderFilesResult(
     string SessionId,
