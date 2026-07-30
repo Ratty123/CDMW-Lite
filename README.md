@@ -160,6 +160,8 @@ Portable builds keep settings, caches, logs, and crash reports beside the execut
 
 These paths and all build outputs are excluded from version control.
 
+Neither package is code-signed. The standalone launcher unpacks its runtime and then starts it, which Microsoft Defender's machine-learning heuristic has flagged on a fresh release as `Trojan:Win32/Wacatac.B!ml` — a false positive. Each release lists the SHA-256 of both packages, and the portable zip carries the same application as ordinary files rather than as a self-extracting executable.
+
 ## Project documents
 
 - [TESTING.md](TESTING.md) - validation matrix and proof boundaries
