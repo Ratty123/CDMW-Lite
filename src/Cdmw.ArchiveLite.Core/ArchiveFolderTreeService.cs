@@ -202,7 +202,9 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
     /// Files the entry under every folder on its path. The trailing segment is the file name, so a
     /// path without a separator belongs directly to the archive root.
     /// </summary>
-    private static void Add(ArchiveFolderTreeNode root, string virtualPath, long entryId)
+    public static ArchiveFolderTreeNode CreateRoot() => new(string.Empty, string.Empty);
+
+    public static void Add(ArchiveFolderTreeNode root, string virtualPath, long entryId)
     {
         var path = virtualPath.Replace('\\', '/').Trim('/');
         root.TotalCount++;

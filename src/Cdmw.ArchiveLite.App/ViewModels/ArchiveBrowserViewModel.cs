@@ -1405,6 +1405,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             PreviewableOnly: PreviewableOnly,
             ViewMode: ViewMode,
             IncludeCategoryFacets: ShowCategories,
+            IncludeFolderTree: ShowFolderNavigator || ShowEntryTree,
             SortField: SortField,
             SortDescending: SortDescending,
             PageStart: pageStart,
