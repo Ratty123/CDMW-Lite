@@ -43,7 +43,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private long _folderTreeGeneration;
     private string? _folderTreeFilterKey;
     private long _folderTreeTotalCount;
-    private bool _entryTreeRebuildQueued;
+    private readonly ArchiveEntryTreeRows _entryTreeRows = new();
     private bool _restoringCategorySelection;
     private ArchiveFolderNodeViewModel? _selectedTreeNode;
     private ArchiveRoleFilter _selectedRole = null!;
@@ -211,7 +211,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     /// WPF has no tree that can align columns, so the tree view is a grid of these rows and the
     /// indent and expander live inside the first column.
     /// </summary>
-    public ObservableCollection<ArchiveFolderNodeViewModel> EntryTreeRows { get; } = [];
+    public ObservableCollection<ArchiveFolderNodeViewModel> EntryTreeRows => _entryTreeRows.Rows;
     public ObservableCollection<ArchiveCategoryCount> Categories { get; } = [];
     public ObservableCollection<ArchiveExtensionChoice> ExtensionChoices { get; } = [];
     public ObservableCollection<ArchiveExtensionChoice> MostCommonExtensionChoices { get; } = [];
@@ -1448,7 +1448,10 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         }
         // The pane's tree lists folders alone and the tree view lists their files as well, so moving
         // between the two rebuilds from the root rather than reusing rows built to the other shape.
-        if (_folderTreeContext is { } existing && existing.IncludesFiles == ShowEntryTree)
+        // A filter that moved while no tree was on screen is picked up here for the same reason.
+        if (_folderTreeContext is { } existing
+            && existing.IncludesFiles == ShowEntryTree
+            && string.Equals(_folderTreeFilterKey, CreateTreeFilter().CacheKey, StringComparison.Ordinal))
         {
             return;
         }
@@ -1496,6 +1499,14 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     /// </summary>
     private void RefreshFolderTreeForFilters()
     {
+        // Only when a tree is actually on screen. Rebuilding one costs a pass over the archive, and a
+        // role filter - which is what choosing a category applies - has no index to shorten it. Doing
+        // that on every category click for a tree nobody can see is the expensive kind of nothing.
+        // Coming back to a tree view re-reads the filter, so it cannot be left showing stale rows.
+        if (!ShowFolderNavigator && !ShowEntryTree)
+        {
+            return;
+        }
         if (_folderTreeContext is null || SessionId is not { } sessionId || string.IsNullOrWhiteSpace(sessionId))
         {
             return;
@@ -1537,10 +1548,6 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             foreach (var file in rootFiles)
             {
                 FolderTree.Add(ArchiveFolderNodeViewModel.CreateFile(context, file));
-            }
-            foreach (var root in FolderTree)
-            {
-                TrackEntryTreeNode(root);
             }
             RebuildEntryTreeRows();
         }
@@ -1597,89 +1604,16 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         return result.Nodes;
     }
 
-    /// <summary>
-    /// Asks for the flattened rows to be rebuilt. The request is deferred because the things that
-    /// raise it - a node expanding, a level arriving - happen inside a binding update on the very row
-    /// the grid is handling, and replacing its items from in there is a re-entrant edit that WPF is
-    /// entitled to drop. Deferring also collapses the burst of one notification per arriving child
-    /// into a single rebuild.
-    /// </summary>
-    private void RequestEntryTreeRowRebuild()
-    {
-        if (_entryTreeRebuildQueued)
-        {
-            return;
-        }
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher is null)
-        {
-            RebuildEntryTreeRows();
-            return;
-        }
-        _entryTreeRebuildQueued = true;
-        _ = dispatcher.BeginInvoke(
-            System.Windows.Threading.DispatcherPriority.Background,
-            () =>
-            {
-                _entryTreeRebuildQueued = false;
-                RebuildEntryTreeRows();
-            });
-    }
-
-    /// <summary>
-    /// Rebuilds the flattened rows the tree grid shows. Every open node contributes its children.
-    /// </summary>
     private void RebuildEntryTreeRows()
     {
-        if (!ShowEntryTree)
+        if (ShowEntryTree)
         {
-            if (EntryTreeRows.Count > 0)
-            {
-                EntryTreeRows.Clear();
-            }
-            return;
+            _entryTreeRows.Reset(FolderTree);
         }
-
-        EntryTreeRows.Clear();
-        foreach (var root in FolderTree)
+        else
         {
-            EntryTreeRows.Add(root);
-            foreach (var descendant in root.VisibleDescendants())
-            {
-                EntryTreeRows.Add(descendant);
-            }
+            _entryTreeRows.Clear();
         }
-    }
-
-    /// <summary>
-    /// Watches a node so the flattened rows follow it. Expanding changes which rows are visible, and
-    /// a level arriving from the worker changes them again once its children land.
-    /// </summary>
-    private void TrackEntryTreeNode(ArchiveFolderNodeViewModel node)
-    {
-        node.PropertyChanged += OnEntryTreeNodeChanged;
-        node.Children.CollectionChanged += OnEntryTreeChildrenChanged;
-        foreach (var child in node.Children)
-        {
-            TrackEntryTreeNode(child);
-        }
-    }
-
-    private void OnEntryTreeNodeChanged(object? sender, PropertyChangedEventArgs eventArgs)
-    {
-        if (eventArgs.PropertyName == nameof(ArchiveFolderNodeViewModel.IsExpanded))
-        {
-            RequestEntryTreeRowRebuild();
-        }
-    }
-
-    private void OnEntryTreeChildrenChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
-    {
-        foreach (var added in eventArgs.NewItems?.OfType<ArchiveFolderNodeViewModel>() ?? [])
-        {
-            TrackEntryTreeNode(added);
-        }
-        RequestEntryTreeRowRebuild();
     }
 
     private async Task<IReadOnlyList<ArchiveEntryDto>> LoadFolderFilesAsync(
@@ -2135,7 +2069,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _folderTreeContext = null;
         IsFolderTreeBusy = false;
         FolderTree.Clear();
-        EntryTreeRows.Clear();
+        _entryTreeRows.Clear();
     }
 
     private async Task LoadPreviewLatestAsync(ArchiveEntryDto? entry)

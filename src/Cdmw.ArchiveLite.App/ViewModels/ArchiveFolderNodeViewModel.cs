@@ -40,8 +40,11 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         if (HasChildren)
         {
             // WPF only draws an expander when an item already has children, so an unexpanded folder
-            // needs one stand-in row to stay expandable before its real level has been fetched.
-            Children.Add(new ArchiveFolderNodeViewModel(LocalizationManager.Get("FolderTreeLoading")));
+            // needs one stand-in row to stay expandable before its real level has been fetched. It
+            // sits one level down like any other child: the flattened rows tell a folder's own rows
+            // from the rest by their depth, and a stand-in left at the root's depth is a row nothing
+            // can identify as belonging to the folder that put it there.
+            Children.Add(new ArchiveFolderNodeViewModel(LocalizationManager.Get("FolderTreeLoading"), Depth + 1));
         }
     }
 
@@ -56,8 +59,9 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
     }
 
     /// <summary>Creates the non-selectable placeholder row shown while children are loading.</summary>
-    private ArchiveFolderNodeViewModel(string label)
+    private ArchiveFolderNodeViewModel(string label, int depth)
     {
+        Depth = depth;
         Name = label;
         Path = string.Empty;
         IsPlaceholder = true;
