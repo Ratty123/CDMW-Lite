@@ -47,6 +47,19 @@ public partial class MainWindow : Window
 
     private const double ArchiveFolderPaneMinimumWidth = 170;
     private GridLength _archiveFolderPaneWidth = new(240);
+    private bool _applyingArchiveTreeColumnLayout;
+
+    /// <summary>
+    /// What the tree grid shows before the user chooses. Size and Path are off because a folder row
+    /// has neither, which would leave most of a browsing session looking at half-empty columns.
+    /// </summary>
+    private static readonly HashSet<string> DefaultArchiveTreeColumns = new(StringComparer.Ordinal)
+    {
+        "Name",
+        "Items",
+        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.FileType),
+        nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.Package),
+    };
 
     public MainWindow(MainWindowViewModel viewModel)
     {
@@ -155,6 +168,8 @@ public partial class MainWindow : Window
         WorkspaceTabs.SelectedIndex = 0;
         ArchiveColumnChooser.ItemsSource = ArchiveGrid.Columns;
         ApplyArchiveColumnLayout();
+        ApplyArchiveTreeColumnLayout();
+        ArchiveTreeColumnChooser.ItemsSource = ArchiveEntryTreeGrid.Columns;
         ApplyGridColumnLayout(ArchiveGrid, _viewModel.ArchiveColumnLayout, migrateArchiveRole: true);
         ApplyGridColumnLayout(TextSearchResultsGrid, _viewModel.TextSearchColumnLayout);
         UpdateWorkspacePreviewLimits();
@@ -221,6 +236,106 @@ public partial class MainWindow : Window
             ? Math.Max(0, column.Width.Value)
             : 0;
     }
+
+    private void OnArchiveEntryTreeSelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        if (ArchiveEntryTreeGrid.SelectedItem is ArchiveFolderNodeViewModel row)
+        {
+            row.IsSelected = true;
+        }
+    }
+
+    /// <summary>
+    /// Selects the row under a right-click in the tree grid before its context menu opens, so the
+    /// menu acts on what was clicked rather than on whatever was selected before.
+    /// </summary>
+    private void OnArchiveEntryTreeRightButtonDown(object sender, MouseButtonEventArgs eventArgs)
+    {
+        for (DependencyObject? node = eventArgs.OriginalSource as DependencyObject;
+            node is not null;
+            node = node is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                : null)
+        {
+            if (node is DataGridRow row)
+            {
+                ArchiveEntryTreeGrid.SelectedItem = row.Item;
+                return;
+            }
+        }
+    }
+
+    private void OnArchiveTreeColumnsButtonClick(object sender, RoutedEventArgs eventArgs) =>
+        ArchiveTreeColumnsPopup.IsOpen = !ArchiveTreeColumnsPopup.IsOpen;
+
+    private void OnArchiveTreeColumnVisibilityChanged(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_applyingArchiveTreeColumnLayout || sender is not CheckBox { DataContext: DataGridColumn changedColumn })
+        {
+            return;
+        }
+        if (!ArchiveEntryTreeGrid.Columns.Any(static column => column.Visibility == Visibility.Visible))
+        {
+            _applyingArchiveTreeColumnLayout = true;
+            changedColumn.Visibility = Visibility.Visible;
+            _applyingArchiveTreeColumnLayout = false;
+        }
+        SaveArchiveTreeColumnLayout();
+    }
+
+    private void OnShowAllArchiveTreeColumnsClick(object sender, RoutedEventArgs eventArgs)
+    {
+        _applyingArchiveTreeColumnLayout = true;
+        try
+        {
+            foreach (var column in ArchiveEntryTreeGrid.Columns)
+            {
+                column.Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            _applyingArchiveTreeColumnLayout = false;
+        }
+        SaveArchiveTreeColumnLayout();
+    }
+
+    /// <summary>
+    /// The tree grid keeps its own chosen columns. Its rows are folders as well as files, so the set
+    /// worth showing is not the one the flat list uses and the two must not overwrite each other.
+    /// </summary>
+    private void ApplyArchiveTreeColumnLayout()
+    {
+        var configured = _viewModel.ArchiveTreeVisibleColumns;
+        var visible = configured is { Count: > 0 }
+            ? configured.ToHashSet(StringComparer.Ordinal)
+            : DefaultArchiveTreeColumns;
+        _applyingArchiveTreeColumnLayout = true;
+        try
+        {
+            foreach (var column in ArchiveEntryTreeGrid.Columns)
+            {
+                column.Visibility = visible.Contains(column.SortMemberPath)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+            if (!ArchiveEntryTreeGrid.Columns.Any(static column => column.Visibility == Visibility.Visible)
+                && ArchiveEntryTreeGrid.Columns.Count > 0)
+            {
+                ArchiveEntryTreeGrid.Columns[0].Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            _applyingArchiveTreeColumnLayout = false;
+        }
+        SaveArchiveTreeColumnLayout();
+    }
+
+    private void SaveArchiveTreeColumnLayout() =>
+        _viewModel.SetArchiveTreeVisibleColumns(ArchiveEntryTreeGrid.Columns
+            .Where(static column => column.Visibility == Visibility.Visible)
+            .Select(static column => column.SortMemberPath));
 
     /// <summary>
     /// Selects the folder under a right-click before its context menu opens. WPF selects a tree item

@@ -104,6 +104,7 @@
   <data name="Extension" xml:space="preserve"><value>扩展名</value></data>
   <data name="Type" xml:space="preserve"><value>类型</value></data>
   <data name="FileType" xml:space="preserve"><value>文件类型</value></data>
+  <data name="FileCount" xml:space="preserve"><value>文件数</value></data>
   <data name="Usage" xml:space="preserve"><value>用途</value></data>
   <data name="Size" xml:space="preserve"><value>大小</value></data>
   <data name="StoredSize" xml:space="preserve"><value>存储大小</value></data>

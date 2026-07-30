@@ -1598,6 +1598,31 @@ internal static class ArchiveLiteTestRunner
             window.Descendants().Any(element => element.Attributes().Any(
                 attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ArchiveColumnChooser")),
             "archive grid has no column chooser");
+
+        // The tree view is a grid of pre-flattened rows because no WPF tree can align columns. Its
+        // rows are folders as well as files, so it carries its own columns and its own chooser.
+        var treeGrid = window.Descendants().Single(element =>
+            element.Attributes().Any(attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ArchiveEntryTreeGrid"));
+        Require(
+            string.Equals((string?)treeGrid.Attribute("CanUserSortColumns"), "False", StringComparison.OrdinalIgnoreCase),
+            "the tree grid offers a sort that would break the order its rows depend on");
+        var treeColumnKeys = treeGrid
+            .Descendants()
+            .Select(element => (string?)element.Attribute("SortMemberPath"))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToHashSet(StringComparer.Ordinal);
+        Require(
+            new[] { "Name", "Items", nameof(ArchiveSortField.FileType), nameof(ArchiveSortField.Package) }
+                .All(treeColumnKeys.Contains),
+            "the tree grid is missing a column the folder and file rows need");
+        Require(
+            treeGrid.Descendants().Any(element => ((string?)element.Attribute("Margin"))?.Contains("IndentMargin", StringComparison.Ordinal) == true)
+            && treeGrid.Descendants().Any(element => ((string?)element.Attribute("IsChecked"))?.Contains("IsExpanded", StringComparison.Ordinal) == true),
+            "the tree grid's first column carries no indent or no expander, so it cannot read as a tree");
+        Require(
+            window.Descendants().Any(element => element.Attributes().Any(
+                attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ArchiveTreeColumnChooser")),
+            "the tree grid has no column chooser of its own");
         foreach (var commandName in new[]
         {
             "ExportSelectedCommand",

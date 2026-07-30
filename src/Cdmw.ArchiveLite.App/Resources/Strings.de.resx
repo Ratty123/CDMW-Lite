@@ -100,6 +100,7 @@
   <data name="Name" xml:space="preserve"><value>Name</value></data>
   <data name="Type" xml:space="preserve"><value>Typ</value></data>
   <data name="FileType" xml:space="preserve"><value>Dateityp</value></data>
+  <data name="FileCount" xml:space="preserve"><value>Dateien</value></data>
   <data name="Usage" xml:space="preserve"><value>Verwendung</value></data>
   <data name="Size" xml:space="preserve"><value>Größe</value></data>
   <data name="Package" xml:space="preserve"><value>Paket</value></data>

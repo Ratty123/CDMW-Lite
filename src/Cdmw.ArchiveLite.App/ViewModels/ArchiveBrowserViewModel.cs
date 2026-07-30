@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
@@ -199,6 +200,13 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     public ObservableCollection<ArchiveEntryDto> Entries { get; } = [];
     public ObservableCollection<ArchiveFolderFilter> Folders { get; } = [];
     public ObservableCollection<ArchiveFolderNodeViewModel> FolderTree { get; } = [];
+
+    /// <summary>
+    /// The folder tree flattened to the rows that are currently visible, each carrying its own depth.
+    /// WPF has no tree that can align columns, so the tree view is a grid of these rows and the
+    /// indent and expander live inside the first column.
+    /// </summary>
+    public ObservableCollection<ArchiveFolderNodeViewModel> EntryTreeRows { get; } = [];
     public ObservableCollection<ArchiveCategoryCount> Categories { get; } = [];
     public ObservableCollection<ArchiveExtensionChoice> ExtensionChoices { get; } = [];
     public ObservableCollection<ArchiveExtensionChoice> MostCommonExtensionChoices { get; } = [];
@@ -413,6 +421,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             OnPropertyChanged(nameof(ShowFolderNavigator));
             OnPropertyChanged(nameof(ShowEntryTree));
             OnPropertyChanged(nameof(ShowEntryGrid));
+            RebuildEntryTreeRows();
             // The folder filter's only controls are the folder navigator and the tree view, so it
             // must not outlive them; it would otherwise keep narrowing every later result with
             // nothing on screen able to release it.
@@ -433,15 +442,24 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         get => _showCategories;
         set
         {
-            if (!SetProperty(ref _showCategories, value) || value)
+            if (!SetProperty(ref _showCategories, value))
             {
                 return;
             }
 
-            // Lite exposes no role control of its own, so the navigator is the only way in and out of
-            // the role filter. Turning it off has to release what it applied.
-            SelectedCategory = null;
-            SelectedRole = RoleFilters.First(static role => role.Role is null);
+            if (!value)
+            {
+                // Lite exposes no role control of its own, so the navigator is the only way in and out
+                // of the role filter. Turning it off has to release what it applied.
+                SelectedCategory = null;
+                SelectedRole = RoleFilters.First(static role => role.Role is null);
+            }
+            // The counts come from the query, and whether they are gathered at all is decided when it
+            // runs, so the navigator would sit empty until the user happened to search again.
+            if (ApplyFilterCommand.CanExecute(null))
+            {
+                ApplyFilterCommand.Execute(null);
+            }
         }
     }
 
@@ -1465,6 +1483,11 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             {
                 FolderTree.Add(ArchiveFolderNodeViewModel.CreateFile(context, file));
             }
+            foreach (var root in FolderTree)
+            {
+                TrackEntryTreeNode(root);
+            }
+            RebuildEntryTreeRows();
         }
         catch (OperationCanceledException)
         {
@@ -1511,6 +1534,63 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             _setShellStatus(LocalizationManager.Format("FolderTreeTruncated", result.Nodes.Count));
         }
         return result.Nodes;
+    }
+
+    /// <summary>
+    /// Rebuilds the flattened rows the tree grid shows. Every open node contributes its children, so
+    /// this runs whenever one is expanded or collapsed and whenever a level finishes loading.
+    /// </summary>
+    private void RebuildEntryTreeRows()
+    {
+        if (!ShowEntryTree)
+        {
+            if (EntryTreeRows.Count > 0)
+            {
+                EntryTreeRows.Clear();
+            }
+            return;
+        }
+
+        EntryTreeRows.Clear();
+        foreach (var root in FolderTree)
+        {
+            EntryTreeRows.Add(root);
+            foreach (var descendant in root.VisibleDescendants())
+            {
+                EntryTreeRows.Add(descendant);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Watches a node so the flattened rows follow it. Expanding changes which rows are visible, and
+    /// a level arriving from the worker changes them again once its children land.
+    /// </summary>
+    private void TrackEntryTreeNode(ArchiveFolderNodeViewModel node)
+    {
+        node.PropertyChanged += OnEntryTreeNodeChanged;
+        node.Children.CollectionChanged += OnEntryTreeChildrenChanged;
+        foreach (var child in node.Children)
+        {
+            TrackEntryTreeNode(child);
+        }
+    }
+
+    private void OnEntryTreeNodeChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        if (eventArgs.PropertyName == nameof(ArchiveFolderNodeViewModel.IsExpanded))
+        {
+            RebuildEntryTreeRows();
+        }
+    }
+
+    private void OnEntryTreeChildrenChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
+    {
+        foreach (var added in eventArgs.NewItems?.OfType<ArchiveFolderNodeViewModel>() ?? [])
+        {
+            TrackEntryTreeNode(added);
+        }
+        RebuildEntryTreeRows();
     }
 
     private async Task<IReadOnlyList<ArchiveEntryDto>> LoadFolderFilesAsync(
@@ -1953,6 +2033,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _folderTreeContext = null;
         IsFolderTreeBusy = false;
         FolderTree.Clear();
+        EntryTreeRows.Clear();
     }
 
     private async Task LoadPreviewLatestAsync(ArchiveEntryDto? entry)

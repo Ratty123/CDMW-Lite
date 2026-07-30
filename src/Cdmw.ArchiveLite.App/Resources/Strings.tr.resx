@@ -104,6 +104,7 @@
   <data name="Extension" xml:space="preserve"><value>Uzantı</value></data>
   <data name="Type" xml:space="preserve"><value>Tür</value></data>
   <data name="FileType" xml:space="preserve"><value>Dosya türü</value></data>
+  <data name="FileCount" xml:space="preserve"><value>Dosyalar</value></data>
   <data name="Usage" xml:space="preserve"><value>Kullanım</value></data>
   <data name="Size" xml:space="preserve"><value>Boyut</value></data>
   <data name="StoredSize" xml:space="preserve"><value>Depolanan</value></data>
