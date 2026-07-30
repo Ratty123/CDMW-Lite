@@ -133,6 +133,7 @@
   <data name="FoldersView" xml:space="preserve"><value>Папки</value></data>
   <data name="CategoriesView" xml:space="preserve"><value>Категории</value></data>
   <data name="CategoriesFoldersView" xml:space="preserve"><value>Категории + папки</value></data>
+  <data name="TreeView" xml:space="preserve"><value>Дерево</value></data>
   <data name="FlatView" xml:space="preserve"><value>Плоский</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Папка</value></data>
   <data name="SortBy" xml:space="preserve"><value>Сортировать по</value></data>
@@ -140,6 +141,7 @@
   <data name="Folders" xml:space="preserve"><value>Папки</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>Загрузка папок...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>Показаны первые {0} папок этого уровня.</value></data>
+  <data name="FolderFilesTruncated" xml:space="preserve"><value>Показаны {0} из {1} файлов в этой папке.</value></data>
   <data name="Categories" xml:space="preserve"><value>Категории</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>Назад</value></data>
   <data name="NextPage" xml:space="preserve"><value>Вперёд</value></data>

@@ -6,9 +6,10 @@ using Cdmw.ArchiveLite.Contracts;
 namespace Cdmw.ArchiveLite.App.ViewModels;
 
 /// <summary>
-/// One folder in the Archive Browser's folder tree. Children are fetched the first time the user
-/// expands the node, so opening an archive never has to carry its whole directory structure across
-/// the worker protocol or into memory on the interface side.
+/// One row of an Archive Browser tree: a folder, one of the files inside a folder, or the stand-in
+/// shown while a level loads. Children are fetched the first time the user expands a folder, so
+/// opening an archive never has to carry its whole structure across the worker protocol or into
+/// memory on the interface side.
 /// </summary>
 public sealed class ArchiveFolderNodeViewModel : ObservableObject
 {
@@ -30,13 +31,24 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         Path = path;
         DirectCount = directCount;
         TotalCount = totalCount;
-        HasChildren = hasChildren;
-        if (hasChildren)
+        // A folder with no subfolders still expands when the tree carries files, because its own
+        // files are what it opens onto.
+        HasChildren = hasChildren || (context.IncludesFiles && directCount > 0);
+        if (HasChildren)
         {
             // WPF only draws an expander when an item already has children, so an unexpanded folder
             // needs one stand-in row to stay expandable before its real level has been fetched.
             Children.Add(new ArchiveFolderNodeViewModel(LocalizationManager.Get("FolderTreeLoading")));
         }
+    }
+
+    /// <summary>Creates the row for one archive entry inside a folder.</summary>
+    private ArchiveFolderNodeViewModel(ArchiveFolderTreeContext context, ArchiveEntryDto entry)
+    {
+        _context = context;
+        Entry = entry;
+        Name = entry.Name;
+        Path = entry.Path;
     }
 
     /// <summary>Creates the non-selectable placeholder row shown while children are loading.</summary>
@@ -47,22 +59,29 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         IsPlaceholder = true;
     }
 
-    public string Name { get; }
-    public string Path { get; }
+    public string Name { get; } = string.Empty;
+    public string Path { get; } = string.Empty;
     public long DirectCount { get; }
     public long TotalCount { get; }
     public bool HasChildren { get; }
     public bool IsPlaceholder { get; }
+
+    /// <summary>The archive entry this row stands for, or null when the row is a folder.</summary>
+    public ArchiveEntryDto? Entry { get; }
+
+    public bool IsFile => Entry is not null;
     public ObservableCollection<ArchiveFolderNodeViewModel> Children { get; } = [];
 
-    public string Label => IsPlaceholder ? Name : $"{Name} ({TotalCount:N0})";
+    // A real folder always holds at least one file somewhere below it, so a zero count belongs to the
+    // synthetic "All" row, which names no folder and has nothing to count.
+    public string Label => IsPlaceholder || IsFile || TotalCount == 0 ? Name : $"{Name} ({TotalCount:N0})";
 
     public bool IsExpanded
     {
         get => _isExpanded;
         set
         {
-            if (!SetProperty(ref _isExpanded, value) || !value || _childrenRequested || _context is null)
+            if (!SetProperty(ref _isExpanded, value) || !value || _childrenRequested || _context is null || IsFile)
             {
                 return;
             }
@@ -105,11 +124,20 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         }
         try
         {
-            var children = await _context.LoadChildrenAsync(Path).ConfigureAwait(true);
+            var folders = await _context.LoadChildrenAsync(Path).ConfigureAwait(true);
+            var files = _context.IncludesFiles
+                ? await _context.LoadFilesAsync(Path).ConfigureAwait(true)
+                : [];
             Children.Clear();
-            foreach (var child in children)
+            foreach (var folder in folders)
             {
-                Children.Add(Create(_context, child));
+                Children.Add(Create(_context, folder));
+            }
+            // Folders first, then the folder's own files, so a level reads the way a file manager
+            // presents one rather than interleaving the two by name.
+            foreach (var file in files)
+            {
+                Children.Add(new ArchiveFolderNodeViewModel(_context, file));
             }
         }
         catch (OperationCanceledException)
@@ -145,18 +173,32 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         }
         return created;
     }
+
+    public static ArchiveFolderNodeViewModel CreateFile(ArchiveFolderTreeContext context, ArchiveEntryDto entry) =>
+        new(context, entry);
+
+    /// <summary>Creates the row that releases the folder filter, shown above the top-level folders.</summary>
+    public static ArchiveFolderNodeViewModel CreateAllFolders(ArchiveFolderTreeContext context) =>
+        new(context, LocalizationManager.Get("All"), string.Empty, 0, 0, hasChildren: false);
 }
 
 /// <summary>
-/// The folder tree's link back to the Archive Browser: how to fetch a level, what to do when the user
-/// picks a folder, and where a failed expansion is reported.
+/// A tree's link back to the Archive Browser: how to fetch a level, whether that level includes the
+/// folder's own files, what to do when the user picks a row, and where a failed expansion is
+/// reported. The folder navigator and the tree view differ only in whether files are included.
 /// </summary>
 public sealed class ArchiveFolderTreeContext(
     Func<string, Task<IReadOnlyList<ArchiveFolderNode>>> loadChildren,
+    Func<string, Task<IReadOnlyList<ArchiveEntryDto>>> loadFiles,
     Action<ArchiveFolderNodeViewModel> select,
-    Action<Exception> reportFailure)
+    Action<Exception> reportFailure,
+    bool includesFiles)
 {
+    public bool IncludesFiles { get; } = includesFiles;
+
     public Task<IReadOnlyList<ArchiveFolderNode>> LoadChildrenAsync(string path) => loadChildren(path);
+
+    public Task<IReadOnlyList<ArchiveEntryDto>> LoadFilesAsync(string path) => loadFiles(path);
 
     public void Select(ArchiveFolderNodeViewModel node) => select(node);
 

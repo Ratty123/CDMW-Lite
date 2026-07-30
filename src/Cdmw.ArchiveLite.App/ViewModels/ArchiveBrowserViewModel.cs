@@ -401,6 +401,9 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             }
 
             OnPropertyChanged(nameof(ShowCategoryNavigator));
+            OnPropertyChanged(nameof(ShowFolderNavigator));
+            OnPropertyChanged(nameof(ShowEntryTree));
+            OnPropertyChanged(nameof(ShowEntryGrid));
             // Lite exposes no role control of its own: the category navigator is the only thing that
             // sets the role filter, so the filter must not outlive the view modes that show it.
             // Otherwise it would keep narrowing every later result with nothing on screen to release it.
@@ -408,6 +411,12 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             {
                 SelectedCategory = null;
                 SelectedRole = RoleFilters.First(static role => role.Role is null);
+            }
+            // The same reasoning applies to the folder filter, whose only controls are the folder
+            // navigator and the tree view. Neither is on screen in the flat or category views.
+            if (!ShowFolderNavigator && !ShowEntryTree)
+            {
+                SelectedFolder = Folders.FirstOrDefault(static folder => folder.Path is null);
             }
             EnsureFolderTreeLoaded();
         }
@@ -420,6 +429,14 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     }
 
     public bool ShowCategoryNavigator => ViewMode is ArchiveViewMode.Categories or ArchiveViewMode.CategoriesAndFolders;
+
+    /// <summary>Whether the folder tree has its own pane beside the entry list.</summary>
+    public bool ShowFolderNavigator => ViewMode is ArchiveViewMode.Folders or ArchiveViewMode.CategoriesAndFolders;
+
+    /// <summary>Whether the entry list is itself a tree of folders and the files inside them.</summary>
+    public bool ShowEntryTree => ViewMode is ArchiveViewMode.Tree;
+
+    public bool ShowEntryGrid => !ShowEntryTree;
 
     public ArchiveSortField SortField
     {
@@ -1352,12 +1369,23 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Starts the folder tree once per session. The tree is its own pane rather than a view mode, so
-    /// it loads whenever an archive is open and is not rebuilt when the view mode moves.
+    /// Starts whichever tree the current view mode shows. Deriving a tree costs a pass over every
+    /// archive path, so the flat and category views - which show neither the folder pane nor the
+    /// tree view - never pay for it.
     /// </summary>
     private void EnsureFolderTreeLoaded()
     {
-        if (_folderTreeContext is not null || SessionId is not { } sessionId || string.IsNullOrWhiteSpace(sessionId))
+        if (!ShowFolderNavigator && !ShowEntryTree)
+        {
+            return;
+        }
+        if (SessionId is not { } sessionId || string.IsNullOrWhiteSpace(sessionId))
+        {
+            return;
+        }
+        // The pane's tree lists folders alone and the tree view lists their files as well, so moving
+        // between the two rebuilds from the root rather than reusing rows built to the other shape.
+        if (_folderTreeContext is { } existing && existing.IncludesFiles == ShowEntryTree)
         {
             return;
         }
@@ -1377,8 +1405,10 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         FolderTree.Clear();
         _folderTreeContext = new ArchiveFolderTreeContext(
             path => LoadFolderChildrenAsync(sessionId, generation, path),
+            path => LoadFolderFilesAsync(sessionId, generation, path),
             SelectFolderNode,
-            exception => _setShellStatus(exception.Message));
+            exception => _setShellStatus(exception.Message),
+            includesFiles: ShowEntryTree);
         _ = LoadFolderTreeRootAsync(sessionId, generation);
     }
 
@@ -1393,14 +1423,24 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             IsFolderTreeBusy = true;
             var children = await LoadFolderChildrenAsync(sessionId, generation, string.Empty).ConfigureAwait(true);
+            var rootFiles = context.IncludesFiles
+                ? await LoadFolderFilesAsync(sessionId, generation, string.Empty).ConfigureAwait(true)
+                : [];
             if (generation != Volatile.Read(ref _folderTreeGeneration))
             {
                 return;
             }
             FolderTree.Clear();
+            // The tree has no row for the archive itself, so without this there is no way back to
+            // every folder once one is chosen - the picker that used to do it is gone.
+            FolderTree.Add(ArchiveFolderNodeViewModel.CreateAllFolders(context));
             foreach (var child in children)
             {
                 FolderTree.Add(ArchiveFolderNodeViewModel.Create(context, child));
+            }
+            foreach (var file in rootFiles)
+            {
+                FolderTree.Add(ArchiveFolderNodeViewModel.CreateFile(context, file));
             }
         }
         catch (OperationCanceledException)
@@ -1450,14 +1490,47 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         return result.Nodes;
     }
 
+    private async Task<IReadOnlyList<ArchiveEntryDto>> LoadFolderFilesAsync(
+        string sessionId,
+        long generation,
+        string path)
+    {
+        var operation = _folderTreeOperation;
+        if (operation is null || generation != Volatile.Read(ref _folderTreeGeneration))
+        {
+            return [];
+        }
+        var result = await _worker.SendAsync<ArchiveFolderFilesRequest, ArchiveFolderFilesResult>(
+            WorkerProtocol.ArchiveFolderFiles,
+            generation,
+            new ArchiveFolderFilesRequest(sessionId, path),
+            operation.Token).ConfigureAwait(true);
+        if (generation != Volatile.Read(ref _folderTreeGeneration)
+            || !string.Equals(SessionId, sessionId, StringComparison.Ordinal))
+        {
+            return [];
+        }
+        if (result.Truncated)
+        {
+            _setShellStatus(LocalizationManager.Format("FolderFilesTruncated", result.Files.Count, result.TotalFiles));
+        }
+        return result.Files;
+    }
+
     /// <summary>
-    /// Applies a folder chosen in the tree. The path is added to the folder filter list when the
-    /// current result does not mention it, so the picker and the tree always agree on the filter.
+    /// Applies whichever row the user picked in a tree. A file previews itself the way a grid row
+    /// does; a folder filters the entry list to it; the "All" row releases that filter.
     /// </summary>
     private void SelectFolderNode(ArchiveFolderNodeViewModel node)
     {
+        if (node.Entry is { } entry)
+        {
+            SelectedEntry = entry;
+            return;
+        }
         if (string.IsNullOrEmpty(node.Path))
         {
+            ApplyFolderSelection(Folders.FirstOrDefault(static folder => folder.Path is null));
             return;
         }
         var existing = Folders.FirstOrDefault(folder =>
@@ -1467,12 +1540,23 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             existing = new ArchiveFolderFilter(node.Path, node.Path);
             Folders.Insert(Folders.Count > 0 ? 1 : 0, existing);
         }
-        if (Equals(SelectedFolder, existing))
+        ApplyFolderSelection(existing);
+    }
+
+    private void ApplyFolderSelection(ArchiveFolderFilter? folder)
+    {
+        if (folder is null || Equals(SelectedFolder, folder))
         {
             return;
         }
-        SelectedFolder = existing;
-        ApplyFilterCommand.Execute(null);
+        SelectedFolder = folder;
+        // In the tree view the tree is the entry list, so a folder is navigated by expanding it and
+        // re-querying would only churn a list nobody is looking at. The selection is still recorded
+        // because the export commands act on it.
+        if (ShowEntryGrid)
+        {
+            ApplyFilterCommand.Execute(null);
+        }
     }
 
     /// <summary>
@@ -1660,6 +1744,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Categories, LocalizationManager.Get("CategoriesView")),
             new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.CategoriesAndFolders, LocalizationManager.Get("CategoriesFoldersView")),
             new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Flat, LocalizationManager.Get("FlatView")),
+            new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Tree, LocalizationManager.Get("TreeView")),
         ];
         _sortFields = Enum.GetValues<ArchiveSortField>()
             // The evidence is folded into the item name the grid shows, so it is no longer a sort

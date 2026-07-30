@@ -43,6 +43,9 @@ public partial class MainWindow : Window
         nameof(Cdmw.ArchiveLite.Contracts.ArchiveSortField.Path),
     };
 
+    private const double ArchiveFolderPaneMinimumWidth = 170;
+    private GridLength _archiveFolderPaneWidth = new(240);
+
     public MainWindow(MainWindowViewModel viewModel)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
@@ -59,7 +62,11 @@ public partial class MainWindow : Window
         ApplyWindowPlacement();
     }
 
-    private void OnSourceInitialized(object? sender, EventArgs eventArgs) => ThemedWindowChrome.Apply(this);
+    private void OnSourceInitialized(object? sender, EventArgs eventArgs)
+    {
+        ThemedWindowChrome.Apply(this);
+        MaximizedWindowBounds.Apply(this);
+    }
 
     private void OnThemeChanged(object? sender, EventArgs eventArgs)
     {
@@ -382,6 +389,28 @@ public partial class MainWindow : Window
         {
             UpdateArchiveSortIndicators();
         }
+        if (eventArgs.PropertyName is nameof(ArchiveBrowserViewModel.ShowFolderNavigator))
+        {
+            UpdateFolderPaneLayout();
+        }
+    }
+
+    /// <summary>
+    /// Gives the folder pane's column its width back when the pane is shown and takes it to zero when
+    /// it is not. Collapsing the pane alone would leave its column holding the space, and a grid
+    /// column cannot follow a Visibility of its own.
+    /// </summary>
+    private void UpdateFolderPaneLayout()
+    {
+        var visible = _viewModel.ArchiveBrowser.ShowFolderNavigator;
+        if (!visible && ArchiveFolderColumn.Width.IsAbsolute && ArchiveFolderColumn.Width.Value > 0)
+        {
+            _archiveFolderPaneWidth = ArchiveFolderColumn.Width;
+        }
+        ArchiveFolderColumn.MinWidth = visible ? ArchiveFolderPaneMinimumWidth : 0;
+        ArchiveFolderColumn.Width = visible ? _archiveFolderPaneWidth : new GridLength(0);
+        ArchiveFolderSplitterColumn.Width = visible ? new GridLength(7) : new GridLength(0);
+        UpdateWorkspacePreviewLimits();
     }
 
     private void ApplyArchiveColumnLayout()
@@ -570,7 +599,8 @@ public partial class MainWindow : Window
         }
 
         ArchiveFilterColumn.Width = PixelGridLength(layout.ArchiveFilterWidth, 250, 720, 278);
-        ArchiveFolderColumn.Width = PixelGridLength(layout.ArchiveFolderWidth, 170, 720, 240);
+        _archiveFolderPaneWidth = PixelGridLength(layout.ArchiveFolderWidth, ArchiveFolderPaneMinimumWidth, 720, 240);
+        UpdateFolderPaneLayout();
         ArchiveResultsColumn.Width = new GridLength(1, GridUnitType.Star);
         ArchivePreviewColumn.Width = PixelGridLength(
             layout.ArchivePreviewWidth,
@@ -680,7 +710,9 @@ public partial class MainWindow : Window
                 MeasuredWidthOrFallback(ArchivePreviewColumn, priorWorkspace.ArchivePreviewWidth),
                 MeasuredWidthOrFallback(TextSearchFilterColumn, priorWorkspace.TextSearchFilterWidth),
                 MeasuredWidthOrFallback(TextSearchPreviewColumn, priorWorkspace.TextSearchPreviewWidth),
-                MeasuredWidthOrFallback(ArchiveFolderColumn, priorWorkspace.ArchiveFolderWidth)),
+                _viewModel.ArchiveBrowser.ShowFolderNavigator
+                    ? MeasuredWidthOrFallback(ArchiveFolderColumn, priorWorkspace.ArchiveFolderWidth)
+                    : _archiveFolderPaneWidth.Value),
             CaptureGridColumnLayout(ArchiveGrid, _viewModel.ArchiveColumnLayout),
             CaptureGridColumnLayout(TextSearchResultsGrid, _viewModel.TextSearchColumnLayout));
     }

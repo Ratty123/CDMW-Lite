@@ -18,6 +18,12 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
 
     private const int MaximumDepth = 3;
 
+    /// <summary>
+    /// How many entries one file listing may carry. Entry records are far larger than folder rows,
+    /// so this is well below the folder cap to stay inside the bounded protocol message.
+    /// </summary>
+    private const int MaximumFilesPerResult = 1024;
+
     public async Task<ArchiveFolderTreeResult> LoadAsync(
         ArchiveFolderTreeRequest request,
         Func<ProgressUpdate, Task>? publishProgress,
@@ -42,6 +48,41 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
             folder.TotalCount,
             nodes,
             Truncated: budget <= 0);
+    }
+
+    /// <summary>
+    /// Lists the files stored directly in one folder, a page at a time. Order follows the archive
+    /// index, which is already sorted by path, so a page is stable between calls.
+    /// </summary>
+    public async Task<ArchiveFolderFilesResult> ListFilesAsync(
+        ArchiveFolderFilesRequest request,
+        Func<ProgressUpdate, Task>? publishProgress,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var session = sessions.GetRequired(request.SessionId);
+        var tree = await BuildOrGetAsync(session, publishProgress, cancellationToken).ConfigureAwait(false);
+        var folder = tree.Find(request.Path);
+        if (folder is null)
+        {
+            return new ArchiveFolderFilesResult(session.Id, request.Path, 0, []);
+        }
+
+        var pageStart = Math.Max(0, request.PageStart);
+        var pageSize = Math.Clamp(request.PageSize, 1, MaximumFilesPerResult);
+        var ids = folder.DirectFileIds;
+        var files = new List<ArchiveEntryDto>(Math.Min(pageSize, Math.Max(0, ids.Count - pageStart)));
+        for (var index = pageStart; index < ids.Count && files.Count < pageSize; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            files.Add(session.EnrichEntry(session.Index.ReadEntry(ids[index])));
+        }
+        return new ArchiveFolderFilesResult(
+            session.Id,
+            request.Path,
+            ids.Count,
+            files,
+            Truncated: pageStart + files.Count < ids.Count);
     }
 
     private static async Task<ArchiveFolderTree> BuildOrGetAsync(
@@ -96,7 +137,7 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
                 buffer = new byte[Math.Max(length, buffer.Length * 2)];
             }
             session.Index.ReadPathBytes(entryId, buffer);
-            Add(root, Encoding.UTF8.GetString(buffer, 0, length));
+            Add(root, Encoding.UTF8.GetString(buffer, 0, length), entryId);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -111,7 +152,7 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
     /// Files the entry under every folder on its path. The trailing segment is the file name, so a
     /// path without a separator belongs directly to the archive root.
     /// </summary>
-    private static void Add(ArchiveFolderTreeNode root, string virtualPath)
+    private static void Add(ArchiveFolderTreeNode root, string virtualPath, long entryId)
     {
         var path = virtualPath.Replace('\\', '/').Trim('/');
         root.TotalCount++;
@@ -123,7 +164,7 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
             if (separator < 0)
             {
                 // Whatever remains is the file name, so the folder walked to so far stores it.
-                folder.DirectCount++;
+                folder.AddFile(entryId);
                 return;
             }
             var name = path[start..separator];
@@ -197,16 +238,30 @@ public sealed class ArchiveFolderTree(ArchiveFolderTreeNode root)
 
 public sealed class ArchiveFolderTreeNode(string name, string path)
 {
+    private List<long>? _directFileIds;
+
     public string Name { get; } = name;
     public string Path { get; } = path;
 
     /// <summary>Files stored in this folder itself.</summary>
-    public long DirectCount { get; set; }
+    public long DirectCount => _directFileIds?.Count ?? 0;
 
     /// <summary>Files stored at or below this folder.</summary>
     public long TotalCount { get; set; }
 
+    /// <summary>
+    /// The entries stored directly in this folder, in archive order. The tree view lists them under
+    /// their folder, which the recursive folder filter cannot express.
+    /// </summary>
+    public IReadOnlyList<long> DirectFileIds => _directFileIds ?? (IReadOnlyList<long>)[];
+
     public Dictionary<string, ArchiveFolderTreeNode>? Children { get; private set; }
+
+    internal void AddFile(long entryId)
+    {
+        _directFileIds ??= [];
+        _directFileIds.Add(entryId);
+    }
 
     internal ArchiveFolderTreeNode GetOrAddChild(string name, string path)
     {

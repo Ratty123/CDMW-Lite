@@ -5310,6 +5310,20 @@ internal static class ArchiveLiteTestRunner
             Require(
                 browser.SelectedRole.Role is null && browser.SelectedCategory is null,
                 "the role filter outlived the navigator that is the only control able to clear it");
+
+            // The folder filter is reachable from the folder pane and the tree view and nowhere else,
+            // so it has to be released on the way into a view that shows neither.
+            Require(
+                browser.ShowFolderNavigator == false && browser.ShowEntryTree == false && browser.ShowEntryGrid,
+                "the flat view offers a folder control after all");
+            browser.ViewMode = ArchiveViewMode.Folders;
+            Require(
+                browser.ShowFolderNavigator && browser.ShowEntryGrid && !browser.ShowEntryTree,
+                "the folders view does not pair the folder pane with the entry grid");
+            browser.ViewMode = ArchiveViewMode.Tree;
+            Require(
+                browser.ShowEntryTree && !browser.ShowEntryGrid && !browser.ShowFolderNavigator,
+                "the tree view did not replace the entry grid, or kept a second folder pane beside it");
             return Task.CompletedTask;
         });
 
@@ -5420,6 +5434,33 @@ internal static class ArchiveLiteTestRunner
             null,
             CancellationToken.None).ConfigureAwait(false);
         Require(missing.Nodes.Count == 0 && missing.TotalCount == 0, "an unknown folder returned a level");
+
+        // The tree view lists a folder's own files beneath it, which the folder filter cannot express
+        // because it matches a path prefix and so takes the whole subtree.
+        var files = await trees.ListFilesAsync(
+            new ArchiveFolderFilesRequest(opened.SessionId, "character/model"),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(files.TotalFiles == 3 && files.Files.Count == 3, "a folder did not list the files stored in it");
+        Require(
+            files.Files.Select(static file => file.Name).Order(StringComparer.Ordinal)
+                .SequenceEqual(["hero.meshinfo", "hero.pac", "hero.prefab"]),
+            "a folder's file listing is wrong");
+        Require(!files.Truncated, "a complete file listing was reported as truncated");
+        var branch = await trees.ListFilesAsync(
+            new ArchiveFolderFilesRequest(opened.SessionId, "character"),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            branch.TotalFiles == 0,
+            "a folder that only holds subfolders claimed files of its own");
+        var paged = await trees.ListFilesAsync(
+            new ArchiveFolderFilesRequest(opened.SessionId, "character/model", PageStart: 1, PageSize: 1),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            paged.Files.Count == 1 && paged.TotalFiles == 3 && paged.Truncated,
+            "a paged file listing did not report the rest of the folder");
     }
 
     private static async Task TestArchiveServicesAsync()
