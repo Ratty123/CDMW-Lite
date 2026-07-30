@@ -5372,6 +5372,12 @@ internal static class ArchiveLiteTestRunner
                 browser.SelectedRole.Role is null && browser.SelectedCategory is null,
                 "the role filter outlived the navigator that is the only control able to clear it");
 
+            // A tree offers a folder and a file different actions, and neither should be offered what
+            // belongs to the other.
+            Require(
+                !browser.IsTreeFileSelected && !browser.IsTreeFolderSelected,
+                "a tree row looks selected before anything has been picked");
+
             // The navigator is a setting of its own now, so it has to survive every arrangement of
             // the entry list rather than belonging to two of them.
             browser.ShowCategories = true;
