@@ -4,6 +4,10 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- The model preview no longer leaves an unpainted black margin when its window moves to a display at another scale. The renderer runs in its own process whose window is reparented into the app; that process defaulted to the WinForms `SystemAware` DPI mode, so it kept measuring in the scale of the monitor it started on and Windows resized the hosted window underneath the host on any other scale. It now declares `PerMonitorV2`, matching the app. The host also paints its own background on `WM_ERASEBKGND` in the renderer's clear colour, because WPF cannot draw inside a hosted window's region and any margin the renderer has not covered yet — mid-resize, mid-DPI-change, or before the first frame — was left unpainted. Resizes now read the host's client rect, the same figure the renderer's own reconciliation timer reads, instead of rounding the layout rectangle a second time and leaving the two disagreeing by a pixel.
+
 ## [1.0.0] - 2026-07-28
 
 ### Added

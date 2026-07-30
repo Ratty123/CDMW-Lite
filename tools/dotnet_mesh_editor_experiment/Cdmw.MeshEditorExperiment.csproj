@@ -4,6 +4,11 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
+    <!-- The preview window is reparented into Archive Lite, which is PerMonitorV2. The
+         WinForms default of SystemAware would leave this process measuring in the logon
+         monitor's scale, so on any other scale Windows resizes the hosted window behind
+         our back and the host is left showing an unpainted margin. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>cdmw-mesh-dotnet-editor</AssemblyName>
