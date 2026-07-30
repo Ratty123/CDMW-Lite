@@ -110,7 +110,7 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
             // has not been applied to. Deriving it here is what spares the archive a second pass.
             if (treeRoot is not null && matchesRole)
             {
-                ArchiveFolderTreeService.Add(treeRoot, entry.Path, entryId);
+                ArchiveFolderTreeService.Add(treeRoot, entry.Path);
             }
             if (!ArchiveEntryMatcher.MatchesFolder(entry, filter)) continue;
             // The category navigator selects the role filter, so counting it under that same filter

@@ -117,12 +117,6 @@ internal sealed class WorkerRuntime : IDisposable
                     var result = await _folderTree.LoadAsync(payload, publishProgress, cancellationToken).ConfigureAwait(false);
                     return WorkerProtocol.Response(request, WorkerMessageStatus.Result, result);
                 }
-            case WorkerProtocol.ArchiveFolderFiles:
-                {
-                    var payload = RequirePayload<ArchiveFolderFilesRequest>(request);
-                    var result = await _folderTree.ListFilesAsync(payload, publishProgress, cancellationToken).ConfigureAwait(false);
-                    return WorkerProtocol.Response(request, WorkerMessageStatus.Result, result);
-                }
             case WorkerProtocol.BuildNameIndex:
                 {
                     var payload = RequirePayload<BuildNameIndexRequest>(request);

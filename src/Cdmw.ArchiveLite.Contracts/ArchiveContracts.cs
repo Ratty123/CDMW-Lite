@@ -87,8 +87,6 @@ public enum ArchiveViewMode
 {
     Folders = 0,
     Flat = 3,
-    /// <summary>The entry list is itself the archive's tree, with files under their folders.</summary>
-    Tree = 4,
 }
 
 public enum ArchiveSortField
