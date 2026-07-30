@@ -238,6 +238,30 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Selects the row under a right-click before its context menu opens, unless the click landed on
+    /// a row that is already part of the selection - taking a multi-row selection down to one would
+    /// change what the export commands are about to act on.
+    /// </summary>
+    private void OnArchiveGridRightButtonDown(object sender, MouseButtonEventArgs eventArgs)
+    {
+        for (DependencyObject? node = eventArgs.OriginalSource as DependencyObject;
+            node is not null;
+            node = node is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                : null)
+        {
+            if (node is DataGridRow row)
+            {
+                if (!row.IsSelected)
+                {
+                    ArchiveGrid.SelectedItem = row.Item;
+                }
+                return;
+            }
+        }
+    }
+
     private void OnArchiveGridSelectionChanged(object sender, SelectionChangedEventArgs eventArgs) =>
         _viewModel.ArchiveBrowser.SetSelectedEntries(ArchiveGrid.SelectedItems.OfType<ArchiveEntryDto>());
 
@@ -593,14 +617,21 @@ public partial class MainWindow : Window
     private void ApplyWorkspaceLayout()
     {
         var layout = _viewModel.WorkspaceLayout;
+        // The folder pane's column has to be sized to the current view mode even on a first run with
+        // nothing saved: it is hidden in the flat view, and a hidden pane whose column still holds
+        // its width leaves a gap between the filters and the entry list.
+        _archiveFolderPaneWidth = PixelGridLength(
+            layout?.ArchiveFolderWidth ?? 240,
+            ArchiveFolderPaneMinimumWidth,
+            720,
+            240);
+        UpdateFolderPaneLayout();
         if (layout is null)
         {
             return;
         }
 
         ArchiveFilterColumn.Width = PixelGridLength(layout.ArchiveFilterWidth, 250, 720, 278);
-        _archiveFolderPaneWidth = PixelGridLength(layout.ArchiveFolderWidth, ArchiveFolderPaneMinimumWidth, 720, 240);
-        UpdateFolderPaneLayout();
         ArchiveResultsColumn.Width = new GridLength(1, GridUnitType.Star);
         ArchivePreviewColumn.Width = PixelGridLength(
             layout.ArchivePreviewWidth,
@@ -652,6 +683,13 @@ public partial class MainWindow : Window
         foreach (var (key, setting) in layoutByKey)
         {
             var column = columnsByKey[key];
+            // Columns the design sizes to their content or to the remaining width keep doing that.
+            // Restoring a stored pixel width over them would reintroduce a Name column too narrow
+            // for its own text and leave unused space past the last column.
+            if (!column.Width.IsAbsolute)
+            {
+                continue;
+            }
             if (double.IsFinite(setting.Width) && setting.Width > 0)
             {
                 var minimum = Math.Max(48, Math.Max(grid.MinColumnWidth, column.MinWidth));

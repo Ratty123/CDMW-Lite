@@ -180,6 +180,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             ExportFolderAsync,
             () => !string.IsNullOrWhiteSpace(SessionId) && !string.IsNullOrWhiteSpace(SelectedFolder?.Path) && !IsBusy);
         ExportFilteredCommand = new AsyncCommand(ExportFilteredAsync, () => TotalMatches > 0 && !IsBusy);
+        CopyFileNameCommand = new RelayCommand(CopySelectedFileName, () => SelectedEntry is not null);
         RebuildLocalizedOptions(null);
         ExtensionChoices.Add(ArchiveExtensionChoice.AllFiles(LocalizationManager.Get("AllFiles"), LocalizationManager.Get("ExtensionGroupAll")));
         MostCommonExtensionChoices.Add(ArchiveExtensionChoice.AllFiles(LocalizationManager.Get("AllFiles"), LocalizationManager.Get("ExtensionGroupAll")));
@@ -216,6 +217,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     public AsyncCommand ExportFamilyCommand { get; }
     public AsyncCommand ExportFolderCommand { get; }
     public AsyncCommand ExportFilteredCommand { get; }
+    public RelayCommand CopyFileNameCommand { get; }
 
     public event EventHandler? SessionChanged;
     public event EventHandler<ItemCatalogReadyEventArgs>? ItemCatalogReady;
@@ -587,6 +589,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 OnPropertyChanged(nameof(CanOpenPreviewSettings));
                 ExportSelectedCommand.RaiseCanExecuteChanged();
                 ExportFamilyCommand.RaiseCanExecuteChanged();
+                CopyFileNameCommand.RaiseCanExecuteChanged();
                 if (!_suppressPreviewSelection)
                 {
                     _ = LoadPreviewLatestAsync(value);
@@ -2289,6 +2292,28 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         await RunExportAsync([], destination, ExportKind.FilteredEntries, cancellationToken).ConfigureAwait(true);
     }
 
+    /// <summary>
+    /// Puts the selected entry's file name on the clipboard. The clipboard is owned by whichever
+    /// process last set it and can be held open by another one, so a refusal is reported rather than
+    /// thrown at the user as a crash.
+    /// </summary>
+    private void CopySelectedFileName()
+    {
+        if (SelectedEntry is not { } entry)
+        {
+            return;
+        }
+        try
+        {
+            System.Windows.Clipboard.SetText(entry.Name);
+            _setShellStatus(LocalizationManager.Format("CopiedFileName", entry.Name));
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            _setShellStatus(exception.Message);
+        }
+    }
+
     private async Task ExportFolderAsync(CancellationToken cancellationToken)
     {
         var folderPath = SelectedFolder?.Path;
@@ -2531,6 +2556,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         CancelCommand.RaiseCanExecuteChanged();
         ExportSelectedCommand.RaiseCanExecuteChanged();
         ExportFamilyCommand.RaiseCanExecuteChanged();
+        CopyFileNameCommand.RaiseCanExecuteChanged();
         ExportFolderCommand.RaiseCanExecuteChanged();
         ExportFilteredCommand.RaiseCanExecuteChanged();
         AssociatedAssets.RaiseCommandStates();

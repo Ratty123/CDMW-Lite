@@ -1184,11 +1184,56 @@
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
     </Style>
 
+    <!-- A context menu opens in its own popup window, so it takes none of the surrounding chrome
+         with it. Without a template of its own it renders in WPF's default light colours whatever
+         theme the shell is using. -->
     <Style TargetType="ContextMenu">
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Padding="4"
+                            Background="{DynamicResource SurfaceRaisedBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6">
+                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style TargetType="MenuItem">
         <Setter Property="FontSize" Value="{DynamicResource BaseFontSize}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="ItemBorder"
+                            Padding="{TemplateBinding Padding}"
+                            Background="Transparent"
+                            CornerRadius="4">
+                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="Separator">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Margin" Value="6,4" />
+        <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
     </Style>
 </ResourceDictionary>
