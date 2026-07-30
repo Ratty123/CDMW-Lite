@@ -36,6 +36,17 @@ public static class ArchiveContentClassification
         "_specular",
     ];
 
+    /// <summary>
+    /// Every terminal suffix that marks a texture variant, so a caller that builds or strips variant
+    /// names stays in step with <see cref="ClassifyTextureUsage"/> instead of keeping its own list.
+    /// </summary>
+    public static IReadOnlyList<string> TextureVariantSuffixes { get; } =
+    [
+        .. ColorTextureSuffixes,
+        .. NormalTextureSuffixes,
+        .. MaterialTextureSuffixes,
+    ];
+
     public static string ClassifyRole(string path, string extension)
     {
         var normalizedPath = (path ?? string.Empty).Replace('\\', '/').ToLowerInvariant();

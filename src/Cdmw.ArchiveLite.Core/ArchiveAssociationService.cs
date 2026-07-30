@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using Cdmw.Archive.Content;
 using Cdmw.ArchiveLite.Contracts;
 
 namespace Cdmw.ArchiveLite.Core;
@@ -12,41 +13,17 @@ public sealed class ArchiveAssociationService
     private const int MaximumMatchesPerBasename = 32;
     private const long MaximumReferenceContainerBytes = 16L * 1024L * 1024L;
 
-    private static readonly string[] FamilySuffixes =
-    [
-        ".prefabdata_xml", ".prefabdata.xml", ".pamlod_xml", ".pamlod.xml",
-        ".pac_xml", ".pac.xml", ".pam_xml", ".pam.xml", ".app_xml", ".app.xml",
-        ".paa_metabin", ".sockets.xml", ".motionblending", ".paschedulepath",
-        ".pamlod", ".meshinfo", ".prefab", ".pappt", ".pamhc", ".pami",
-        ".hkx", ".hkt", ".pac", ".pam", ".pabgb", ".pabgh", ".pabc",
-        ".pabv", ".papr", ".pab", ".paa", ".paem", ".pae", ".paseqc",
-        ".paseq", ".paschedule", ".pastage", ".seqmt", ".xml",
-    ];
+    /// <summary>
+    /// A stem this short is a serial number rather than an asset name, and expanding it would name a
+    /// file in every unrelated corner of the archive.
+    /// </summary>
+    private const int MinimumFamilyStemLength = 3;
 
-    private static readonly string[] TextureFamilySuffixes =
-    [
-        ".dds", "_d.dds", "_n.dds", "_m.dds", "_r.dds", "_s.dds", "_a.dds",
-        "_ao.dds", "_orm.dds", "_mra.dds", "_albedo.dds", "_basecolor.dds",
-        "_diffuse.dds", "_normal.dds", "_mask.dds", "_roughness.dds",
-        "_metallic.dds", "_specular.dds", "_emissive.dds", "_opacity.dds",
-    ];
-
-    private static readonly HashSet<string> ReferenceContainerExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".pac", ".pam", ".pamlod", ".pac_xml", ".pam_xml", ".pamlod_xml",
-        ".pami", ".app_xml", ".prefabdata_xml", ".prefab", ".pappt", ".pamhc",
-        ".meshinfo", ".xml", ".json", ".material",
-    };
-
-    private static readonly Regex TextureVariantSuffix = new(
-        @"(?:_(?:d|n|m|r|s|a|ao|orm|mra|albedo|basecolor|diffuse|normal|nrm|mask|roughness|metallic|specular|emissive|opacity))+$",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        TimeSpan.FromMilliseconds(250));
-
-    private static readonly Regex AssetReferencePattern = new(
-        @"(?<path>(?:[A-Za-z0-9_@%+\-.]+[\\/])*(?:[A-Za-z0-9_@%+\-.]+)\.(?:prefabdata_xml|prefabdata\.xml|pamlod_xml|pamlod\.xml|pac_xml|pac\.xml|pam_xml|pam\.xml|app_xml|app\.xml|paa_metabin|sockets\.xml|motionblending|paschedulepath|pamlod|meshinfo|prefab|pappt|pamhc|pami|paschedule|pastage|paseqc|paseq|seqmt|pabgb|pabgh|pabc|pabv|papr|paem|pac|pam|hkx|hkt|pab|paa|pae|dds|wem|bnk|xml|json))",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-        TimeSpan.FromSeconds(1));
+    private static readonly IReadOnlyList<string> FamilySuffixes = ArchiveAssociationVocabulary.FamilySuffixes;
+    private static readonly IReadOnlyList<string> TextureFamilySuffixes = ArchiveAssociationVocabulary.TextureFamilySuffixes;
+    private static readonly IReadOnlySet<string> ReferenceContainerExtensions = ArchiveAssociationVocabulary.ReferenceContainerExtensions;
+    private static readonly Regex TextureVariantSuffix = ArchiveAssociationVocabulary.TextureVariantSuffix;
+    private static readonly Regex AssetReferencePattern = ArchiveAssociationVocabulary.AssetReferencePattern;
 
     private readonly ArchiveSessionManager _sessions;
     private readonly NativeArchiveCore _native;
@@ -75,12 +52,20 @@ public sealed class ArchiveAssociationService
             return BuildResponse(session.Id, source.EntryId, cached.Assets, maximumResults, 0, cached.Truncated);
         }
 
-        if (TryReadLearned(cacheKey, out var learnedOnly) && learnedOnly.Count > 0)
+        var discovered = new Dictionary<long, AssociatedAssetDto>();
+
+        // What another member of this family already resolved is a head start, not the answer: this
+        // entry still gets its own pass, so opening a companion first cannot leave it permanently
+        // showing a shallower family than the one that discovered it. Real evidence found below
+        // replaces the inherited kind, because AddCandidate keeps the strongest evidence per entry.
+        if (TryReadLearned(cacheKey, out var learned))
         {
-            return BuildResponse(session.Id, source.EntryId, learnedOnly, maximumResults, 0, false);
+            foreach (var asset in learned)
+            {
+                discovered[asset.Entry.EntryId] = asset;
+            }
         }
 
-        var discovered = new Dictionary<long, AssociatedAssetDto>();
         var parsedEntryIds = new HashSet<long>();
         var references = new Dictionary<string, ReferenceCandidate>(StringComparer.OrdinalIgnoreCase);
         var familyStem = GetFamilyStem(source.Path);
@@ -190,6 +175,7 @@ public sealed class ArchiveAssociationService
         {
             var decoded = _native.Decode(entry);
             cancellationToken.ThrowIfCancellationRequested();
+            AddWwiseMediaReferences(entry, decoded.Bytes, references);
             var searchable = TextDecoding.LooksTextual(decoded.Bytes)
                 ? TextDecoding.Decode(decoded.Bytes)
                 : BuildPrintableText(decoded.Bytes);
@@ -211,6 +197,27 @@ public sealed class ArchiveAssociationService
         catch (Exception exception) when (exception is NativeArchiveException or InvalidDataException or DecoderFallbackException)
         {
             // Relationship hints are best-effort; same-family discovery remains available.
+        }
+    }
+
+    /// <summary>
+    /// A Wwise bank names its sounds by source id rather than by path, and a sound stored outside the
+    /// bank carries that id as its file name. Reading the media table therefore links a bank to the
+    /// loose sounds that belong with it, which nothing written in the bank spells out as a path.
+    /// </summary>
+    private static void AddWwiseMediaReferences(
+        ArchiveEntryDto entry,
+        byte[] bytes,
+        IDictionary<string, ReferenceCandidate> references)
+    {
+        if (!ArchiveWwiseBank.IsSoundBank(bytes))
+        {
+            return;
+        }
+        foreach (var media in ArchiveWwiseBank.ReadEmbeddedMedia(bytes))
+        {
+            var basename = $"{media.SourceId}.wem";
+            references.TryAdd(basename, new ReferenceCandidate(basename, basename, entry.Name));
         }
     }
 
@@ -394,7 +401,7 @@ public sealed class ArchiveAssociationService
     private static HashSet<string> BuildCandidateBasenames(string stem)
     {
         var basenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(stem))
+        if (string.IsNullOrWhiteSpace(stem) || stem.Length < MinimumFamilyStemLength)
         {
             return basenames;
         }
@@ -475,11 +482,14 @@ public sealed class ArchiveAssociationService
 
     private static AssociatedAssetCategory ClassifyCategory(ArchiveEntryDto entry)
     {
-        var extension = entry.Extension.ToLowerInvariant();
+        var extension = ArchiveContentRegistry.NormalizeExtension(entry.Extension);
         var basename = GetBasename(entry.Path);
         var path = entry.Path.Replace('\\', '/').ToLowerInvariant();
         if (extension is ".pac" or ".pam" or ".pamlod") return AssociatedAssetCategory.Model;
-        if (IsMaterialSidecar(extension, basename) || extension == ".pamhc") return AssociatedAssetCategory.Material;
+        if (IsMaterialSidecar(extension, basename) || extension is ".pamhc" or ".material" or ".shader" or ".mtl")
+        {
+            return AssociatedAssetCategory.Material;
+        }
         if (extension is ".dds" or ".seqmt") return AssociatedAssetCategory.Texture;
         if (extension is ".hkx" or ".hkt"
             && (path.Contains("physics", StringComparison.Ordinal) || path.Contains("ragdoll", StringComparison.Ordinal)))
@@ -487,8 +497,9 @@ public sealed class ArchiveAssociationService
             return AssociatedAssetCategory.Physics;
         }
         if (extension == ".meshinfo") return AssociatedAssetCategory.MeshMetadata;
-        if (extension is ".prefab" or ".prefabdata_xml" or ".app_xml" or ".pappt"
-            || basename.EndsWith(".prefabdata.xml", StringComparison.OrdinalIgnoreCase))
+        if (extension is ".prefab" or ".prefabdata_xml" or ".prefab_xml" or ".app_xml" or ".pappt"
+            || basename.EndsWith(".prefabdata.xml", StringComparison.OrdinalIgnoreCase)
+            || basename.EndsWith(".prefab.xml", StringComparison.OrdinalIgnoreCase))
         {
             return AssociatedAssetCategory.PrefabMetadata;
         }
@@ -503,7 +514,37 @@ public sealed class ArchiveAssociationService
         }
         if (entry.Role is ArchiveEntryRole.Audio or ArchiveEntryRole.Video) return AssociatedAssetCategory.AudioVideo;
         if (entry.Role == ArchiveEntryRole.UserInterface) return AssociatedAssetCategory.UserInterface;
-        return AssociatedAssetCategory.Other;
+        return ClassifyFromRegistry(extension);
+    }
+
+    /// <summary>
+    /// What the capability manifest says a format is, so a registered extension that no rule above
+    /// names still reaches the group a reader expects instead of falling into "Other".
+    /// </summary>
+    private static AssociatedAssetCategory ClassifyFromRegistry(string extension)
+    {
+        if (ArchiveContentRegistry.Find(extension) is not { } capability)
+        {
+            return AssociatedAssetCategory.Other;
+        }
+        if (capability.Group == "texture_image") return AssociatedAssetCategory.Texture;
+        return capability.Role switch
+        {
+            "model" => AssociatedAssetCategory.Model,
+            "physics" => AssociatedAssetCategory.Physics,
+            "animation" => AssociatedAssetCategory.AnimationMotion,
+            "audio" or "video" => AssociatedAssetCategory.AudioVideo,
+            "user_interface" => AssociatedAssetCategory.UserInterface,
+            "image" or "normal" => AssociatedAssetCategory.Texture,
+            "material" => AssociatedAssetCategory.Material,
+
+            // Level, route, and gimmick data all describe a scene rather than a mesh, which is the
+            // bucket the prefab label already covers.
+            "metadata" => AssociatedAssetCategory.PrefabMetadata,
+            _ => capability.Group == "material_metadata"
+                ? AssociatedAssetCategory.PrefabMetadata
+                : AssociatedAssetCategory.Other,
+        };
     }
 
     private static bool IsMaterialSidecar(string extension, string basename) =>
@@ -558,7 +599,7 @@ public sealed class ArchiveAssociationService
     private static string GetFamilyStem(string path)
     {
         var basename = GetBasename(path);
-        foreach (var suffix in FamilySuffixes.OrderByDescending(static value => value.Length))
+        foreach (var suffix in FamilySuffixes)
         {
             if (basename.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
             {
