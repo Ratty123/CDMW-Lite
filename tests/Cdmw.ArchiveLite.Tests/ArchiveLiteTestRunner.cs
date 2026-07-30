@@ -1517,7 +1517,7 @@ internal static class ArchiveLiteTestRunner
         }
     }
 
-    private static Task TestArchiveGridFeaturesAsync()
+    private static async Task TestArchiveGridFeaturesAsync()
     {
         var repositoryRoot = FindRepositoryRoot();
         var appRoot = Path.Combine(
@@ -1561,7 +1561,6 @@ internal static class ArchiveLiteTestRunner
         {
             nameof(ArchiveSortField.Name),
             nameof(ArchiveSortField.KnownName),
-            nameof(ArchiveSortField.NameEvidence),
             nameof(ArchiveSortField.Extension),
             nameof(ArchiveSortField.FileType),
             nameof(ArchiveSortField.TextureUsage),
@@ -1572,6 +1571,23 @@ internal static class ArchiveLiteTestRunner
             nameof(ArchiveSortField.Path),
         };
         Require(expectedSortMembers.All(sortMembers.Contains), "archive grid is missing a sortable requested column");
+        Require(
+            !sortMembers.Contains(nameof(ArchiveSortField.NameEvidence)),
+            "the archive grid still carries a separate name-evidence column");
+        var itemNameColumns = archiveGrid
+            .Descendants()
+            .Where(element => ((string?)element.Attribute("Binding"))?.Contains("{Binding ItemName}", StringComparison.Ordinal) == true)
+            .ToArray();
+        Require(
+            itemNameColumns.Length == 1
+            && (string?)itemNameColumns[0].Attribute("SortMemberPath") == nameof(ArchiveSortField.KnownName)
+            && ((string?)itemNameColumns[0].Attribute("ElementStyle"))?.Contains("ArchiveItemNameCellStyle", StringComparison.Ordinal) == true,
+            "the merged item-name column is missing, duplicated, unsortable, or has no provenance tooltip");
+        Require(
+            !archiveGrid.Descendants().Any(element =>
+                ((string?)element.Attribute("Binding"))?.Contains("{Binding KnownName}", StringComparison.Ordinal) == true
+                || ((string?)element.Attribute("Binding"))?.Contains("{Binding NameEvidence}", StringComparison.Ordinal) == true),
+            "archive rows still present the archive-stated name and its evidence as separate columns");
         Require(
             archiveGrid.Descendants().Any(element => ((string?)element.Attribute("Binding"))?.Contains("ArchiveEntryFileTypeLabelConverter", StringComparison.Ordinal) == true)
             && archiveGrid.Descendants().Any(element => ((string?)element.Attribute("Binding"))?.Contains("ArchiveTextureUsageLabelConverter", StringComparison.Ordinal) == true),
@@ -1744,7 +1760,54 @@ internal static class ArchiveLiteTestRunner
             && materialShader.Contains("keyLight * 0.48f", StringComparison.Ordinal)
             && materialShader.Contains("rimShape * 0.025f", StringComparison.Ordinal),
             "textureless preview shading does not preserve form without the exaggerated rim glow");
-        return Task.CompletedTask;
+
+        // One column carries both kinds of name, so the merged value has to prefer the name the
+        // archive states and the tooltip has to keep saying which of the two a row is showing.
+        var tooltips = new ArchiveItemNameTooltipConverter();
+        object? Tooltip(ArchiveEntryDto entry) =>
+            tooltips.Convert(entry, typeof(string), null!, CultureInfo.InvariantCulture);
+        var statedName = CreateArchiveEntry("equipment/cd_phm_01_sword_0016.pac") with
+        {
+            KnownName = "Gilded Longsword",
+            NameEvidence = "Exact localization",
+        };
+        var inferredName = CreateArchiveEntry("equipment/cd_phm_02_sword_0042_in.pac") with
+        {
+            NameEvidence = "Ashen Greatsword",
+        };
+        var unnamed = CreateArchiveEntry("equipment/cd_phm_03_sword_0100.pac");
+        Require(
+            statedName.ItemName == "Gilded Longsword" && statedName.HasExactItemName,
+            "the merged item name did not prefer the name the archive states");
+        Require(
+            inferredName.ItemName == "Ashen Greatsword" && !inferredName.HasExactItemName,
+            "the merged item name did not fall back to the related-item evidence");
+        Require(
+            unnamed.ItemName.Length == 0 && !unnamed.HasExactItemName,
+            "an entry with no name at all was given one");
+        Require(
+            (string?)Tooltip(statedName) == LocalizationManager.Get("ItemNameExactHint")
+            && (string?)Tooltip(inferredName) == LocalizationManager.Get("ItemNameEvidenceHint")
+            && Tooltip(unnamed) is null,
+            "the merged item name does not say whether it is stated by the archive or inferred");
+
+        await RunOnWpfDispatcherAsync(() =>
+        {
+            var browser = new ArchiveBrowserViewModel(
+                null!,
+                "C:\\game",
+                _ => { },
+                (_, _) => ArchiveCacheMode.Persistent,
+                ArchiveSortField.NameEvidence);
+            Require(
+                browser.SortField == ArchiveSortField.KnownName,
+                "a saved name-evidence sort was not migrated onto the merged item name");
+            Require(
+                browser.SortFields.All(static option => option.Value != ArchiveSortField.NameEvidence)
+                && browser.SortFields.Any(static option => option.Value == ArchiveSortField.KnownName),
+                "the sort picker still offers evidence that no column shows");
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
     }
 
     private static async Task TestAssociatedAssetsAsync()
@@ -3936,6 +3999,23 @@ internal static class ArchiveLiteTestRunner
         Require(
             string.IsNullOrEmpty(icon.KnownName) && icon.NameEvidence == "Synthetic Blade",
             "recovered related evidence did not propagate to the derived item-icon texture");
+
+        // The grid shows one merged name column, so its sort has to order an evidence-only row by
+        // the name that row displays rather than by an archive-stated name it does not have.
+        var byItemName = await queries.QueryAsync(
+            new ArchiveQuerySpec(
+                opened.SessionId,
+                SortField: ArchiveSortField.KnownName,
+                SortDescending: true,
+                PageSize: 8),
+            1,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            byItemName.Entries.Any(static entry => !entry.HasExactItemName && entry.ItemName.Length > 0)
+            && byItemName.Entries
+                .Zip(byItemName.Entries.Skip(1))
+                .All(static pair => StringComparer.OrdinalIgnoreCase.Compare(pair.First.ItemName, pair.Second.ItemName) >= 0),
+            "the merged item-name sort ordered evidence-only rows as if they had no name");
 
         await RequireChunkedIconWarmupAsync(sessions, session, service, native, opened.SessionId).ConfigureAwait(false);
     }

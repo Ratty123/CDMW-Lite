@@ -234,16 +234,16 @@
   <data name="RendererReady" xml:space="preserve"><value>.NET/Vortice-Vorschau ist bereit.</value></data>
   <data name="RendererFailed" xml:space="preserve"><value>.NET-Vorschau nicht verfügbar: {0}</value></data>
   <data name="RendererUnknownError" xml:space="preserve"><value>Die .NET-Vorschau hat einen unbekannten Fehler gemeldet.</value></data>
-  <data name="KnownName" xml:space="preserve"><value>Bekannter Name</value></data>
-  <data name="NameEvidence" xml:space="preserve"><value>Namensnachweis</value></data>
+  <data name="ItemName" xml:space="preserve"><value>Objektname</value></data>
+  <data name="ItemNameExactHint" xml:space="preserve"><value>Objektname, den das Archiv selbst angibt.</value></data>
+  <data name="ItemNameEvidenceHint" xml:space="preserve"><value>Ein wahrscheinlicher Objektname, abgeleitet aus einem verwandten Modell, Symbol, einer Textur oder Begleitdatei. Er ist kein Beweis, dass diese Datei zu diesem Objekt gehört.</value></data>
   <data name="Extension" xml:space="preserve"><value>Dateiendung</value></data>
   <data name="StoredSize" xml:space="preserve"><value>Gespeichert</value></data>
   <data name="Compression" xml:space="preserve"><value>Komprimierung</value></data>
   <data name="Columns" xml:space="preserve"><value>Spalten</value></data>
   <data name="ChooseColumns" xml:space="preserve"><value>Sichtbare Spalten auswählen</value></data>
   <data name="ShowAllColumns" xml:space="preserve"><value>Alle Spalten anzeigen</value></data>
-  <data name="SortKnownName" xml:space="preserve"><value>Bekannter Name</value></data>
-  <data name="SortNameEvidence" xml:space="preserve"><value>Namensnachweis</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>Objektname</value></data>
   <data name="SortCompression" xml:space="preserve"><value>Komprimierung</value></data>
   <data name="AllFiles" xml:space="preserve"><value>Alle Dateien</value></data>
   <data name="ExtensionGroupAll" xml:space="preserve"><value>Alle</value></data>

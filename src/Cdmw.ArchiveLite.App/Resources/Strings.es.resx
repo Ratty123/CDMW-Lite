@@ -234,16 +234,16 @@
   <data name="RendererReady" xml:space="preserve"><value>Vista previa .NET/Vortice lista.</value></data>
   <data name="RendererFailed" xml:space="preserve"><value>Vista previa .NET no disponible: {0}</value></data>
   <data name="RendererUnknownError" xml:space="preserve"><value>El visor .NET informó de un error desconocido.</value></data>
-  <data name="KnownName" xml:space="preserve"><value>Nombre conocido</value></data>
-  <data name="NameEvidence" xml:space="preserve"><value>Evidencia del nombre</value></data>
+  <data name="ItemName" xml:space="preserve"><value>Nombre del objeto</value></data>
+  <data name="ItemNameExactHint" xml:space="preserve"><value>Nombre de objeto indicado por el propio archivo.</value></data>
+  <data name="ItemNameEvidenceHint" xml:space="preserve"><value>Nombre de objeto probable, deducido de un modelo, icono, textura o fichero complementario relacionado. No demuestra que este archivo pertenezca a ese objeto.</value></data>
   <data name="Extension" xml:space="preserve"><value>Extensión</value></data>
   <data name="StoredSize" xml:space="preserve"><value>Almacenado</value></data>
   <data name="Compression" xml:space="preserve"><value>Compresión</value></data>
   <data name="Columns" xml:space="preserve"><value>Columnas</value></data>
   <data name="ChooseColumns" xml:space="preserve"><value>Elegir columnas visibles</value></data>
   <data name="ShowAllColumns" xml:space="preserve"><value>Mostrar todas las columnas</value></data>
-  <data name="SortKnownName" xml:space="preserve"><value>Nombre conocido</value></data>
-  <data name="SortNameEvidence" xml:space="preserve"><value>Evidencia del nombre</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>Nombre del objeto</value></data>
   <data name="SortCompression" xml:space="preserve"><value>Compresión</value></data>
   <data name="AllFiles" xml:space="preserve"><value>Todos los archivos</value></data>
   <data name="ExtensionGroupAll" xml:space="preserve"><value>Todo</value></data>

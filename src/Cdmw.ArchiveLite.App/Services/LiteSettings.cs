@@ -98,7 +98,8 @@ public sealed record WorkspaceLayoutSettings(
     double ArchiveFilterWidth = 278,
     double ArchivePreviewWidth = 420,
     double TextSearchFilterWidth = 300,
-    double TextSearchPreviewWidth = 420);
+    double TextSearchPreviewWidth = 420,
+    double ArchiveFolderWidth = 240);
 
 public sealed record GridColumnSettings(
     string Key,

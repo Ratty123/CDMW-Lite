@@ -25,6 +25,15 @@ public sealed record ArchiveEntryDto(
     public int EncryptionType => (Flags >> 4) & 0x0F;
     public string Name => System.IO.Path.GetFileName(Path.Replace('/', System.IO.Path.DirectorySeparatorChar));
     public string CompressionLabel => IsCompressed ? $"Type {CompressionType}" : "None";
+
+    /// <summary>
+    /// The single name to present for an entry: the item name the archive states outright when
+    /// there is one, and otherwise the related-item evidence, which names a likely item rather
+    /// than a certain one. <see cref="HasExactItemName"/> tells the two apart.
+    /// </summary>
+    public string ItemName => string.IsNullOrWhiteSpace(KnownName) ? NameEvidence : KnownName;
+
+    public bool HasExactItemName => !string.IsNullOrWhiteSpace(KnownName);
 }
 
 public enum ArchiveEntryRole

@@ -96,8 +96,9 @@
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>导出资源系列</value></data>
   <data name="Path" xml:space="preserve"><value>路径</value></data>
   <data name="Name" xml:space="preserve"><value>名称</value></data>
-  <data name="KnownName" xml:space="preserve"><value>已知名称</value></data>
-  <data name="NameEvidence" xml:space="preserve"><value>名称依据</value></data>
+  <data name="ItemName" xml:space="preserve"><value>物品名称</value></data>
+  <data name="ItemNameExactHint" xml:space="preserve"><value>档案自身给出的物品名称。</value></data>
+  <data name="ItemNameEvidenceHint" xml:space="preserve"><value>根据相关的模型、图标、贴图或附属文件推断出的可能物品名称，并不能证明此文件属于该物品。</value></data>
   <data name="Extension" xml:space="preserve"><value>扩展名</value></data>
   <data name="Type" xml:space="preserve"><value>类型</value></data>
   <data name="FileType" xml:space="preserve"><value>文件类型</value></data>
@@ -196,8 +197,7 @@
   <data name="TextureUsageMaterialMap" xml:space="preserve"><value>材质贴图</value></data>
   <data name="SortPath" xml:space="preserve"><value>路径</value></data>
   <data name="SortName" xml:space="preserve"><value>名称</value></data>
-  <data name="SortKnownName" xml:space="preserve"><value>已知名称</value></data>
-  <data name="SortNameEvidence" xml:space="preserve"><value>名称依据</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>物品名称</value></data>
   <data name="SortExtension" xml:space="preserve"><value>扩展名</value></data>
   <data name="SortPackage" xml:space="preserve"><value>数据包</value></data>
   <data name="SortOriginalSize" xml:space="preserve"><value>原始大小</value></data>
