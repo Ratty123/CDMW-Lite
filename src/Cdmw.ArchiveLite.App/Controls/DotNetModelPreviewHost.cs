@@ -22,6 +22,9 @@ public sealed class DotNetModelPreviewHost : HwndHost
     private const int WsPopup = unchecked((int)0x80000000);
     private const int WsExToolWindow = 0x00000080;
     private const int WsExNoActivate = 0x08000000;
+    private const int WmEraseBackground = 0x0014;
+    /// <summary>The renderer's own default clear colour, as a COLORREF (0x00BBGGRR).</summary>
+    private const int DefaultHostBackgroundColorRef = 0x1A1412;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpFrameChanged = 0x0020;
@@ -37,8 +40,8 @@ public sealed class DotNetModelPreviewHost : HwndHost
     private IntPtr _warmupHostHandle;
     private long _generation;
     private long _cameraInputGeneration;
-    private int _hostPixelWidth = 1;
-    private int _hostPixelHeight = 1;
+    private IntPtr _backgroundBrush;
+    private int _backgroundBrushColorRef = -1;
     private int _prewarmStarted;
     private int _shutdown;
     private bool _hasPresentedPackage;
@@ -254,15 +257,82 @@ public sealed class DotNetModelPreviewHost : HwndHost
     protected override void OnWindowPositionChanged(Rect rcBoundingBox)
     {
         base.OnWindowPositionChanged(rcBoundingBox);
-        var width = Math.Max(1, (int)Math.Round(rcBoundingBox.Width));
-        var height = Math.Max(1, (int)Math.Round(rcBoundingBox.Height));
-        Volatile.Write(ref _hostPixelWidth, width);
-        Volatile.Write(ref _hostPixelHeight, height);
         if (_hostHandle == IntPtr.Zero || Volatile.Read(ref _shutdown) != 0)
         {
             return;
         }
-        GetCurrentSession()?.TryResizeAttachedRenderer(_hostHandle, width, height);
+        // The base call has already sized the host window from this same rect. Let the
+        // resize read that result back rather than rounding the rect a second time: the
+        // renderer reconciles itself against the host's client rect on its own timer, so
+        // a second rounding of one layout pass would leave the two fighting over a pixel.
+        GetCurrentSession()?.TryResizeAttachedRenderer(_hostHandle);
+    }
+
+    /// <summary>
+    /// Paints the host window itself. WPF cannot draw inside a hosted window's region, so
+    /// without this any margin the renderer has not covered yet — during a resize, a DPI
+    /// change, or before the first frame — is left unpainted and reads as black.
+    /// </summary>
+    protected override IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmEraseBackground
+            && wParam != IntPtr.Zero
+            && GetClientRect(hwnd, out var rect))
+        {
+            var brush = EnsureBackgroundBrush();
+            if (brush != IntPtr.Zero && FillRect(wParam, ref rect, brush))
+            {
+                handled = true;
+                return new IntPtr(1);
+            }
+        }
+        return base.WndProc(hwnd, msg, wParam, lParam, ref handled);
+    }
+
+    private IntPtr EnsureBackgroundBrush()
+    {
+        var colorRef = ResolveBackgroundColorRef();
+        if (_backgroundBrush != IntPtr.Zero && _backgroundBrushColorRef == colorRef)
+        {
+            return _backgroundBrush;
+        }
+        var brush = CreateSolidBrush(colorRef);
+        if (brush == IntPtr.Zero)
+        {
+            return _backgroundBrush;
+        }
+        DestroyBackgroundBrush();
+        _backgroundBrush = brush;
+        _backgroundBrushColorRef = colorRef;
+        return brush;
+    }
+
+    /// <summary>Converts the renderer's "#RRGGBB" clear colour into a COLORREF (0x00BBGGRR).</summary>
+    private int ResolveBackgroundColorRef()
+    {
+        var hex = (PreviewBackgroundColor ?? string.Empty).AsSpan().Trim();
+        if (hex.Length == 7
+            && hex[0] == '#'
+            && int.TryParse(
+                hex[1..],
+                System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var rgb))
+        {
+            return ((rgb >> 16) & 0xFF) | (rgb & 0xFF00) | ((rgb & 0xFF) << 16);
+        }
+        return DefaultHostBackgroundColorRef;
+    }
+
+    private void DestroyBackgroundBrush()
+    {
+        var brush = _backgroundBrush;
+        _backgroundBrush = IntPtr.Zero;
+        _backgroundBrushColorRef = -1;
+        if (brush != IntPtr.Zero)
+        {
+            _ = DeleteObject(brush);
+        }
     }
 
     protected override void DestroyWindowCore(HandleRef hwnd)
@@ -280,6 +350,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
         {
             _ = DestroyWindow(hwnd.Handle);
         }
+        DestroyBackgroundBrush();
     }
 
     private static void OnPackagePathChanged(DependencyObject dependencyObject, DependencyPropertyChangedEventArgs args)
@@ -303,6 +374,11 @@ public sealed class DotNetModelPreviewHost : HwndHost
         if (Volatile.Read(ref _shutdown) != 0)
         {
             return;
+        }
+        if (_hostHandle != IntPtr.Zero)
+        {
+            // The clear colour may have moved, so repaint the margin the renderer never covers.
+            _ = InvalidateRect(_hostHandle, IntPtr.Zero, true);
         }
         var generation = Interlocked.Increment(ref _cameraInputGeneration);
         var operation = new CancellationTokenSource();
@@ -498,10 +574,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                             throw new OperationCanceledException(operation.Token);
                         }
                         await resident.AttachToHostAsync(visibleHost, activate: true, loadTimeout.Token).ConfigureAwait(true);
-                        resident.TryResizeAttachedRenderer(
-                            visibleHost,
-                            Volatile.Read(ref _hostPixelWidth),
-                            Volatile.Read(ref _hostPixelHeight));
+                        resident.TryResizeAttachedRenderer(visibleHost);
                         SetValue(IsReadyPropertyKey, true);
                         SetValue(IsLoadingPropertyKey, false);
                         SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
@@ -553,10 +626,7 @@ public sealed class DotNetModelPreviewHost : HwndHost
                         _currentSession = session;
                         _startingSession = null;
                     }
-                    session.TryResizeAttachedRenderer(
-                        _hostHandle,
-                        Volatile.Read(ref _hostPixelWidth),
-                        Volatile.Read(ref _hostPixelHeight));
+                    session.TryResizeAttachedRenderer(_hostHandle);
                     SetValue(IsReadyPropertyKey, true);
                     SetValue(IsLoadingPropertyKey, false);
                     SetValue(StatusTextPropertyKey, LocalizationManager.Get("RendererReady"));
@@ -784,6 +854,21 @@ public sealed class DotNetModelPreviewHost : HwndHost
         int height,
         uint flags);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool InvalidateRect(IntPtr window, IntPtr rect, [MarshalAs(UnmanagedType.Bool)] bool erase);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FillRect(IntPtr deviceContext, ref NativeRect rect, IntPtr brush);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateSolidBrush(int color);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(IntPtr handle);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandleW(string? moduleName);
 
@@ -894,7 +979,11 @@ public sealed class DotNetModelPreviewHost : HwndHost
             return true;
         }
 
-        public bool TryResizeAttachedRenderer(IntPtr parentHandle, int width, int height)
+        /// <summary>
+        /// Sizes the renderer from the host's own client rect, which is the single figure
+        /// the renderer's reconciliation timer also reads.
+        /// </summary>
+        public bool TryResizeAttachedRenderer(IntPtr parentHandle)
         {
             if (parentHandle == IntPtr.Zero
                 || !IsWindow(parentHandle)
@@ -906,11 +995,12 @@ public sealed class DotNetModelPreviewHost : HwndHost
             if (rendererHandle == IntPtr.Zero
                 || !IsWindow(rendererHandle)
                 || GetParent(rendererHandle) != parentHandle
-                || width <= 0
-                || height <= 0)
+                || !GetClientRect(parentHandle, out var rect))
             {
                 return false;
             }
+            var width = Math.Max(1, rect.Right - rect.Left);
+            var height = Math.Max(1, rect.Bottom - rect.Top);
             return SetWindowPos(
                 rendererHandle,
                 IntPtr.Zero,
