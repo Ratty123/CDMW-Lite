@@ -96,8 +96,9 @@
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>Eksportuj rodzinę</value></data>
   <data name="Path" xml:space="preserve"><value>Ścieżka</value></data>
   <data name="Name" xml:space="preserve"><value>Nazwa</value></data>
-  <data name="KnownName" xml:space="preserve"><value>Znana nazwa</value></data>
-  <data name="NameEvidence" xml:space="preserve"><value>Podstawa nazwy</value></data>
+  <data name="ItemName" xml:space="preserve"><value>Nazwa przedmiotu</value></data>
+  <data name="ItemNameExactHint" xml:space="preserve"><value>Nazwa przedmiotu podana przez samo archiwum.</value></data>
+  <data name="ItemNameEvidenceHint" xml:space="preserve"><value>Prawdopodobna nazwa przedmiotu, wywnioskowana z powiązanego modelu, ikony, tekstury lub pliku towarzyszącego. Nie jest to dowód, że ten plik należy do tego przedmiotu.</value></data>
   <data name="Extension" xml:space="preserve"><value>Rozszerzenie</value></data>
   <data name="Type" xml:space="preserve"><value>Typ</value></data>
   <data name="FileType" xml:space="preserve"><value>Typ pliku</value></data>
@@ -196,8 +197,7 @@
   <data name="TextureUsageMaterialMap" xml:space="preserve"><value>Mapa materiału</value></data>
   <data name="SortPath" xml:space="preserve"><value>Ścieżka</value></data>
   <data name="SortName" xml:space="preserve"><value>Nazwa</value></data>
-  <data name="SortKnownName" xml:space="preserve"><value>Znana nazwa</value></data>
-  <data name="SortNameEvidence" xml:space="preserve"><value>Podstawa nazwy</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>Nazwa przedmiotu</value></data>
   <data name="SortExtension" xml:space="preserve"><value>Rozszerzenie</value></data>
   <data name="SortPackage" xml:space="preserve"><value>Pakiet</value></data>
   <data name="SortOriginalSize" xml:space="preserve"><value>Rozmiar pierwotny</value></data>

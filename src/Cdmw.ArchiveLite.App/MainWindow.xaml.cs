@@ -211,6 +211,26 @@ public partial class MainWindow : Window
             : 0;
     }
 
+    /// <summary>
+    /// Selects the folder under a right-click before its context menu opens. WPF selects a tree item
+    /// on the left button only, so without this the menu would act on whatever was selected earlier.
+    /// </summary>
+    private void OnArchiveFolderTreeRightButtonDown(object sender, MouseButtonEventArgs eventArgs)
+    {
+        for (DependencyObject? node = eventArgs.OriginalSource as DependencyObject;
+            node is not null;
+            node = node is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                : null)
+        {
+            if (node is TreeViewItem item)
+            {
+                item.IsSelected = true;
+                return;
+            }
+        }
+    }
+
     private void OnArchiveGridSelectionChanged(object sender, SelectionChangedEventArgs eventArgs) =>
         _viewModel.ArchiveBrowser.SetSelectedEntries(ArchiveGrid.SelectedItems.OfType<ArchiveEntryDto>());
 
@@ -550,6 +570,7 @@ public partial class MainWindow : Window
         }
 
         ArchiveFilterColumn.Width = PixelGridLength(layout.ArchiveFilterWidth, 250, 720, 278);
+        ArchiveFolderColumn.Width = PixelGridLength(layout.ArchiveFolderWidth, 170, 720, 240);
         ArchiveResultsColumn.Width = new GridLength(1, GridUnitType.Star);
         ArchivePreviewColumn.Width = PixelGridLength(
             layout.ArchivePreviewWidth,
@@ -658,7 +679,8 @@ public partial class MainWindow : Window
                 MeasuredWidthOrFallback(ArchiveFilterColumn, priorWorkspace.ArchiveFilterWidth),
                 MeasuredWidthOrFallback(ArchivePreviewColumn, priorWorkspace.ArchivePreviewWidth),
                 MeasuredWidthOrFallback(TextSearchFilterColumn, priorWorkspace.TextSearchFilterWidth),
-                MeasuredWidthOrFallback(TextSearchPreviewColumn, priorWorkspace.TextSearchPreviewWidth)),
+                MeasuredWidthOrFallback(TextSearchPreviewColumn, priorWorkspace.TextSearchPreviewWidth),
+                MeasuredWidthOrFallback(ArchiveFolderColumn, priorWorkspace.ArchiveFolderWidth)),
             CaptureGridColumnLayout(ArchiveGrid, _viewModel.ArchiveColumnLayout),
             CaptureGridColumnLayout(TextSearchResultsGrid, _viewModel.TextSearchColumnLayout));
     }

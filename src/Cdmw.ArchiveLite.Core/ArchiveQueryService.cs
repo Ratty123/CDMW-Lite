@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Cdmw.ArchiveLite.Contracts;
 
 namespace Cdmw.ArchiveLite.Core;
@@ -297,7 +297,9 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
             var result = field switch
             {
                 ArchiveSortField.Name => StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name),
-                ArchiveSortField.KnownName => StringComparer.OrdinalIgnoreCase.Compare(left.KnownName, right.KnownName),
+                // The grid presents one merged item-name column, so its sort orders by the same
+                // merged value rather than by the archive-stated name alone.
+                ArchiveSortField.KnownName => StringComparer.OrdinalIgnoreCase.Compare(left.ItemName, right.ItemName),
                 ArchiveSortField.NameEvidence => StringComparer.OrdinalIgnoreCase.Compare(left.NameEvidence, right.NameEvidence),
                 ArchiveSortField.Extension => StringComparer.OrdinalIgnoreCase.Compare(left.Extension, right.Extension),
                 ArchiveSortField.Package => StringComparer.OrdinalIgnoreCase.Compare(left.Package, right.Package),

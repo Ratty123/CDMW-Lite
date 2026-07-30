@@ -96,8 +96,9 @@
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>Export family</value></data>
   <data name="Path" xml:space="preserve"><value>Path</value></data>
   <data name="Name" xml:space="preserve"><value>Name</value></data>
-  <data name="KnownName" xml:space="preserve"><value>Known name</value></data>
-  <data name="NameEvidence" xml:space="preserve"><value>Name evidence</value></data>
+  <data name="ItemName" xml:space="preserve"><value>Item name</value></data>
+  <data name="ItemNameExactHint" xml:space="preserve"><value>Item name stated by the archive itself.</value></data>
+  <data name="ItemNameEvidenceHint" xml:space="preserve"><value>A likely item name, inferred from a related model, icon, texture, or sidecar file. It is not proof that this file belongs to that item.</value></data>
   <data name="Extension" xml:space="preserve"><value>Extension</value></data>
   <data name="Type" xml:space="preserve"><value>Type</value></data>
   <data name="FileType" xml:space="preserve"><value>File type</value></data>
@@ -196,8 +197,7 @@
   <data name="TextureUsageMaterialMap" xml:space="preserve"><value>Material map</value></data>
   <data name="SortPath" xml:space="preserve"><value>Path</value></data>
   <data name="SortName" xml:space="preserve"><value>Name</value></data>
-  <data name="SortKnownName" xml:space="preserve"><value>Known name</value></data>
-  <data name="SortNameEvidence" xml:space="preserve"><value>Name evidence</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>Item name</value></data>
   <data name="SortExtension" xml:space="preserve"><value>Extension</value></data>
   <data name="SortPackage" xml:space="preserve"><value>Package</value></data>
   <data name="SortOriginalSize" xml:space="preserve"><value>Original size</value></data>

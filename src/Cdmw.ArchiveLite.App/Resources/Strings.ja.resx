@@ -96,8 +96,9 @@
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>ファミリーをエクスポート</value></data>
   <data name="Path" xml:space="preserve"><value>パス</value></data>
   <data name="Name" xml:space="preserve"><value>名前</value></data>
-  <data name="KnownName" xml:space="preserve"><value>判明した名前</value></data>
-  <data name="NameEvidence" xml:space="preserve"><value>名前の根拠</value></data>
+  <data name="ItemName" xml:space="preserve"><value>アイテム名</value></data>
+  <data name="ItemNameExactHint" xml:space="preserve"><value>アーカイブ自体が示しているアイテム名です。</value></data>
+  <data name="ItemNameEvidenceHint" xml:space="preserve"><value>関連するモデル、アイコン、テクスチャ、付随ファイルから推定した可能性の高いアイテム名です。このファイルがそのアイテムのものである証拠ではありません。</value></data>
   <data name="Extension" xml:space="preserve"><value>拡張子</value></data>
   <data name="Type" xml:space="preserve"><value>種類</value></data>
   <data name="FileType" xml:space="preserve"><value>ファイルの種類</value></data>
@@ -196,8 +197,7 @@
   <data name="TextureUsageMaterialMap" xml:space="preserve"><value>マテリアルマップ</value></data>
   <data name="SortPath" xml:space="preserve"><value>パス</value></data>
   <data name="SortName" xml:space="preserve"><value>名前</value></data>
-  <data name="SortKnownName" xml:space="preserve"><value>判明した名前</value></data>
-  <data name="SortNameEvidence" xml:space="preserve"><value>名前の根拠</value></data>
+  <data name="SortKnownName" xml:space="preserve"><value>アイテム名</value></data>
   <data name="SortExtension" xml:space="preserve"><value>拡張子</value></data>
   <data name="SortPackage" xml:space="preserve"><value>パッケージ</value></data>
   <data name="SortOriginalSize" xml:space="preserve"><value>元のサイズ</value></data>

@@ -124,6 +124,10 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             _sortField = ArchiveSortField.FileType;
         }
+        if (_sortField == ArchiveSortField.NameEvidence)
+        {
+            _sortField = ArchiveSortField.KnownName;
+        }
         _sortDescending = initialSortDescending;
         _selectedFolder = string.IsNullOrWhiteSpace(browserSettings.FolderPath)
             ? null
@@ -396,7 +400,6 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 return;
             }
 
-            OnPropertyChanged(nameof(ShowFolderNavigator));
             OnPropertyChanged(nameof(ShowCategoryNavigator));
             // Lite exposes no role control of its own: the category navigator is the only thing that
             // sets the role filter, so the filter must not outlive the view modes that show it.
@@ -416,7 +419,6 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         private set => SetProperty(ref _isFolderTreeBusy, value);
     }
 
-    public bool ShowFolderNavigator => ViewMode is ArchiveViewMode.Folders or ArchiveViewMode.CategoriesAndFolders;
     public bool ShowCategoryNavigator => ViewMode is ArchiveViewMode.Categories or ArchiveViewMode.CategoriesAndFolders;
 
     public ArchiveSortField SortField
@@ -1350,13 +1352,12 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Starts the folder tree the first time a view mode that shows it is active. Deriving the tree
-    /// costs a pass over every archive path, so a session spent in the flat or category views never
-    /// pays for it.
+    /// Starts the folder tree once per session. The tree is its own pane rather than a view mode, so
+    /// it loads whenever an archive is open and is not rebuilt when the view mode moves.
     /// </summary>
     private void EnsureFolderTreeLoaded()
     {
-        if (!ShowFolderNavigator || _folderTreeContext is not null || SessionId is not { } sessionId || string.IsNullOrWhiteSpace(sessionId))
+        if (_folderTreeContext is not null || SessionId is not { } sessionId || string.IsNullOrWhiteSpace(sessionId))
         {
             return;
         }
@@ -1661,6 +1662,9 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Flat, LocalizationManager.Get("FlatView")),
         ];
         _sortFields = Enum.GetValues<ArchiveSortField>()
+            // The evidence is folded into the item name the grid shows, so it is no longer a sort
+            // of its own; a persisted selection of it is migrated to the merged name.
+            .Where(static field => field != ArchiveSortField.NameEvidence)
             .Select(field => new LocalizedOption<ArchiveSortField>(field, LocalizationManager.Get($"Sort{field}")))
             .ToArray();
         _collisionPolicies = Enum.GetValues<ExportCollisionPolicy>()
