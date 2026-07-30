@@ -42,6 +42,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private bool _isFolderTreeBusy;
     private long _folderTreeGeneration;
     private string? _folderTreeFilterKey;
+    private long _folderTreeTotalCount;
+    private bool _entryTreeRebuildQueued;
     private ArchiveRoleFilter _selectedRole = null!;
     private ArchiveCategoryCount? _selectedCategory;
     private ArchiveEntryDto? _selectedEntry;
@@ -1509,7 +1511,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             FolderTree.Clear();
             // The tree has no row for the archive itself, so without this there is no way back to
             // every folder once one is chosen - the picker that used to do it is gone.
-            FolderTree.Add(ArchiveFolderNodeViewModel.CreateAllFolders(context));
+            FolderTree.Add(ArchiveFolderNodeViewModel.CreateAllFolders(context, _folderTreeTotalCount));
             foreach (var child in children)
             {
                 FolderTree.Add(ArchiveFolderNodeViewModel.Create(context, child));
@@ -1565,6 +1567,11 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             return [];
         }
+        if (string.IsNullOrEmpty(path))
+        {
+            // The root's own total is what the "All" row counts, and only this reply carries it.
+            _folderTreeTotalCount = result.TotalCount;
+        }
         if (result.Truncated)
         {
             _setShellStatus(LocalizationManager.Format("FolderTreeTruncated", result.Nodes.Count));
@@ -1573,8 +1580,36 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Rebuilds the flattened rows the tree grid shows. Every open node contributes its children, so
-    /// this runs whenever one is expanded or collapsed and whenever a level finishes loading.
+    /// Asks for the flattened rows to be rebuilt. The request is deferred because the things that
+    /// raise it - a node expanding, a level arriving - happen inside a binding update on the very row
+    /// the grid is handling, and replacing its items from in there is a re-entrant edit that WPF is
+    /// entitled to drop. Deferring also collapses the burst of one notification per arriving child
+    /// into a single rebuild.
+    /// </summary>
+    private void RequestEntryTreeRowRebuild()
+    {
+        if (_entryTreeRebuildQueued)
+        {
+            return;
+        }
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null)
+        {
+            RebuildEntryTreeRows();
+            return;
+        }
+        _entryTreeRebuildQueued = true;
+        _ = dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Background,
+            () =>
+            {
+                _entryTreeRebuildQueued = false;
+                RebuildEntryTreeRows();
+            });
+    }
+
+    /// <summary>
+    /// Rebuilds the flattened rows the tree grid shows. Every open node contributes its children.
     /// </summary>
     private void RebuildEntryTreeRows()
     {
@@ -1616,7 +1651,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     {
         if (eventArgs.PropertyName == nameof(ArchiveFolderNodeViewModel.IsExpanded))
         {
-            RebuildEntryTreeRows();
+            RequestEntryTreeRowRebuild();
         }
     }
 
@@ -1626,7 +1661,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         {
             TrackEntryTreeNode(added);
         }
-        RebuildEntryTreeRows();
+        RequestEntryTreeRowRebuild();
     }
 
     private async Task<IReadOnlyList<ArchiveEntryDto>> LoadFolderFilesAsync(
