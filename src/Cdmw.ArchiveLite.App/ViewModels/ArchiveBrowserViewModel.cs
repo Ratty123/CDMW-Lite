@@ -44,6 +44,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private string? _folderTreeFilterKey;
     private long _folderTreeTotalCount;
     private bool _entryTreeRebuildQueued;
+    private bool _restoringCategorySelection;
+    private ArchiveFolderNodeViewModel? _selectedTreeNode;
     private ArchiveRoleFilter _selectedRole = null!;
     private ArchiveCategoryCount? _selectedCategory;
     private ArchiveEntryDto? _selectedEntry;
@@ -480,6 +482,14 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
 
     public bool ShowEntryGrid => !ShowEntryTree;
 
+    /// <summary>
+    /// What kind of row a tree is sitting on, which decides what its context menu offers. A folder
+    /// has no family and no file name to copy; a file is not a folder anyone can export.
+    /// </summary>
+    public bool IsTreeFileSelected => _selectedTreeNode is { IsFile: true };
+
+    public bool IsTreeFolderSelected => _selectedTreeNode is { IsFile: false, IsPlaceholder: false };
+
     public ArchiveSortField SortField
     {
         get => _sortField;
@@ -610,6 +620,14 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             SelectedRole = Enum.TryParse<ArchiveEntryRole>(value.Name, out var role)
                 ? RoleFilters.First(option => option.Role == role)
                 : RoleFilters.First(static option => option.Role is null);
+
+            // Choosing a category is choosing a filter, so it applies itself. The restore that
+            // follows every query goes through this same setter, and re-querying from there would
+            // never stop, so only a choice the user made reaches this.
+            if (!_restoringCategorySelection && ApplyFilterCommand.CanExecute(null))
+            {
+                ApplyFilterCommand.Execute(null);
+            }
         }
     }
 
@@ -1698,6 +1716,9 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     /// </summary>
     private void SelectFolderNode(ArchiveFolderNodeViewModel node)
     {
+        _selectedTreeNode = node;
+        OnPropertyChanged(nameof(IsTreeFileSelected));
+        OnPropertyChanged(nameof(IsTreeFolderSelected));
         if (node.Entry is { } entry)
         {
             SelectedEntry = entry;
@@ -2004,9 +2025,17 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         // backing field as well keeps the restore below from being swallowed as "no change" when the
         // rebuilt row compares equal to the old one, which would leave the list visually unselected.
         _selectedCategory = null;
-        SelectedCategory = Categories.FirstOrDefault(category =>
-            string.Equals(category.Name, previousName, StringComparison.OrdinalIgnoreCase))
-            ?? Categories[0];
+        _restoringCategorySelection = true;
+        try
+        {
+            SelectedCategory = Categories.FirstOrDefault(category =>
+                string.Equals(category.Name, previousName, StringComparison.OrdinalIgnoreCase))
+                ?? Categories[0];
+        }
+        finally
+        {
+            _restoringCategorySelection = false;
+        }
     }
 
     private void RefreshExtensionLabels()

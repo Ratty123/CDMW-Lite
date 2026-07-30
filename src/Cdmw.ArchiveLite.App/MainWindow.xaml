@@ -675,16 +675,23 @@
                                           PreviewMouseRightButtonDown="OnArchiveEntryTreeRightButtonDown"
                                           ScrollViewer.CanContentScroll="True"
                                           ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                    <!-- A folder row and a file row are offered different things:
+                                         a folder has no family and no file name to copy, and a file
+                                         is not a folder anyone can export. -->
                                     <DataGrid.ContextMenu>
                                         <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                                             <MenuItem Header="{infra:Loc Key=ExportFolder}"
-                                                      Command="{Binding ArchiveBrowser.ExportFolderCommand}" />
+                                                      Command="{Binding ArchiveBrowser.ExportFolderCommand}"
+                                                      Visibility="{Binding ArchiveBrowser.IsTreeFolderSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <MenuItem Header="{infra:Loc Key=ExportSelected}"
-                                                      Command="{Binding ArchiveBrowser.ExportSelectedCommand}" />
+                                                      Command="{Binding ArchiveBrowser.ExportSelectedCommand}"
+                                                      Visibility="{Binding ArchiveBrowser.IsTreeFileSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <MenuItem Header="{infra:Loc Key=ExportAssociatedFamily}"
-                                                      Command="{Binding ArchiveBrowser.ExportFamilyCommand}" />
+                                                      Command="{Binding ArchiveBrowser.ExportFamilyCommand}"
+                                                      Visibility="{Binding ArchiveBrowser.IsTreeFileSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                             <MenuItem Header="{infra:Loc Key=CopyFileName}"
-                                                      Command="{Binding ArchiveBrowser.CopyFileNameCommand}" />
+                                                      Command="{Binding ArchiveBrowser.CopyFileNameCommand}"
+                                                      Visibility="{Binding ArchiveBrowser.IsTreeFileSelected, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         </ContextMenu>
                                     </DataGrid.ContextMenu>
                                     <DataGrid.Columns>
