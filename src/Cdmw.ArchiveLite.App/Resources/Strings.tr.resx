@@ -104,7 +104,6 @@
   <data name="Extension" xml:space="preserve"><value>Uzantı</value></data>
   <data name="Type" xml:space="preserve"><value>Tür</value></data>
   <data name="FileType" xml:space="preserve"><value>Dosya türü</value></data>
-  <data name="FileCount" xml:space="preserve"><value>Dosyalar</value></data>
   <data name="Usage" xml:space="preserve"><value>Kullanım</value></data>
   <data name="Size" xml:space="preserve"><value>Boyut</value></data>
   <data name="StoredSize" xml:space="preserve"><value>Depolanan</value></data>
@@ -134,7 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>Salt okunur uygulama başlatılamadı.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Arka plan işleri durduruluyor…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Klasörler</value></data>
-  <data name="TreeView" xml:space="preserve"><value>Ağaç</value></data>
   <data name="FlatView" xml:space="preserve"><value>Düz</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Klasör</value></data>
   <data name="SortBy" xml:space="preserve"><value>Sıralama ölçütü</value></data>
@@ -142,7 +140,6 @@
   <data name="Folders" xml:space="preserve"><value>Klasörler</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>Klasörler yükleniyor...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>Bu düzeydeki ilk {0} klasör gösteriliyor.</value></data>
-  <data name="FolderFilesTruncated" xml:space="preserve"><value>Bu klasördeki {1} dosyadan {0} tanesi gösteriliyor.</value></data>
   <data name="Categories" xml:space="preserve"><value>Kategoriler</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>Önceki</value></data>
   <data name="NextPage" xml:space="preserve"><value>Sonraki</value></data>

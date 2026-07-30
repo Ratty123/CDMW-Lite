@@ -52,24 +52,6 @@ public sealed record ArchiveFolderNode(
     bool HasChildren,
     IReadOnlyList<ArchiveFolderNode> Children);
 
-/// <summary>
-/// Asks for the files stored directly in one folder, excluding anything in its subfolders. The tree
-/// view lists a folder's own files beneath it, which the recursive folder filter cannot express.
-/// </summary>
-public sealed record ArchiveFolderFilesRequest(
-    string SessionId,
-    string? Path = null,
-    int PageStart = 0,
-    int PageSize = 512,
-    ArchiveEntryFilter? Filter = null);
-
-public sealed record ArchiveFolderFilesResult(
-    string SessionId,
-    string? Path,
-    long TotalFiles,
-    IReadOnlyList<ArchiveEntryDto> Files,
-    bool Truncated = false);
-
 public sealed record BuildNameIndexRequest(string SessionId);
 
 public sealed record BuildNameIndexResult(

@@ -104,7 +104,6 @@
   <data name="Extension" xml:space="preserve"><value>확장자</value></data>
   <data name="Type" xml:space="preserve"><value>종류</value></data>
   <data name="FileType" xml:space="preserve"><value>파일 종류</value></data>
-  <data name="FileCount" xml:space="preserve"><value>파일 수</value></data>
   <data name="Usage" xml:space="preserve"><value>용도</value></data>
   <data name="Size" xml:space="preserve"><value>크기</value></data>
   <data name="StoredSize" xml:space="preserve"><value>저장 크기</value></data>
@@ -134,7 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>읽기 전용 애플리케이션을 시작하지 못했습니다.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>백그라운드 작업을 중지하는 중…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>폴더</value></data>
-  <data name="TreeView" xml:space="preserve"><value>트리</value></data>
   <data name="FlatView" xml:space="preserve"><value>단순 목록</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>폴더</value></data>
   <data name="SortBy" xml:space="preserve"><value>정렬 기준</value></data>
@@ -142,7 +140,6 @@
   <data name="Folders" xml:space="preserve"><value>폴더</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>폴더를 불러오는 중...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>이 수준의 처음 {0}개 폴더를 표시합니다.</value></data>
-  <data name="FolderFilesTruncated" xml:space="preserve"><value>이 폴더의 파일 {1}개 중 {0}개를 표시합니다.</value></data>
   <data name="Categories" xml:space="preserve"><value>범주</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>이전</value></data>
   <data name="NextPage" xml:space="preserve"><value>다음</value></data>

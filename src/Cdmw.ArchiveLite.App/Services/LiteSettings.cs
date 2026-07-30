@@ -19,8 +19,7 @@ public sealed record LiteSettings(
     WorkspaceLayoutSettings? WorkspaceLayout = null,
     GridColumnSettings[]? ArchiveColumnLayout = null,
     GridColumnSettings[]? TextSearchColumnLayout = null,
-    int ArchiveColumnDefaultsRevision = 0,
-    string[]? ArchiveTreeVisibleColumns = null);
+    int ArchiveColumnDefaultsRevision = 0);
 
 /// <summary>
 /// Tracks which shipped catalog column defaults a settings file was written against. A file left at

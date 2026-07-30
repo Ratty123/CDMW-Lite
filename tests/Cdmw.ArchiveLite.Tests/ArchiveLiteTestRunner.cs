@@ -62,7 +62,6 @@ internal static class ArchiveLiteTestRunner
             ("UTF-8, UTF-16, and Latin-1 text decode without Python codecs", TestTextDecodingAsync),
             ("native archive ABI scans and decodes synthetic PAMT/PAZ", TestNativeArchiveAsync),
             ("archive query, preview, and text search are read-only", TestArchiveServicesAsync),
-            ("opening a folder in the tree view reveals the level below it", TestEntryTreeRowsAsync),
             ("the category navigator owns the whole life of the role filter", TestCategoryNavigatorOwnsRoleFilterAsync),
             ("category facets stay complete under a role filter", TestCategoryFacetsIgnoreRoleFilterAsync),
             ("the folder tree counts descendants and expands one level at a time", TestArchiveFolderTreeAsync),
@@ -144,15 +143,6 @@ internal static class ArchiveLiteTestRunner
             && readBack.Filter.Extensions[0] == ".pac"
             && readBack.Filter.Roles[0] == ArchiveEntryRole.Model,
             "the folder tree filter did not round-trip across the protocol");
-        var filesRequest = WorkerProtocol.Request(
-            Guid.Parse("55555555-5555-5555-5555-555555555555"),
-            9,
-            WorkerProtocol.ArchiveFolderFiles,
-            new ArchiveFolderFilesRequest("session", "character/model", Filter: new ArchiveEntryFilter(PathText: "hero")));
-        Require(
-            WorkerProtocol.ReadPayload<ArchiveFolderFilesRequest>(filesRequest)?.Filter?.PathText == "hero",
-            "the folder file listing's filter did not round-trip across the protocol");
-
         var cachedOnlyMessage = WorkerProtocol.Request(
             Guid.Parse("23232323-2323-2323-2323-232323232323"),
             8,
@@ -1634,30 +1624,6 @@ internal static class ArchiveLiteTestRunner
                 attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ArchiveColumnChooser")),
             "archive grid has no column chooser");
 
-        // The tree view is a grid of pre-flattened rows because no WPF tree can align columns. Its
-        // rows are folders as well as files, so it carries its own columns and its own chooser.
-        var treeGrid = window.Descendants().Single(element =>
-            element.Attributes().Any(attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ArchiveEntryTreeGrid"));
-        Require(
-            string.Equals((string?)treeGrid.Attribute("CanUserSortColumns"), "False", StringComparison.OrdinalIgnoreCase),
-            "the tree grid offers a sort that would break the order its rows depend on");
-        var treeColumnKeys = treeGrid
-            .Descendants()
-            .Select(element => (string?)element.Attribute("SortMemberPath"))
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .ToHashSet(StringComparer.Ordinal);
-        Require(
-            new[] { "Name", "Items", nameof(ArchiveSortField.FileType), nameof(ArchiveSortField.Package) }
-                .All(treeColumnKeys.Contains),
-            "the tree grid is missing a column the folder and file rows need");
-        Require(
-            treeGrid.Descendants().Any(element => ((string?)element.Attribute("Margin"))?.Contains("IndentMargin", StringComparison.Ordinal) == true)
-            && treeGrid.Descendants().Any(element => ((string?)element.Attribute("IsChecked"))?.Contains("IsExpanded", StringComparison.Ordinal) == true),
-            "the tree grid's first column carries no indent or no expander, so it cannot read as a tree");
-        Require(
-            window.Descendants().Any(element => element.Attributes().Any(
-                attribute => attribute.Name.LocalName == "Name" && attribute.Value == "ArchiveTreeColumnChooser")),
-            "the tree grid has no column chooser of its own");
         foreach (var commandName in new[]
         {
             "ExportSelectedCommand",
@@ -5333,108 +5299,6 @@ internal static class ArchiveLiteTestRunner
     }
 
     /// <summary>
-    /// The tree view is a grid of the tree flattened to rows, so opening a folder has to splice the
-    /// level below it into those rows. This drives that directly, with the worker replaced by a
-    /// canned level, because it is the piece that decides whether the tree opens at all.
-    /// </summary>
-    private static async Task TestEntryTreeRowsAsync()
-    {
-        static ArchiveFolderNode Folder(string name, bool hasChildren, long total) =>
-            new(name, name, 0, total, hasChildren, []);
-
-        var levels = new Dictionary<string, IReadOnlyList<ArchiveFolderNode>>(StringComparer.Ordinal)
-        {
-            [string.Empty] = [Folder("character", true, 7), Folder("unrelated", false, 1)],
-            ["character"] = [new ArchiveFolderNode("model", "character/model", 3, 3, false, [])],
-        };
-        var files = new Dictionary<string, IReadOnlyList<ArchiveEntryDto>>(StringComparer.Ordinal)
-        {
-            ["character/model"] = [CreateArchiveEntry("character/model/hero.pac")],
-        };
-
-        var rows = new ArchiveEntryTreeRows();
-        var context = new ArchiveFolderTreeContext(
-            path => Task.FromResult(levels.TryGetValue(path, out var level) ? level : []),
-            path => Task.FromResult(files.TryGetValue(path, out var found) ? found : []),
-            _ => { },
-            _ => { },
-            includesFiles: true);
-
-        rows.Reset(levels[string.Empty].Select(node => ArchiveFolderNodeViewModel.Create(context, node)));
-        Require(
-            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "unrelated"]),
-            "the flattened tree did not start at its top level");
-
-        var character = rows.Rows[0];
-        character.IsExpanded = true;
-        // A row appears the moment the folder opens - the stand-in while the level is being fetched,
-        // or the level itself when it was already to hand.
-        Require(rows.Rows.Count == 3, "opening a folder showed nothing at all below it");
-
-        // The level arrives on its own continuation, so let the load that opening started finish.
-        for (var attempt = 0; attempt < 50 && rows.Rows[1].IsPlaceholder; attempt++)
-        {
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-        Require(
-            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "model", "unrelated"]),
-            "opening a folder never replaced its placeholder with the level below it");
-        Require(rows.Rows[1].Depth == 1, "a revealed row is not indented under the folder that revealed it");
-
-        var model = rows.Rows[1];
-        model.IsExpanded = true;
-        for (var attempt = 0; attempt < 50 && rows.Rows.Count != 4; attempt++)
-        {
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-        Require(
-            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "model", "hero.pac", "unrelated"]),
-            "opening a folder did not reveal the files it holds");
-        Require(rows.Rows[2].Depth == 2, "a file is not indented under its folder");
-
-        character.IsExpanded = false;
-        Require(
-            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "unrelated"]),
-            "closing a folder left the rows it had revealed behind");
-
-        // A row left over from a superseded load gets an empty level back rather than a fetch,
-        // because the generation its context captured is no longer the current one. Such a row must
-        // not end up permanently unopenable: the stand-in goes back and the next click tries again.
-        var supersededLevels = 0;
-        var superseded = new ArchiveFolderTreeContext(
-            _ =>
-            {
-                supersededLevels++;
-                return Task.FromResult<IReadOnlyList<ArchiveFolderNode>>([]);
-            },
-            _ => Task.FromResult<IReadOnlyList<ArchiveEntryDto>>([]),
-            _ => { },
-            _ => { },
-            includesFiles: true);
-        var stale = new ArchiveEntryTreeRows();
-        stale.Reset([ArchiveFolderNodeViewModel.Create(superseded, Folder("character", true, 7))]);
-        var staleRoot = stale.Rows[0];
-
-        staleRoot.IsExpanded = true;
-        for (var attempt = 0; attempt < 50 && stale.Rows.Count > 1; attempt++)
-        {
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-        Require(supersededLevels == 1, "a superseded row did not ask for its level at all");
-        Require(
-            stale.Rows.Count == 2 && stale.Rows[1].IsPlaceholder,
-            "a row whose level came back empty was left open and showing nothing");
-
-        staleRoot.IsExpanded = false;
-        staleRoot.IsExpanded = true;
-        for (var attempt = 0; attempt < 50 && supersededLevels < 2; attempt++)
-        {
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-        Require(supersededLevels == 2, "a row that came back empty never tried again, so it was dead for good");
-    }
-
-    /// <summary>
     /// Lite ships no role control, so the category navigator is the only way in and out of the role
     /// filter. Its "All" row has to release the filter, and leaving the view modes that show the
     /// navigator has to release it too, or the filter would keep narrowing results invisibly.
@@ -5475,14 +5339,8 @@ internal static class ArchiveLiteTestRunner
                 browser.SelectedRole.Role is null && browser.SelectedCategory is null,
                 "the role filter outlived the navigator that is the only control able to clear it");
 
-            // A tree offers a folder and a file different actions, and neither should be offered what
-            // belongs to the other.
-            Require(
-                !browser.IsTreeFileSelected && !browser.IsTreeFolderSelected,
-                "a tree row looks selected before anything has been picked");
-
-            // The navigator is a setting of its own now, so it has to survive every arrangement of
-            // the entry list rather than belonging to two of them.
+            // The navigator is a setting of its own, so it survives every arrangement of the entry
+            // list rather than belonging to particular ones.
             browser.ShowCategories = true;
             foreach (var mode in Enum.GetValues<ArchiveViewMode>())
             {
@@ -5490,41 +5348,12 @@ internal static class ArchiveLiteTestRunner
                 Require(browser.ShowCategories, $"the {mode} view dropped the category navigator");
             }
 
-            // The folder filter is reachable from the folder pane and the tree view and nowhere else,
-            // so it has to be released on the way into a view that shows neither.
+            // The folder pane is the only way to the folder filter, so the view that hides it
+            // releases it rather than leaving it narrowing results with nothing able to clear it.
             browser.ViewMode = ArchiveViewMode.Flat;
-            Require(
-                !browser.ShowFolderNavigator && !browser.ShowEntryTree && browser.ShowEntryGrid,
-                "the flat view offers a folder control after all");
+            Require(!browser.ShowFolderNavigator, "the flat view still offers the folder pane");
             browser.ViewMode = ArchiveViewMode.Folders;
-            Require(
-                browser.ShowFolderNavigator && browser.ShowEntryGrid && !browser.ShowEntryTree,
-                "the folders view does not pair the folder pane with the entry grid");
-            browser.ViewMode = ArchiveViewMode.Tree;
-            Require(
-                browser.ShowEntryTree && !browser.ShowEntryGrid && !browser.ShowFolderNavigator,
-                "the tree view did not replace the entry grid, or kept a second folder pane beside it");
-
-            // The rows the tree view shows must not outlive the roots they came from. A row left over
-            // from a replaced load has a superseded generation behind it, so every level it asks for
-            // comes back empty and it opens onto nothing - which is what starting a load discards it
-            // for. Replacing the roots is what every load does first, so the rows follow them.
-            var context = new ArchiveFolderTreeContext(
-                _ => Task.FromResult<IReadOnlyList<ArchiveFolderNode>>([]),
-                _ => Task.FromResult<IReadOnlyList<ArchiveEntryDto>>([]),
-                _ => { },
-                _ => { },
-                includesFiles: true);
-            browser.FolderTree.Add(ArchiveFolderNodeViewModel.Create(
-                context,
-                new ArchiveFolderNode("character", "character", 0, 7, true, [])));
-            Require(
-                browser.EntryTreeRows.Count == 1 && browser.EntryTreeRows[0].Name == "character",
-                "the tree view's rows do not follow the roots they are built from");
-            browser.FolderTree.Clear();
-            Require(
-                browser.EntryTreeRows.Count == 0,
-                "rows outlived the roots they came from, so a replaced load leaves rows that open onto nothing");
+            Require(browser.ShowFolderNavigator, "the folders view does not offer the folder pane");
             return Task.CompletedTask;
         });
 
@@ -5636,33 +5465,6 @@ internal static class ArchiveLiteTestRunner
             CancellationToken.None).ConfigureAwait(false);
         Require(missing.Nodes.Count == 0 && missing.TotalCount == 0, "an unknown folder returned a level");
 
-        // The tree view lists a folder's own files beneath it, which the folder filter cannot express
-        // because it matches a path prefix and so takes the whole subtree.
-        var files = await trees.ListFilesAsync(
-            new ArchiveFolderFilesRequest(opened.SessionId, "character/model"),
-            null,
-            CancellationToken.None).ConfigureAwait(false);
-        Require(files.TotalFiles == 3 && files.Files.Count == 3, "a folder did not list the files stored in it");
-        Require(
-            files.Files.Select(static file => file.Name).Order(StringComparer.Ordinal)
-                .SequenceEqual(["hero.meshinfo", "hero.pac", "hero.prefab"]),
-            "a folder's file listing is wrong");
-        Require(!files.Truncated, "a complete file listing was reported as truncated");
-        var branch = await trees.ListFilesAsync(
-            new ArchiveFolderFilesRequest(opened.SessionId, "character"),
-            null,
-            CancellationToken.None).ConfigureAwait(false);
-        Require(
-            branch.TotalFiles == 0,
-            "a folder that only holds subfolders claimed files of its own");
-        var paged = await trees.ListFilesAsync(
-            new ArchiveFolderFilesRequest(opened.SessionId, "character/model", PageStart: 1, PageSize: 1),
-            null,
-            CancellationToken.None).ConfigureAwait(false);
-        Require(
-            paged.Files.Count == 1 && paged.TotalFiles == 3 && paged.Truncated,
-            "a paged file listing did not report the rest of the folder");
-
         // The tree is a view of the same result the entry list shows, so a filter has to reach it.
         // Its counts are the filtered counts and a folder holding nothing that matches is gone.
         var filter = new ArchiveEntryFilter(Extensions: [".dds"]);
@@ -5681,11 +5483,6 @@ internal static class ArchiveLiteTestRunner
         Require(
             filteredLevel.Nodes.Select(static node => node.Name).SequenceEqual(["texture"]),
             "a filtered level still lists folders holding nothing that matches");
-        var filteredFiles = await trees.ListFilesAsync(
-            new ArchiveFolderFilesRequest(opened.SessionId, "character/model", Filter: filter),
-            null,
-            CancellationToken.None).ConfigureAwait(false);
-        Require(filteredFiles.TotalFiles == 0, "a filtered folder listed files the filter excludes");
 
         // The unfiltered tree is still there afterwards, since it is the expensive one to rebuild.
         var again = await trees.LoadAsync(

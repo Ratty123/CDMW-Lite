@@ -104,7 +104,6 @@
   <data name="Extension" xml:space="preserve"><value>Расширение</value></data>
   <data name="Type" xml:space="preserve"><value>Тип</value></data>
   <data name="FileType" xml:space="preserve"><value>Тип файла</value></data>
-  <data name="FileCount" xml:space="preserve"><value>Файлы</value></data>
   <data name="Usage" xml:space="preserve"><value>Назначение</value></data>
   <data name="Size" xml:space="preserve"><value>Размер</value></data>
   <data name="StoredSize" xml:space="preserve"><value>В архиве</value></data>
@@ -134,7 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>Не удалось запустить приложение, работающее только для чтения.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Остановка фоновых задач…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Папки</value></data>
-  <data name="TreeView" xml:space="preserve"><value>Дерево</value></data>
   <data name="FlatView" xml:space="preserve"><value>Плоский</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Папка</value></data>
   <data name="SortBy" xml:space="preserve"><value>Сортировать по</value></data>
@@ -142,7 +140,6 @@
   <data name="Folders" xml:space="preserve"><value>Папки</value></data>
   <data name="FolderTreeLoading" xml:space="preserve"><value>Загрузка папок...</value></data>
   <data name="FolderTreeTruncated" xml:space="preserve"><value>Показаны первые {0} папок этого уровня.</value></data>
-  <data name="FolderFilesTruncated" xml:space="preserve"><value>Показаны {0} из {1} файлов в этой папке.</value></data>
   <data name="Categories" xml:space="preserve"><value>Категории</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>Назад</value></data>
   <data name="NextPage" xml:space="preserve"><value>Вперёд</value></data>
