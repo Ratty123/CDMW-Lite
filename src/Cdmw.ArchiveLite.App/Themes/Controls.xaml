@@ -1231,9 +1231,4 @@
         </Setter>
     </Style>
 
-    <Style TargetType="Separator">
-        <Setter Property="Height" Value="1" />
-        <Setter Property="Margin" Value="6,4" />
-        <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
-    </Style>
 </ResourceDictionary>

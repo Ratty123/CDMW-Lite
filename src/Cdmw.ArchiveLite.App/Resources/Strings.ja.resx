@@ -133,8 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>読み取り専用アプリケーションを起動できませんでした。\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>バックグラウンド処理を停止しています…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>フォルダー</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>カテゴリ</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>カテゴリ + フォルダー</value></data>
   <data name="TreeView" xml:space="preserve"><value>ツリー</value></data>
   <data name="FlatView" xml:space="preserve"><value>フラット</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>フォルダー</value></data>

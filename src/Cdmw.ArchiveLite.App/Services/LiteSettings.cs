@@ -39,7 +39,8 @@ public sealed record ArchiveBrowserSettings(
     ExportCollisionPolicy CollisionPolicy = ExportCollisionPolicy.Skip,
     ExportManifestFormat ManifestFormat = ExportManifestFormat.Json,
     ModelPreviewCameraInputSettings? ModelPreviewCameraInput = null,
-    PreviewBackgroundSettings? PreviewBackground = null);
+    PreviewBackgroundSettings? PreviewBackground = null,
+    bool ShowCategories = false);
 
 /// <summary>
 /// The colour drawn behind a preview. <see cref="PreviewBackgroundChoice.Theme"/> keeps the surface

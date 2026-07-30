@@ -229,6 +229,7 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
 
     private static bool IsDirectPathPage(ArchiveQuerySpec query) =>
         query.ViewMode == ArchiveViewMode.Flat &&
+        !query.IncludeCategoryFacets &&
         query.SortField == ArchiveSortField.Path &&
         string.IsNullOrWhiteSpace(query.PathText) &&
         query.Extensions is not { Count: > 0 } &&

@@ -133,8 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>The read-only application could not start.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Stopping background work…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Folders</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>Categories</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>Categories + folders</value></data>
   <data name="TreeView" xml:space="preserve"><value>Tree</value></data>
   <data name="FlatView" xml:space="preserve"><value>Flat</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Folder</value></data>

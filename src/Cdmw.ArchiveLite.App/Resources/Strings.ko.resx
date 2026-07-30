@@ -133,8 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>읽기 전용 애플리케이션을 시작하지 못했습니다.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>백그라운드 작업을 중지하는 중…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>폴더</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>범주</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>범주 + 폴더</value></data>
   <data name="TreeView" xml:space="preserve"><value>트리</value></data>
   <data name="FlatView" xml:space="preserve"><value>단순 목록</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>폴더</value></data>
