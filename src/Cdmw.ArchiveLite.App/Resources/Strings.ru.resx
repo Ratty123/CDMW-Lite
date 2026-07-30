@@ -361,4 +361,108 @@
   <data name="ClearItemScope" xml:space="preserve"><value>Очистить набор предметов</value></data>
   <data name="MostCommonExtensions" xml:space="preserve"><value>Самые частые</value></data>
   <data name="MostCommonExtensionsHint" xml:space="preserve"><value>Показать самые частые расширения в активном архиве или наборе Поиска предметов.</value></data>
+  <data name="ItemCategoryAccessory" xml:space="preserve"><value>Аксессуар</value></data>
+  <data name="ItemCategoryArmor" xml:space="preserve"><value>Броня</value></data>
+  <data name="ItemCategoryCharacterCustomization" xml:space="preserve"><value>Настройка персонажа</value></data>
+  <data name="ItemCategoryConsumable" xml:space="preserve"><value>Расходуемое</value></data>
+  <data name="ItemCategoryCraftingRecipe" xml:space="preserve"><value>Ремесло / Рецепт</value></data>
+  <data name="ItemCategoryGimmickInteractive" xml:space="preserve"><value>Механизм / Интерактивное</value></data>
+  <data name="ItemCategoryHousingProp" xml:space="preserve"><value>Жильё / Реквизит</value></data>
+  <data name="ItemCategoryItem" xml:space="preserve"><value>Предмет</value></data>
+  <data name="ItemCategoryMaterial" xml:space="preserve"><value>Материал</value></data>
+  <data name="ItemCategoryMountPet" xml:space="preserve"><value>Ездовое животное / Питомец</value></data>
+  <data name="ItemCategoryProgressionReward" xml:space="preserve"><value>Прогресс / Награда</value></data>
+  <data name="ItemCategoryQuestDocument" xml:space="preserve"><value>Задание / Документ</value></data>
+  <data name="ItemCategoryTool" xml:space="preserve"><value>Инструмент</value></data>
+  <data name="ItemCategoryWeapon" xml:space="preserve"><value>Оружие</value></data>
+  <data name="ItemGroupAmuletCharm" xml:space="preserve"><value>Амулет / Талисман</value></data>
+  <data name="ItemGroupArtifact" xml:space="preserve"><value>Артефакт</value></data>
+  <data name="ItemGroupAxeMaceHammer" xml:space="preserve"><value>Топор / Булава / Молот</value></data>
+  <data name="ItemGroupBackCloak" xml:space="preserve"><value>Спина / Плащ</value></data>
+  <data name="ItemGroupBackpackPack" xml:space="preserve"><value>Рюкзак / Поклажа</value></data>
+  <data name="ItemGroupBeltBand" xml:space="preserve"><value>Пояс / Лента</value></data>
+  <data name="ItemGroupBody" xml:space="preserve"><value>Торс</value></data>
+  <data name="ItemGroupBodyAppearance" xml:space="preserve"><value>Тело / Внешность</value></data>
+  <data name="ItemGroupBookDiary" xml:space="preserve"><value>Книга / Дневник</value></data>
+  <data name="ItemGroupBowCrossbow" xml:space="preserve"><value>Лук / Арбалет</value></data>
+  <data name="ItemGroupClothLeather" xml:space="preserve"><value>Ткань / Кожа</value></data>
+  <data name="ItemGroupClueReport" xml:space="preserve"><value>Улика / Донесение</value></data>
+  <data name="ItemGroupCollectionProp" xml:space="preserve"><value>Коллекционный предмет</value></data>
+  <data name="ItemGroupContainer" xml:space="preserve"><value>Контейнер</value></data>
+  <data name="ItemGroupCrafting" xml:space="preserve"><value>Ремесло</value></data>
+  <data name="ItemGroupCreaturePart" xml:space="preserve"><value>Часть существа</value></data>
+  <data name="ItemGroupCrystalGem" xml:space="preserve"><value>Кристалл / Самоцвет</value></data>
+  <data name="ItemGroupCurrency" xml:space="preserve"><value>Валюта</value></data>
+  <data name="ItemGroupDaggerRapier" xml:space="preserve"><value>Кинжал / Рапира</value></data>
+  <data name="ItemGroupDecor" xml:space="preserve"><value>Декор</value></data>
+  <data name="ItemGroupDocument" xml:space="preserve"><value>Документ</value></data>
+  <data name="ItemGroupEarrings" xml:space="preserve"><value>Серьги</value></data>
+  <data name="ItemGroupFace" xml:space="preserve"><value>Лицо</value></data>
+  <data name="ItemGroupFeet" xml:space="preserve"><value>Ступни</value></data>
+  <data name="ItemGroupFirearm" xml:space="preserve"><value>Огнестрельное оружие</value></data>
+  <data name="ItemGroupFishing" xml:space="preserve"><value>Рыбалка</value></data>
+  <data name="ItemGroupFistMartial" xml:space="preserve"><value>Кулак / Боевые искусства</value></data>
+  <data name="ItemGroupFlagMarker" xml:space="preserve"><value>Флаг / Метка</value></data>
+  <data name="ItemGroupFoodDrink" xml:space="preserve"><value>Еда / Напиток</value></data>
+  <data name="ItemGroupFurniture" xml:space="preserve"><value>Мебель</value></data>
+  <data name="ItemGroupGatheringTool" xml:space="preserve"><value>Инструмент сбора</value></data>
+  <data name="ItemGroupGimmick" xml:space="preserve"><value>Механизм</value></data>
+  <data name="ItemGroupHair" xml:space="preserve"><value>Волосы</value></data>
+  <data name="ItemGroupHandTool" xml:space="preserve"><value>Ручной инструмент</value></data>
+  <data name="ItemGroupHands" xml:space="preserve"><value>Кисти рук</value></data>
+  <data name="ItemGroupHead" xml:space="preserve"><value>Голова</value></data>
+  <data name="ItemGroupHorseGear" xml:space="preserve"><value>Конская сбруя</value></data>
+  <data name="ItemGroupKeyPermit" xml:space="preserve"><value>Ключ / Пропуск</value></data>
+  <data name="ItemGroupLegs" xml:space="preserve"><value>Ноги</value></data>
+  <data name="ItemGroupLightLantern" xml:space="preserve"><value>Свет / Фонарь</value></data>
+  <data name="ItemGroupMachinePart" xml:space="preserve"><value>Деталь механизма</value></data>
+  <data name="ItemGroupMapTreasure" xml:space="preserve"><value>Карта / Сокровище</value></data>
+  <data name="ItemGroupNecklace" xml:space="preserve"><value>Ожерелье</value></data>
+  <data name="ItemGroupOreMetal" xml:space="preserve"><value>Руда / Металл</value></data>
+  <data name="ItemGroupOtherAccessory" xml:space="preserve"><value>Прочий аксессуар</value></data>
+  <data name="ItemGroupOtherArmor" xml:space="preserve"><value>Прочая броня</value></data>
+  <data name="ItemGroupOtherConsumable" xml:space="preserve"><value>Прочее расходуемое</value></data>
+  <data name="ItemGroupOtherMaterial" xml:space="preserve"><value>Прочий материал</value></data>
+  <data name="ItemGroupOtherTool" xml:space="preserve"><value>Прочий инструмент</value></data>
+  <data name="ItemGroupOtherWeapon" xml:space="preserve"><value>Прочее оружие</value></data>
+  <data name="ItemGroupPetGear" xml:space="preserve"><value>Снаряжение питомца</value></data>
+  <data name="ItemGroupPolearmSpear" xml:space="preserve"><value>Древковое оружие / Копьё</value></data>
+  <data name="ItemGroupPotionMedicine" xml:space="preserve"><value>Зелье / Лекарство</value></data>
+  <data name="ItemGroupQuest" xml:space="preserve"><value>Задание</value></data>
+  <data name="ItemGroupRecipeBook" xml:space="preserve"><value>Книга рецептов</value></data>
+  <data name="ItemGroupReward" xml:space="preserve"><value>Награда</value></data>
+  <data name="ItemGroupRing" xml:space="preserve"><value>Кольцо</value></data>
+  <data name="ItemGroupShield" xml:space="preserve"><value>Щит</value></data>
+  <data name="ItemGroupSkill" xml:space="preserve"><value>Навык</value></data>
+  <data name="ItemGroupStat" xml:space="preserve"><value>Характеристика</value></data>
+  <data name="ItemGroupSword" xml:space="preserve"><value>Меч</value></data>
+  <data name="ItemGroupThrowableUtility" xml:space="preserve"><value>Метательное / Вспомогательное</value></data>
+  <data name="ItemGroupTokenSeal" xml:space="preserve"><value>Жетон / Печать</value></data>
+  <data name="ItemGroupUnclassified" xml:space="preserve"><value>Без категории</value></data>
+  <data name="ItemGroupVehicle" xml:space="preserve"><value>Транспорт</value></data>
+  <data name="ItemGroupWandFan" xml:space="preserve"><value>Жезл / Веер</value></data>
+  <data name="ItemGroupWoodStone" xml:space="preserve"><value>Дерево / Камень</value></data>
+  <data name="ItemMaterialBone" xml:space="preserve"><value>кость</value></data>
+  <data name="ItemMaterialCloth" xml:space="preserve"><value>ткань</value></data>
+  <data name="ItemMaterialCrystal" xml:space="preserve"><value>кристалл</value></data>
+  <data name="ItemMaterialDirt" xml:space="preserve"><value>земля</value></data>
+  <data name="ItemMaterialFur" xml:space="preserve"><value>мех</value></data>
+  <data name="ItemMaterialGlass" xml:space="preserve"><value>стекло</value></data>
+  <data name="ItemMaterialGrass" xml:space="preserve"><value>трава</value></data>
+  <data name="ItemMaterialHair" xml:space="preserve"><value>волосы</value></data>
+  <data name="ItemMaterialLeather" xml:space="preserve"><value>кожа</value></data>
+  <data name="ItemMaterialMetal" xml:space="preserve"><value>металл</value></data>
+  <data name="ItemMaterialRope" xml:space="preserve"><value>верёвка</value></data>
+  <data name="ItemMaterialSkin" xml:space="preserve"><value>кожа тела</value></data>
+  <data name="ItemMaterialStone" xml:space="preserve"><value>камень</value></data>
+  <data name="ItemMaterialWater" xml:space="preserve"><value>вода</value></data>
+  <data name="ItemMaterialWood" xml:space="preserve"><value>дерево</value></data>
+  <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>хеш префаба ItemInfo</value></data>
+  <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>ссылка на значок/модель</value></data>
+  <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>локализованное отображаемое имя</value></data>
+  <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>путь значка инвентаря</value></data>
+  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>теги слотов материалов</value></data>
+  <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>запись в базе данных предметов</value></data>
+  <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Восстановленные имена предмета/модели</value></data>
+  <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Более надёжных признаков категории не найдено</value></data>
 </root>

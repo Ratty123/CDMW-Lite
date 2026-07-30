@@ -361,4 +361,108 @@
   <data name="ClearItemScope" xml:space="preserve"><value>Eşya kümesini temizle</value></data>
   <data name="MostCommonExtensions" xml:space="preserve"><value>En yaygın</value></data>
   <data name="MostCommonExtensionsHint" xml:space="preserve"><value>Etkin arşivdeki veya Eşya bulucu kümesindeki en yaygın uzantıları göster.</value></data>
+  <data name="ItemCategoryAccessory" xml:space="preserve"><value>Aksesuar</value></data>
+  <data name="ItemCategoryArmor" xml:space="preserve"><value>Zırh</value></data>
+  <data name="ItemCategoryCharacterCustomization" xml:space="preserve"><value>Karakter Özelleştirme</value></data>
+  <data name="ItemCategoryConsumable" xml:space="preserve"><value>Sarf Malzemesi</value></data>
+  <data name="ItemCategoryCraftingRecipe" xml:space="preserve"><value>Üretim / Tarif</value></data>
+  <data name="ItemCategoryGimmickInteractive" xml:space="preserve"><value>Mekanizma / Etkileşimli</value></data>
+  <data name="ItemCategoryHousingProp" xml:space="preserve"><value>Konut / Dekor Nesnesi</value></data>
+  <data name="ItemCategoryItem" xml:space="preserve"><value>Eşya</value></data>
+  <data name="ItemCategoryMaterial" xml:space="preserve"><value>Malzeme</value></data>
+  <data name="ItemCategoryMountPet" xml:space="preserve"><value>Binek / Evcil Hayvan</value></data>
+  <data name="ItemCategoryProgressionReward" xml:space="preserve"><value>İlerleme / Ödül</value></data>
+  <data name="ItemCategoryQuestDocument" xml:space="preserve"><value>Görev / Belge</value></data>
+  <data name="ItemCategoryTool" xml:space="preserve"><value>Alet</value></data>
+  <data name="ItemCategoryWeapon" xml:space="preserve"><value>Silah</value></data>
+  <data name="ItemGroupAmuletCharm" xml:space="preserve"><value>Muska / Tılsım</value></data>
+  <data name="ItemGroupArtifact" xml:space="preserve"><value>Kalıntı</value></data>
+  <data name="ItemGroupAxeMaceHammer" xml:space="preserve"><value>Balta / Topuz / Çekiç</value></data>
+  <data name="ItemGroupBackCloak" xml:space="preserve"><value>Sırt / Pelerin</value></data>
+  <data name="ItemGroupBackpackPack" xml:space="preserve"><value>Sırt Çantası / Denk</value></data>
+  <data name="ItemGroupBeltBand" xml:space="preserve"><value>Kemer / Bant</value></data>
+  <data name="ItemGroupBody" xml:space="preserve"><value>Gövde</value></data>
+  <data name="ItemGroupBodyAppearance" xml:space="preserve"><value>Vücut / Görünüm</value></data>
+  <data name="ItemGroupBookDiary" xml:space="preserve"><value>Kitap / Günlük</value></data>
+  <data name="ItemGroupBowCrossbow" xml:space="preserve"><value>Yay / Tatar Yayı</value></data>
+  <data name="ItemGroupClothLeather" xml:space="preserve"><value>Kumaş / Deri</value></data>
+  <data name="ItemGroupClueReport" xml:space="preserve"><value>İpucu / Rapor</value></data>
+  <data name="ItemGroupCollectionProp" xml:space="preserve"><value>Koleksiyon Nesnesi</value></data>
+  <data name="ItemGroupContainer" xml:space="preserve"><value>Kap</value></data>
+  <data name="ItemGroupCrafting" xml:space="preserve"><value>Üretim</value></data>
+  <data name="ItemGroupCreaturePart" xml:space="preserve"><value>Yaratık Parçası</value></data>
+  <data name="ItemGroupCrystalGem" xml:space="preserve"><value>Kristal / Mücevher</value></data>
+  <data name="ItemGroupCurrency" xml:space="preserve"><value>Para Birimi</value></data>
+  <data name="ItemGroupDaggerRapier" xml:space="preserve"><value>Hançer / Meç</value></data>
+  <data name="ItemGroupDecor" xml:space="preserve"><value>Dekorasyon</value></data>
+  <data name="ItemGroupDocument" xml:space="preserve"><value>Belge</value></data>
+  <data name="ItemGroupEarrings" xml:space="preserve"><value>Küpe</value></data>
+  <data name="ItemGroupFace" xml:space="preserve"><value>Yüz</value></data>
+  <data name="ItemGroupFeet" xml:space="preserve"><value>Ayak</value></data>
+  <data name="ItemGroupFirearm" xml:space="preserve"><value>Ateşli Silah</value></data>
+  <data name="ItemGroupFishing" xml:space="preserve"><value>Balıkçılık</value></data>
+  <data name="ItemGroupFistMartial" xml:space="preserve"><value>Yumruk / Dövüş</value></data>
+  <data name="ItemGroupFlagMarker" xml:space="preserve"><value>Bayrak / İşaret</value></data>
+  <data name="ItemGroupFoodDrink" xml:space="preserve"><value>Yiyecek / İçecek</value></data>
+  <data name="ItemGroupFurniture" xml:space="preserve"><value>Mobilya</value></data>
+  <data name="ItemGroupGatheringTool" xml:space="preserve"><value>Toplama Aleti</value></data>
+  <data name="ItemGroupGimmick" xml:space="preserve"><value>Mekanizma</value></data>
+  <data name="ItemGroupHair" xml:space="preserve"><value>Saç</value></data>
+  <data name="ItemGroupHandTool" xml:space="preserve"><value>El Aleti</value></data>
+  <data name="ItemGroupHands" xml:space="preserve"><value>El</value></data>
+  <data name="ItemGroupHead" xml:space="preserve"><value>Baş</value></data>
+  <data name="ItemGroupHorseGear" xml:space="preserve"><value>At Teçhizatı</value></data>
+  <data name="ItemGroupKeyPermit" xml:space="preserve"><value>Anahtar / İzin</value></data>
+  <data name="ItemGroupLegs" xml:space="preserve"><value>Bacak</value></data>
+  <data name="ItemGroupLightLantern" xml:space="preserve"><value>Işık / Fener</value></data>
+  <data name="ItemGroupMachinePart" xml:space="preserve"><value>Makine Parçası</value></data>
+  <data name="ItemGroupMapTreasure" xml:space="preserve"><value>Harita / Hazine</value></data>
+  <data name="ItemGroupNecklace" xml:space="preserve"><value>Kolye</value></data>
+  <data name="ItemGroupOreMetal" xml:space="preserve"><value>Cevher / Metal</value></data>
+  <data name="ItemGroupOtherAccessory" xml:space="preserve"><value>Diğer Aksesuar</value></data>
+  <data name="ItemGroupOtherArmor" xml:space="preserve"><value>Diğer Zırh</value></data>
+  <data name="ItemGroupOtherConsumable" xml:space="preserve"><value>Diğer Sarf Malzemesi</value></data>
+  <data name="ItemGroupOtherMaterial" xml:space="preserve"><value>Diğer Malzeme</value></data>
+  <data name="ItemGroupOtherTool" xml:space="preserve"><value>Diğer Alet</value></data>
+  <data name="ItemGroupOtherWeapon" xml:space="preserve"><value>Diğer Silah</value></data>
+  <data name="ItemGroupPetGear" xml:space="preserve"><value>Evcil Hayvan Teçhizatı</value></data>
+  <data name="ItemGroupPolearmSpear" xml:space="preserve"><value>Kargı / Mızrak</value></data>
+  <data name="ItemGroupPotionMedicine" xml:space="preserve"><value>İksir / İlaç</value></data>
+  <data name="ItemGroupQuest" xml:space="preserve"><value>Görev</value></data>
+  <data name="ItemGroupRecipeBook" xml:space="preserve"><value>Tarif Kitabı</value></data>
+  <data name="ItemGroupReward" xml:space="preserve"><value>Ödül</value></data>
+  <data name="ItemGroupRing" xml:space="preserve"><value>Yüzük</value></data>
+  <data name="ItemGroupShield" xml:space="preserve"><value>Kalkan</value></data>
+  <data name="ItemGroupSkill" xml:space="preserve"><value>Yetenek</value></data>
+  <data name="ItemGroupStat" xml:space="preserve"><value>Nitelik</value></data>
+  <data name="ItemGroupSword" xml:space="preserve"><value>Kılıç</value></data>
+  <data name="ItemGroupThrowableUtility" xml:space="preserve"><value>Fırlatılabilir / Yardımcı</value></data>
+  <data name="ItemGroupTokenSeal" xml:space="preserve"><value>Jeton / Mühür</value></data>
+  <data name="ItemGroupUnclassified" xml:space="preserve"><value>Sınıflandırılmamış</value></data>
+  <data name="ItemGroupVehicle" xml:space="preserve"><value>Araç</value></data>
+  <data name="ItemGroupWandFan" xml:space="preserve"><value>Asa / Yelpaze</value></data>
+  <data name="ItemGroupWoodStone" xml:space="preserve"><value>Odun / Taş</value></data>
+  <data name="ItemMaterialBone" xml:space="preserve"><value>kemik</value></data>
+  <data name="ItemMaterialCloth" xml:space="preserve"><value>kumaş</value></data>
+  <data name="ItemMaterialCrystal" xml:space="preserve"><value>kristal</value></data>
+  <data name="ItemMaterialDirt" xml:space="preserve"><value>toprak</value></data>
+  <data name="ItemMaterialFur" xml:space="preserve"><value>kürk</value></data>
+  <data name="ItemMaterialGlass" xml:space="preserve"><value>cam</value></data>
+  <data name="ItemMaterialGrass" xml:space="preserve"><value>çim</value></data>
+  <data name="ItemMaterialHair" xml:space="preserve"><value>saç</value></data>
+  <data name="ItemMaterialLeather" xml:space="preserve"><value>deri</value></data>
+  <data name="ItemMaterialMetal" xml:space="preserve"><value>metal</value></data>
+  <data name="ItemMaterialRope" xml:space="preserve"><value>halat</value></data>
+  <data name="ItemMaterialSkin" xml:space="preserve"><value>ten</value></data>
+  <data name="ItemMaterialStone" xml:space="preserve"><value>taş</value></data>
+  <data name="ItemMaterialWater" xml:space="preserve"><value>su</value></data>
+  <data name="ItemMaterialWood" xml:space="preserve"><value>odun</value></data>
+  <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo prefab karması</value></data>
+  <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>simge/model referansı</value></data>
+  <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>yerelleştirilmiş görünen ad</value></data>
+  <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>envanter simgesi yolu</value></data>
+  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>malzeme yuvası etiketleri</value></data>
+  <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>eşya veritabanı kaydı</value></data>
+  <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Kurtarılan eşya/model adlandırması</value></data>
+  <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Daha güçlü bir kategori kanıtı bulunamadı</value></data>
 </root>

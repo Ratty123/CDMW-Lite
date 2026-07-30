@@ -361,4 +361,108 @@
   <data name="ClearItemScope" xml:space="preserve"><value>아이템 세트 지우기</value></data>
   <data name="MostCommonExtensions" xml:space="preserve"><value>많이 쓰는 확장자</value></data>
   <data name="MostCommonExtensionsHint" xml:space="preserve"><value>활성 아카이브 또는 아이템 찾기 세트에서 가장 많이 쓰이는 확장자를 표시합니다.</value></data>
+  <data name="ItemCategoryAccessory" xml:space="preserve"><value>장신구</value></data>
+  <data name="ItemCategoryArmor" xml:space="preserve"><value>방어구</value></data>
+  <data name="ItemCategoryCharacterCustomization" xml:space="preserve"><value>캐릭터 커스터마이징</value></data>
+  <data name="ItemCategoryConsumable" xml:space="preserve"><value>소모품</value></data>
+  <data name="ItemCategoryCraftingRecipe" xml:space="preserve"><value>제작 / 제조법</value></data>
+  <data name="ItemCategoryGimmickInteractive" xml:space="preserve"><value>기믹 / 상호작용</value></data>
+  <data name="ItemCategoryHousingProp" xml:space="preserve"><value>하우징 / 소품</value></data>
+  <data name="ItemCategoryItem" xml:space="preserve"><value>아이템</value></data>
+  <data name="ItemCategoryMaterial" xml:space="preserve"><value>재료</value></data>
+  <data name="ItemCategoryMountPet" xml:space="preserve"><value>탈것 / 펫</value></data>
+  <data name="ItemCategoryProgressionReward" xml:space="preserve"><value>성장 / 보상</value></data>
+  <data name="ItemCategoryQuestDocument" xml:space="preserve"><value>퀘스트 / 문서</value></data>
+  <data name="ItemCategoryTool" xml:space="preserve"><value>도구</value></data>
+  <data name="ItemCategoryWeapon" xml:space="preserve"><value>무기</value></data>
+  <data name="ItemGroupAmuletCharm" xml:space="preserve"><value>아뮬렛 / 부적</value></data>
+  <data name="ItemGroupArtifact" xml:space="preserve"><value>아티팩트</value></data>
+  <data name="ItemGroupAxeMaceHammer" xml:space="preserve"><value>도끼 / 철퇴 / 망치</value></data>
+  <data name="ItemGroupBackCloak" xml:space="preserve"><value>등 / 망토</value></data>
+  <data name="ItemGroupBackpackPack" xml:space="preserve"><value>배낭 / 짐</value></data>
+  <data name="ItemGroupBeltBand" xml:space="preserve"><value>벨트 / 밴드</value></data>
+  <data name="ItemGroupBody" xml:space="preserve"><value>상의</value></data>
+  <data name="ItemGroupBodyAppearance" xml:space="preserve"><value>체형 / 외형</value></data>
+  <data name="ItemGroupBookDiary" xml:space="preserve"><value>책 / 일기</value></data>
+  <data name="ItemGroupBowCrossbow" xml:space="preserve"><value>활 / 석궁</value></data>
+  <data name="ItemGroupClothLeather" xml:space="preserve"><value>천 / 가죽</value></data>
+  <data name="ItemGroupClueReport" xml:space="preserve"><value>단서 / 보고서</value></data>
+  <data name="ItemGroupCollectionProp" xml:space="preserve"><value>수집 소품</value></data>
+  <data name="ItemGroupContainer" xml:space="preserve"><value>용기</value></data>
+  <data name="ItemGroupCrafting" xml:space="preserve"><value>제작</value></data>
+  <data name="ItemGroupCreaturePart" xml:space="preserve"><value>생물 부위</value></data>
+  <data name="ItemGroupCrystalGem" xml:space="preserve"><value>결정 / 보석</value></data>
+  <data name="ItemGroupCurrency" xml:space="preserve"><value>화폐</value></data>
+  <data name="ItemGroupDaggerRapier" xml:space="preserve"><value>단검 / 레이피어</value></data>
+  <data name="ItemGroupDecor" xml:space="preserve"><value>장식</value></data>
+  <data name="ItemGroupDocument" xml:space="preserve"><value>문서</value></data>
+  <data name="ItemGroupEarrings" xml:space="preserve"><value>귀걸이</value></data>
+  <data name="ItemGroupFace" xml:space="preserve"><value>얼굴</value></data>
+  <data name="ItemGroupFeet" xml:space="preserve"><value>발</value></data>
+  <data name="ItemGroupFirearm" xml:space="preserve"><value>화기</value></data>
+  <data name="ItemGroupFishing" xml:space="preserve"><value>낚시</value></data>
+  <data name="ItemGroupFistMartial" xml:space="preserve"><value>주먹 / 격투</value></data>
+  <data name="ItemGroupFlagMarker" xml:space="preserve"><value>깃발 / 표식</value></data>
+  <data name="ItemGroupFoodDrink" xml:space="preserve"><value>음식 / 음료</value></data>
+  <data name="ItemGroupFurniture" xml:space="preserve"><value>가구</value></data>
+  <data name="ItemGroupGatheringTool" xml:space="preserve"><value>채집 도구</value></data>
+  <data name="ItemGroupGimmick" xml:space="preserve"><value>기믹</value></data>
+  <data name="ItemGroupHair" xml:space="preserve"><value>머리카락</value></data>
+  <data name="ItemGroupHandTool" xml:space="preserve"><value>수공구</value></data>
+  <data name="ItemGroupHands" xml:space="preserve"><value>손</value></data>
+  <data name="ItemGroupHead" xml:space="preserve"><value>머리</value></data>
+  <data name="ItemGroupHorseGear" xml:space="preserve"><value>마구</value></data>
+  <data name="ItemGroupKeyPermit" xml:space="preserve"><value>열쇠 / 허가증</value></data>
+  <data name="ItemGroupLegs" xml:space="preserve"><value>다리</value></data>
+  <data name="ItemGroupLightLantern" xml:space="preserve"><value>조명 / 랜턴</value></data>
+  <data name="ItemGroupMachinePart" xml:space="preserve"><value>기계 부품</value></data>
+  <data name="ItemGroupMapTreasure" xml:space="preserve"><value>지도 / 보물</value></data>
+  <data name="ItemGroupNecklace" xml:space="preserve"><value>목걸이</value></data>
+  <data name="ItemGroupOreMetal" xml:space="preserve"><value>광석 / 금속</value></data>
+  <data name="ItemGroupOtherAccessory" xml:space="preserve"><value>기타 장신구</value></data>
+  <data name="ItemGroupOtherArmor" xml:space="preserve"><value>기타 방어구</value></data>
+  <data name="ItemGroupOtherConsumable" xml:space="preserve"><value>기타 소모품</value></data>
+  <data name="ItemGroupOtherMaterial" xml:space="preserve"><value>기타 재료</value></data>
+  <data name="ItemGroupOtherTool" xml:space="preserve"><value>기타 도구</value></data>
+  <data name="ItemGroupOtherWeapon" xml:space="preserve"><value>기타 무기</value></data>
+  <data name="ItemGroupPetGear" xml:space="preserve"><value>펫 장비</value></data>
+  <data name="ItemGroupPolearmSpear" xml:space="preserve"><value>장병기 / 창</value></data>
+  <data name="ItemGroupPotionMedicine" xml:space="preserve"><value>물약 / 약품</value></data>
+  <data name="ItemGroupQuest" xml:space="preserve"><value>퀘스트</value></data>
+  <data name="ItemGroupRecipeBook" xml:space="preserve"><value>제조법 서적</value></data>
+  <data name="ItemGroupReward" xml:space="preserve"><value>보상</value></data>
+  <data name="ItemGroupRing" xml:space="preserve"><value>반지</value></data>
+  <data name="ItemGroupShield" xml:space="preserve"><value>방패</value></data>
+  <data name="ItemGroupSkill" xml:space="preserve"><value>스킬</value></data>
+  <data name="ItemGroupStat" xml:space="preserve"><value>능력치</value></data>
+  <data name="ItemGroupSword" xml:space="preserve"><value>검</value></data>
+  <data name="ItemGroupThrowableUtility" xml:space="preserve"><value>투척 / 보조</value></data>
+  <data name="ItemGroupTokenSeal" xml:space="preserve"><value>증표 / 인장</value></data>
+  <data name="ItemGroupUnclassified" xml:space="preserve"><value>미분류</value></data>
+  <data name="ItemGroupVehicle" xml:space="preserve"><value>탈것</value></data>
+  <data name="ItemGroupWandFan" xml:space="preserve"><value>완드 / 부채</value></data>
+  <data name="ItemGroupWoodStone" xml:space="preserve"><value>목재 / 석재</value></data>
+  <data name="ItemMaterialBone" xml:space="preserve"><value>뼈</value></data>
+  <data name="ItemMaterialCloth" xml:space="preserve"><value>천</value></data>
+  <data name="ItemMaterialCrystal" xml:space="preserve"><value>결정</value></data>
+  <data name="ItemMaterialDirt" xml:space="preserve"><value>흙</value></data>
+  <data name="ItemMaterialFur" xml:space="preserve"><value>모피</value></data>
+  <data name="ItemMaterialGlass" xml:space="preserve"><value>유리</value></data>
+  <data name="ItemMaterialGrass" xml:space="preserve"><value>풀</value></data>
+  <data name="ItemMaterialHair" xml:space="preserve"><value>머리카락</value></data>
+  <data name="ItemMaterialLeather" xml:space="preserve"><value>가죽</value></data>
+  <data name="ItemMaterialMetal" xml:space="preserve"><value>금속</value></data>
+  <data name="ItemMaterialRope" xml:space="preserve"><value>밧줄</value></data>
+  <data name="ItemMaterialSkin" xml:space="preserve"><value>피부</value></data>
+  <data name="ItemMaterialStone" xml:space="preserve"><value>돌</value></data>
+  <data name="ItemMaterialWater" xml:space="preserve"><value>물</value></data>
+  <data name="ItemMaterialWood" xml:space="preserve"><value>목재</value></data>
+  <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo 프리팹 해시</value></data>
+  <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>아이콘/모델 참조</value></data>
+  <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>현지화된 표시 이름</value></data>
+  <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>인벤토리 아이콘 경로</value></data>
+  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>머티리얼 슬롯 태그</value></data>
+  <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>아이템 데이터베이스 레코드</value></data>
+  <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>복원된 아이템/모델 명명</value></data>
+  <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>더 강력한 분류 단서를 찾지 못했습니다</value></data>
 </root>
