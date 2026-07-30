@@ -1,7 +1,7 @@
 # CDMW Archive Lite
 
 [![Archive Lite](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml/badge.svg)](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml)
-![version](https://img.shields.io/badge/version-1.0.0-blue)
+![version](https://img.shields.io/badge/version-1.0.1-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2011%20x64-lightgrey)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![read-only](https://img.shields.io/badge/archives-read--only-brightgreen)
@@ -12,10 +12,10 @@ The application is self-contained in this repository and keeps archive queries, 
 
 ## Highlights
 
-- Browse large archives with flat, folder, and category views, paging, filters, sorting, and persistent indexes.
+- Browse large archives through a folder tree or a flat list, with an optional category navigator, paging, filters, sorting, and persistent indexes.
 - Search text across archives or loose folders with cancellation, result limits, and in-file navigation.
 - Find known items by localized name and follow exact or related archive links.
-- Preview text, XML, images, DDS textures, supported media, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
+- Preview text, XML, images, DDS textures, supported media including the sounds a Wwise `.bnk` embeds, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
 - Discover and export associated assets without altering game data.
 - Run as a portable Windows application or a single self-extracting executable.
 - Switch the interface between the fourteen languages Crimson Desert itself ships; every one but English is machine translated and unreviewed.
@@ -138,7 +138,7 @@ These are asserted by the focused gate, not measured by hand. `scripts/test_arch
 
 | | |
 | --- | --- |
-| focused scenarios | 43, covering archive, preview, export, worker lifetime and cache eviction |
+| focused scenarios | 48, covering archive, preview, export, worker lifetime and cache eviction |
 | model preview, cold cache | ~100 ms |
 | model preview, warm cache | ~1 ms, and warm across sessions |
 | renderer | headless GPU soak, production D3D11 backend, windows stay hidden |
