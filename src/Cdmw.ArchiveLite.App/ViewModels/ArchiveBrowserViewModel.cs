@@ -41,6 +41,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private ArchiveFolderTreeContext? _folderTreeContext;
     private bool _isFolderTreeBusy;
     private long _folderTreeGeneration;
+    private string? _folderTreeFilterKey;
     private ArchiveRoleFilter _selectedRole = null!;
     private ArchiveCategoryCount? _selectedCategory;
     private ArchiveEntryDto? _selectedEntry;
@@ -1311,6 +1312,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         ApplyFolderFacets(result.Folders);
 
         ApplyCategoryFacets(result.Categories);
+        RefreshFolderTreeForFilters();
 
         PageStart = result.PageStart;
         TotalMatches = result.TotalMatches;
@@ -1444,13 +1446,45 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         var operation = new CancellationTokenSource();
         CancelOperation(Interlocked.Exchange(ref _folderTreeOperation, operation));
         FolderTree.Clear();
+        var filter = CreateTreeFilter();
+        _folderTreeFilterKey = filter.CacheKey;
         _folderTreeContext = new ArchiveFolderTreeContext(
-            path => LoadFolderChildrenAsync(sessionId, generation, path),
-            path => LoadFolderFilesAsync(sessionId, generation, path),
+            path => LoadFolderChildrenAsync(sessionId, generation, path, filter),
+            path => LoadFolderFilesAsync(sessionId, generation, path, filter),
             SelectFolderNode,
             exception => _setShellStatus(exception.Message),
             includesFiles: ShowEntryTree);
         _ = LoadFolderTreeRootAsync(sessionId, generation);
+    }
+
+    /// <summary>
+    /// The filters the tree narrows itself with. The folder filter is left out on purpose: the tree
+    /// is how a folder is chosen, so applying it would collapse the tree to the folder already
+    /// chosen and leave no way to reach any other.
+    /// </summary>
+    private ArchiveEntryFilter CreateTreeFilter() => new(
+        PathFilter,
+        ExtensionFilter.Split([';', ',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+        PackageFilter,
+        Folder: null,
+        SelectedRole.Role is { } role ? [role] : null,
+        MinimumSize: null,
+        PreviewableOnly);
+
+    /// <summary>
+    /// Rebuilds the tree when the filters move, since its rows and its counts are the filtered ones.
+    /// </summary>
+    private void RefreshFolderTreeForFilters()
+    {
+        if (_folderTreeContext is null || SessionId is not { } sessionId || string.IsNullOrWhiteSpace(sessionId))
+        {
+            return;
+        }
+        if (string.Equals(_folderTreeFilterKey, CreateTreeFilter().CacheKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+        StartFolderTreeLoad(sessionId);
     }
 
     private async Task LoadFolderTreeRootAsync(string sessionId, long generation)
@@ -1463,9 +1497,10 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         try
         {
             IsFolderTreeBusy = true;
-            var children = await LoadFolderChildrenAsync(sessionId, generation, string.Empty).ConfigureAwait(true);
+            // Through the context so the root is fetched with the same filter its levels will be.
+            var children = await context.LoadChildrenAsync(string.Empty).ConfigureAwait(true);
             var rootFiles = context.IncludesFiles
-                ? await LoadFolderFilesAsync(sessionId, generation, string.Empty).ConfigureAwait(true)
+                ? await context.LoadFilesAsync(string.Empty).ConfigureAwait(true)
                 : [];
             if (generation != Volatile.Read(ref _folderTreeGeneration))
             {
@@ -1512,7 +1547,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private async Task<IReadOnlyList<ArchiveFolderNode>> LoadFolderChildrenAsync(
         string sessionId,
         long generation,
-        string path)
+        string path,
+        ArchiveEntryFilter filter)
     {
         var operation = _folderTreeOperation;
         if (operation is null || generation != Volatile.Read(ref _folderTreeGeneration))
@@ -1522,7 +1558,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         var result = await _worker.SendAsync<ArchiveFolderTreeRequest, ArchiveFolderTreeResult>(
             WorkerProtocol.ArchiveFolderTree,
             generation,
-            new ArchiveFolderTreeRequest(sessionId, path),
+            new ArchiveFolderTreeRequest(sessionId, path, Filter: filter),
             operation.Token).ConfigureAwait(true);
         if (generation != Volatile.Read(ref _folderTreeGeneration)
             || !string.Equals(SessionId, sessionId, StringComparison.Ordinal))
@@ -1596,7 +1632,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private async Task<IReadOnlyList<ArchiveEntryDto>> LoadFolderFilesAsync(
         string sessionId,
         long generation,
-        string path)
+        string path,
+        ArchiveEntryFilter filter)
     {
         var operation = _folderTreeOperation;
         if (operation is null || generation != Volatile.Read(ref _folderTreeGeneration))
@@ -1606,7 +1643,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         var result = await _worker.SendAsync<ArchiveFolderFilesRequest, ArchiveFolderFilesResult>(
             WorkerProtocol.ArchiveFolderFiles,
             generation,
-            new ArchiveFolderFilesRequest(sessionId, path),
+            new ArchiveFolderFilesRequest(sessionId, path, Filter: filter),
             operation.Token).ConfigureAwait(true);
         if (generation != Volatile.Read(ref _folderTreeGeneration)
             || !string.Equals(SessionId, sessionId, StringComparison.Ordinal))
@@ -2004,6 +2041,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         ApplyFolderFacets(result.Folders);
 
         ApplyCategoryFacets(result.Categories);
+        RefreshFolderTreeForFilters();
         PageStart = result.PageStart;
         TotalMatches = result.TotalMatches;
         OnPropertyChanged(nameof(PageSummary));

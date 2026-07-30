@@ -5498,6 +5498,37 @@ internal static class ArchiveLiteTestRunner
         Require(
             paged.Files.Count == 1 && paged.TotalFiles == 3 && paged.Truncated,
             "a paged file listing did not report the rest of the folder");
+
+        // The tree is a view of the same result the entry list shows, so a filter has to reach it.
+        // Its counts are the filtered counts and a folder holding nothing that matches is gone.
+        var filter = new ArchiveEntryFilter(Extensions: [".dds"]);
+        var filtered = await trees.LoadAsync(
+            new ArchiveFolderTreeRequest(opened.SessionId, Filter: filter),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(filtered.TotalCount == 3, "the folder tree ignored an extension filter");
+        Require(
+            filtered.Nodes.Single(static node => node.Name == "character").TotalCount == 2,
+            "a filtered folder does not count only the files that match");
+        var filteredLevel = await trees.LoadAsync(
+            new ArchiveFolderTreeRequest(opened.SessionId, "character", Filter: filter),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            filteredLevel.Nodes.Select(static node => node.Name).SequenceEqual(["texture"]),
+            "a filtered level still lists folders holding nothing that matches");
+        var filteredFiles = await trees.ListFilesAsync(
+            new ArchiveFolderFilesRequest(opened.SessionId, "character/model", Filter: filter),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(filteredFiles.TotalFiles == 0, "a filtered folder listed files the filter excludes");
+
+        // The unfiltered tree is still there afterwards, since it is the expensive one to rebuild.
+        var again = await trees.LoadAsync(
+            new ArchiveFolderTreeRequest(opened.SessionId),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(again.TotalCount == 8, "the unfiltered folder tree did not survive a filtered one");
     }
 
     private static async Task TestArchiveServicesAsync()

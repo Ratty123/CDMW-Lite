@@ -240,22 +240,24 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
         !query.PreviewableOnly &&
         query.EntryIds is null;
 
+    private static ArchiveEntryFilter FilterOf(ArchiveQuerySpec query) => new(
+        query.PathText,
+        query.Extensions,
+        query.Package,
+        query.Folder,
+        query.Roles,
+        query.MinimumSize,
+        query.PreviewableOnly);
+
     private static bool Matches(ArchiveEntryDto entry, ArchiveQuerySpec query, IReadOnlySet<long>? entryIds) =>
         MatchesExceptRole(entry, query, entryIds) && MatchesRole(entry, query);
 
-    private static bool MatchesExceptRole(ArchiveEntryDto entry, ArchiveQuerySpec query, IReadOnlySet<long>? entryIds)
-    {
-        if (entryIds is not null && !entryIds.Contains(entry.EntryId)) return false;
-        if (!MatchesPath(entry, query.PathText)) return false;
-        if (query.Extensions is { Count: > 0 } && !query.Extensions.Any(value => MatchesExtension(entry.Extension, value))) return false;
-        if (!string.IsNullOrWhiteSpace(query.Package) && !entry.Package.Contains(query.Package, StringComparison.OrdinalIgnoreCase)) return false;
-        if (!string.IsNullOrWhiteSpace(query.Folder) && !entry.Path.StartsWith(query.Folder.Trim().Replace('\\', '/').Trim('/') + "/", StringComparison.OrdinalIgnoreCase)) return false;
-        if (query.MinimumSize is { } minimum && entry.OriginalSize < minimum) return false;
-        return !query.PreviewableOnly || entry.IsPreviewable;
-    }
+    private static bool MatchesExceptRole(ArchiveEntryDto entry, ArchiveQuerySpec query, IReadOnlySet<long>? entryIds) =>
+        (entryIds is null || entryIds.Contains(entry.EntryId))
+        && ArchiveEntryMatcher.MatchesExceptRole(entry, FilterOf(query));
 
     private static bool MatchesRole(ArchiveEntryDto entry, ArchiveQuerySpec query) =>
-        query.Roles is not { Count: > 0 } || query.Roles.Contains(entry.Role);
+        ArchiveEntryMatcher.MatchesRole(entry, FilterOf(query));
 
     private static void ValidateScopedEntryIds(IReadOnlyList<long>? entryIds)
     {
@@ -263,32 +265,6 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
         {
             throw new InvalidDataException($"An archive query scope may contain at most {MaximumScopedEntryIds} entry IDs.");
         }
-    }
-
-    private static bool MatchesPath(ArchiveEntryDto entry, string? filter)
-    {
-        if (string.IsNullOrWhiteSpace(filter)) return true;
-        var text = filter.Trim();
-        if (!text.ContainsAny(['*', '?', '[']))
-        {
-            return entry.Path.Contains(text, StringComparison.OrdinalIgnoreCase)
-                || entry.Name.Contains(text, StringComparison.OrdinalIgnoreCase)
-                || entry.KnownName.Contains(text, StringComparison.OrdinalIgnoreCase)
-                || entry.NameEvidence.Contains(text, StringComparison.OrdinalIgnoreCase);
-        }
-        var pattern = "^" + Regex.Escape(text).Replace("\\*", ".*").Replace("\\?", ".") + "$";
-        return Regex.IsMatch(entry.Path, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250))
-            || Regex.IsMatch(entry.Name, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250))
-            || Regex.IsMatch(entry.KnownName, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250))
-            || Regex.IsMatch(entry.NameEvidence, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
-    }
-
-    private static bool MatchesExtension(string extension, string candidate)
-    {
-        var normalized = candidate.Trim().ToLowerInvariant();
-        if (normalized is "*" or ".*" or "all") return true;
-        if (!normalized.StartsWith('.')) normalized = "." + normalized;
-        return extension.Equals(normalized, StringComparison.OrdinalIgnoreCase);
     }
 
     private static IComparer<ArchiveEntryDto> CreateComparer(ArchiveSortField field, bool descending)

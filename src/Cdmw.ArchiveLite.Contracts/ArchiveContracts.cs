@@ -150,6 +150,44 @@ public sealed record ArchiveQuerySpec(
     int PageSize = 256,
     IReadOnlyList<long>? EntryIds = null);
 
+/// <summary>
+/// The part of a query that decides whether an entry belongs in the result, with nothing about
+/// paging, sorting or the arrangement of the list. The entry list and the folder tree both narrow
+/// themselves with one of these so the two can never disagree about what the filters mean.
+/// </summary>
+public sealed record ArchiveEntryFilter(
+    string? PathText = null,
+    IReadOnlyList<string>? Extensions = null,
+    string? Package = null,
+    string? Folder = null,
+    IReadOnlyList<ArchiveEntryRole>? Roles = null,
+    long? MinimumSize = null,
+    bool PreviewableOnly = false)
+{
+    public bool IsEmpty =>
+        string.IsNullOrWhiteSpace(PathText)
+        && Extensions is not { Count: > 0 }
+        && string.IsNullOrWhiteSpace(Package)
+        && string.IsNullOrWhiteSpace(Folder)
+        && Roles is not { Count: > 0 }
+        && MinimumSize is null
+        && !PreviewableOnly;
+
+    /// <summary>Whether matching needs the name data that only enrichment supplies.</summary>
+    public bool NeedsNameData => !string.IsNullOrWhiteSpace(PathText);
+
+    /// <summary>A stable key for caching a tree built against this filter.</summary>
+    public string CacheKey => string.Join(
+        '\u001F',
+        PathText ?? string.Empty,
+        Extensions is null ? string.Empty : string.Join(',', Extensions),
+        Package ?? string.Empty,
+        Folder ?? string.Empty,
+        Roles is null ? string.Empty : string.Join(',', Roles),
+        MinimumSize?.ToString() ?? string.Empty,
+        PreviewableOnly ? "1" : "0");
+}
+
 public sealed record ArchivePageResult(
     string SessionId,
     long Generation,

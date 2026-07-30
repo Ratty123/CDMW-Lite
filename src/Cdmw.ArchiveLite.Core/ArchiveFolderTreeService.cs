@@ -31,7 +31,7 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
     {
         ArgumentNullException.ThrowIfNull(request);
         var session = sessions.GetRequired(request.SessionId);
-        var tree = await BuildOrGetAsync(session, publishProgress, cancellationToken).ConfigureAwait(false);
+        var tree = await BuildOrGetAsync(session, request.Filter, publishProgress, cancellationToken).ConfigureAwait(false);
         var folder = tree.Find(request.Path);
         if (folder is null)
         {
@@ -61,7 +61,7 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
     {
         ArgumentNullException.ThrowIfNull(request);
         var session = sessions.GetRequired(request.SessionId);
-        var tree = await BuildOrGetAsync(session, publishProgress, cancellationToken).ConfigureAwait(false);
+        var tree = await BuildOrGetAsync(session, request.Filter, publishProgress, cancellationToken).ConfigureAwait(false);
         var folder = tree.Find(request.Path);
         if (folder is null)
         {
@@ -87,10 +87,12 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
 
     private static async Task<ArchiveFolderTree> BuildOrGetAsync(
         ArchiveSession session,
+        ArchiveEntryFilter? filter,
         Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
-        if (session.TryGetFolderTree(out var cached) && cached is not null)
+        var effective = filter ?? new ArchiveEntryFilter();
+        if (session.TryGetFolderTree(effective.CacheKey, out var cached) && cached is not null)
         {
             return cached;
         }
@@ -98,12 +100,12 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
         await session.FolderTreeBuildGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (session.TryGetFolderTree(out var raced) && raced is not null)
+            if (session.TryGetFolderTree(effective.CacheKey, out var raced) && raced is not null)
             {
                 return raced;
             }
-            var built = await BuildAsync(session, publishProgress, cancellationToken).ConfigureAwait(false);
-            session.SetFolderTree(built);
+            var built = await BuildAsync(session, effective, publishProgress, cancellationToken).ConfigureAwait(false);
+            session.SetFolderTree(effective.CacheKey, built);
             return built;
         }
         finally
@@ -114,11 +116,60 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
 
     private static async Task<ArchiveFolderTree> BuildAsync(
         ArchiveSession session,
+        ArchiveEntryFilter filter,
+        Func<ProgressUpdate, Task>? publishProgress,
+        CancellationToken cancellationToken)
+    {
+        var root = new ArchiveFolderTreeNode(string.Empty, string.Empty);
+        // With no filter the paths alone are enough, and reading only those avoids building an entry
+        // record and classifying it a million times over. A filter has to read the whole entry,
+        // because what it tests - extension, role, size - is not in the path.
+        if (filter.IsEmpty)
+        {
+            await ScanPathsAsync(session, root, publishProgress, cancellationToken).ConfigureAwait(false);
+            return new ArchiveFolderTree(root);
+        }
+
+        var usesExtensionIndex = session.ExtensionIndex.TryGetEntryIds(filter.Extensions, out var extensionEntryIds);
+        var total = usesExtensionIndex ? extensionEntryIds.Count : session.Index.EntryCount;
+        for (long position = 0; position < total; position++)
+        {
+            if ((position & 0x1FFF) == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (publishProgress is not null)
+                {
+                    await publishProgress(new ProgressUpdate(position, total, "folder_scan")).ConfigureAwait(false);
+                }
+            }
+
+            var entryId = usesExtensionIndex ? extensionEntryIds[checked((int)position)] : position;
+            var entry = session.Index.ReadEntry(entryId);
+            if (filter.NeedsNameData)
+            {
+                entry = session.EnrichEntry(entry);
+            }
+            if (ArchiveEntryMatcher.Matches(entry, filter))
+            {
+                Add(root, entry.Path, entryId);
+            }
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (publishProgress is not null)
+        {
+            await publishProgress(new ProgressUpdate(total, total, "folder_scan")).ConfigureAwait(false);
+        }
+        return new ArchiveFolderTree(root);
+    }
+
+    private static async Task ScanPathsAsync(
+        ArchiveSession session,
+        ArchiveFolderTreeNode root,
         Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken)
     {
         var total = session.Index.EntryCount;
-        var root = new ArchiveFolderTreeNode(string.Empty, string.Empty);
         var buffer = new byte[512];
         for (long entryId = 0; entryId < total; entryId++)
         {
@@ -145,7 +196,6 @@ public sealed class ArchiveFolderTreeService(ArchiveSessionManager sessions)
         {
             await publishProgress(new ProgressUpdate(total, total, "folder_scan")).ConfigureAwait(false);
         }
-        return new ArchiveFolderTree(root);
     }
 
     /// <summary>
