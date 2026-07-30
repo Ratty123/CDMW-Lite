@@ -133,8 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>无法启动只读应用程序。\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>正在停止后台任务…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>文件夹</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>分类</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>分类 + 文件夹</value></data>
   <data name="TreeView" xml:space="preserve"><value>树形</value></data>
   <data name="FlatView" xml:space="preserve"><value>平铺</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>文件夹</value></data>

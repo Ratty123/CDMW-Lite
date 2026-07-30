@@ -237,7 +237,8 @@ public sealed class MainWindowViewModel : ObservableObject
                 CollisionPolicy: ArchiveBrowser.CollisionPolicy,
                 ManifestFormat: ArchiveBrowser.ManifestFormat,
                 ModelPreviewCameraInput: ArchiveBrowser.CaptureModelPreviewCameraInputSettings(),
-                PreviewBackground: ArchiveBrowser.CapturePreviewBackgroundSettings()),
+                PreviewBackground: ArchiveBrowser.CapturePreviewBackgroundSettings(),
+                ShowCategories: ArchiveBrowser.ShowCategories),
             TextSearch = new TextSearchSettings(
                 TextSearch.SourceKind,
                 TextSearch.LooseFolder,

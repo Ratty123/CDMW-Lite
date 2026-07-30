@@ -133,8 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>Не удалось запустить приложение, работающее только для чтения.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Остановка фоновых задач…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Папки</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>Категории</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>Категории + папки</value></data>
   <data name="TreeView" xml:space="preserve"><value>Дерево</value></data>
   <data name="FlatView" xml:space="preserve"><value>Плоский</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Папка</value></data>

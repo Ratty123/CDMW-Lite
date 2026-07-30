@@ -422,9 +422,12 @@
                                                   DisplayMemberPath="Label"
                                                   SelectedValuePath="Value"
                                                   SelectedValue="{Binding ArchiveBrowser.SortField}" />
-                                        <CheckBox Margin="0,1,0,10"
+                                        <CheckBox Margin="0,1,0,6"
                                                   Content="{infra:Loc Key=Descending}"
                                                   IsChecked="{Binding ArchiveBrowser.SortDescending}" />
+                                        <CheckBox Margin="0,1,0,10"
+                                                  Content="{infra:Loc Key=Categories}"
+                                                  IsChecked="{Binding ArchiveBrowser.ShowCategories}" />
                                         <Button Style="{StaticResource PrimaryButtonStyle}"
                                                 Content="{infra:Loc Key=Search}"
                                                 Command="{Binding ArchiveBrowser.ApplyFilterCommand}" />
@@ -432,7 +435,7 @@
                                 </GroupBox>
 
                                 <GroupBox Header="{infra:Loc Key=Categories}"
-                                          Visibility="{Binding ArchiveBrowser.ShowCategoryNavigator, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                          Visibility="{Binding ArchiveBrowser.ShowCategories, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <ListBox MaxHeight="180"
                                              ItemsSource="{Binding ArchiveBrowser.Categories}"
                                              SelectedItem="{Binding ArchiveBrowser.SelectedCategory}" />
@@ -620,7 +623,6 @@
                                                       Command="{Binding ArchiveBrowser.ExportSelectedCommand}" />
                                             <MenuItem Header="{infra:Loc Key=ExportAssociatedFamily}"
                                                       Command="{Binding ArchiveBrowser.ExportFamilyCommand}" />
-                                            <Separator />
                                             <MenuItem Header="{infra:Loc Key=CopyFileName}"
                                                       Command="{Binding ArchiveBrowser.CopyFileNameCommand}" />
                                         </ContextMenu>
@@ -662,7 +664,6 @@
                                                       Command="{Binding ArchiveBrowser.ExportSelectedCommand}" />
                                             <MenuItem Header="{infra:Loc Key=ExportAssociatedFamily}"
                                                       Command="{Binding ArchiveBrowser.ExportFamilyCommand}" />
-                                            <Separator />
                                             <MenuItem Header="{infra:Loc Key=CopyFileName}"
                                                       Command="{Binding ArchiveBrowser.CopyFileNameCommand}" />
                                         </ContextMenu>

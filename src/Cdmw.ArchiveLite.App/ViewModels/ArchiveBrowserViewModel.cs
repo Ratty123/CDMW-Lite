@@ -32,6 +32,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private string _extensionFilter = string.Empty;
     private string _packageFilter = string.Empty;
     private bool _previewableOnly;
+    private bool _showCategories;
     private ArchiveViewMode _viewMode = ArchiveViewMode.Flat;
     private ArchiveSortField _sortField = ArchiveSortField.Path;
     private bool _sortDescending;
@@ -118,7 +119,14 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _archiveRoot = archiveRoot ?? string.Empty;
         _pathFilter = browserSettings.PathFilter ?? string.Empty;
         _extensionFilter = browserSettings.ExtensionFilter ?? string.Empty;
-        _viewMode = Enum.IsDefined(browserSettings.ViewMode) ? browserSettings.ViewMode : ArchiveViewMode.Flat;
+        // The category navigator used to be two view modes of its own, numbered 1 and 2. A settings
+        // file still naming one of those means the user had the navigator on, so the checkbox that
+        // replaced them starts on and the view falls back to the plain list it was paired with.
+        var storedViewMode = (int)browserSettings.ViewMode;
+        _showCategories = browserSettings.ShowCategories || storedViewMode is 1 or 2;
+        _viewMode = Enum.IsDefined(browserSettings.ViewMode)
+            ? browserSettings.ViewMode
+            : storedViewMode == 2 ? ArchiveViewMode.Folders : ArchiveViewMode.Flat;
         _sortField = Enum.IsDefined(initialSortField) ? initialSortField : ArchiveSortField.Path;
         if (_sortField == ArchiveSortField.Role)
         {
@@ -402,25 +410,38 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 return;
             }
 
-            OnPropertyChanged(nameof(ShowCategoryNavigator));
             OnPropertyChanged(nameof(ShowFolderNavigator));
             OnPropertyChanged(nameof(ShowEntryTree));
             OnPropertyChanged(nameof(ShowEntryGrid));
-            // Lite exposes no role control of its own: the category navigator is the only thing that
-            // sets the role filter, so the filter must not outlive the view modes that show it.
-            // Otherwise it would keep narrowing every later result with nothing on screen to release it.
-            if (!ShowCategoryNavigator)
-            {
-                SelectedCategory = null;
-                SelectedRole = RoleFilters.First(static role => role.Role is null);
-            }
-            // The same reasoning applies to the folder filter, whose only controls are the folder
-            // navigator and the tree view. Neither is on screen in the flat or category views.
+            // The folder filter's only controls are the folder navigator and the tree view, so it
+            // must not outlive them; it would otherwise keep narrowing every later result with
+            // nothing on screen able to release it.
             if (!ShowFolderNavigator && !ShowEntryTree)
             {
                 SelectedFolder = Folders.FirstOrDefault(static folder => folder.Path is null);
             }
             EnsureFolderTreeLoaded();
+        }
+    }
+
+    /// <summary>
+    /// Whether the category navigator is shown. It is a setting of its own rather than a view mode,
+    /// so any arrangement of the entry list can have it.
+    /// </summary>
+    public bool ShowCategories
+    {
+        get => _showCategories;
+        set
+        {
+            if (!SetProperty(ref _showCategories, value) || value)
+            {
+                return;
+            }
+
+            // Lite exposes no role control of its own, so the navigator is the only way in and out of
+            // the role filter. Turning it off has to release what it applied.
+            SelectedCategory = null;
+            SelectedRole = RoleFilters.First(static role => role.Role is null);
         }
     }
 
@@ -430,10 +451,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         private set => SetProperty(ref _isFolderTreeBusy, value);
     }
 
-    public bool ShowCategoryNavigator => ViewMode is ArchiveViewMode.Categories or ArchiveViewMode.CategoriesAndFolders;
-
     /// <summary>Whether the folder tree has its own pane beside the entry list.</summary>
-    public bool ShowFolderNavigator => ViewMode is ArchiveViewMode.Folders or ArchiveViewMode.CategoriesAndFolders;
+    public bool ShowFolderNavigator => ViewMode is ArchiveViewMode.Folders;
 
     /// <summary>Whether the entry list is itself a tree of folders and the files inside them.</summary>
     public bool ShowEntryTree => ViewMode is ArchiveViewMode.Tree;
@@ -1345,6 +1364,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             SelectedRole.Role is { } role ? [role] : null,
             PreviewableOnly: PreviewableOnly,
             ViewMode: ViewMode,
+            IncludeCategoryFacets: ShowCategories,
             SortField: SortField,
             SortDescending: SortDescending,
             PageStart: pageStart,
@@ -1744,8 +1764,6 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _viewModes =
         [
             new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Folders, LocalizationManager.Get("FoldersView")),
-            new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Categories, LocalizationManager.Get("CategoriesView")),
-            new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.CategoriesAndFolders, LocalizationManager.Get("CategoriesFoldersView")),
             new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Flat, LocalizationManager.Get("FlatView")),
             new LocalizedOption<ArchiveViewMode>(ArchiveViewMode.Tree, LocalizationManager.Get("TreeView")),
         ];

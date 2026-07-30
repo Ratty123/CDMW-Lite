@@ -133,8 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>Salt okunur uygulama başlatılamadı.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Arka plan işleri durduruluyor…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Klasörler</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>Kategoriler</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>Kategoriler + klasörler</value></data>
   <data name="TreeView" xml:space="preserve"><value>Ağaç</value></data>
   <data name="FlatView" xml:space="preserve"><value>Düz</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Klasör</value></data>

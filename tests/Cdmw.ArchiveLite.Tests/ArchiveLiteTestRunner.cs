@@ -492,10 +492,11 @@ internal static class ArchiveLiteTestRunner
             ArchiveBrowser: new ArchiveBrowserSettings(
                 PathFilter: "character/model",
                 ExtensionFilter: ".pac;.pam",
-                ViewMode: ArchiveViewMode.CategoriesAndFolders,
+                ViewMode: ArchiveViewMode.Folders,
                 FolderPath: "character/model/player",
                 CollisionPolicy: ExportCollisionPolicy.Overwrite,
                 ManifestFormat: ExportManifestFormat.Csv,
+                ShowCategories: true,
                 ModelPreviewCameraInput: new ModelPreviewCameraInputSettings(
                     OrbitSensitivity: 0.35,
                     PanSensitivity: 1.15,
@@ -586,7 +587,8 @@ internal static class ArchiveLiteTestRunner
             Require(browser.ExtensionFilter == ".pac;.pam", "archive extension filter was not restored into the view model");
             Require(browser.PackageFilter.Length == 0, "removed package filter still affects archive queries");
             Require(!browser.PreviewableOnly, "removed previewable-only filter still affects archive queries");
-            Require(browser.ViewMode == ArchiveViewMode.CategoriesAndFolders, "archive view filter was not restored into the view model");
+            Require(browser.ViewMode == ArchiveViewMode.Folders, "archive view filter was not restored into the view model");
+            Require(browser.ShowCategories, "the category navigator's own setting was not restored");
             Require(browser.SelectedFolder?.Path == "character/model/player", "folder filter was not ready before the first archive query");
             Require(browser.SelectedRole.Role is null, "removed role filter still affects archive queries");
             Require(browser.CollisionPolicy == ExportCollisionPolicy.Overwrite, "export collision policy was not restored");
@@ -5283,7 +5285,7 @@ internal static class ArchiveLiteTestRunner
                 "C:\\archive",
                 _ => { },
                 (_, _) => ArchiveCacheMode.Persistent);
-            browser.ViewMode = ArchiveViewMode.CategoriesAndFolders;
+            browser.ShowCategories = true;
             Require(browser.SelectedRole.Role is null, "a new Archive Browser starts with a role filter applied");
 
             browser.SelectedCategory = new ArchiveCategoryCount(nameof(ArchiveEntryRole.Model), "Model", 3);
@@ -5306,15 +5308,25 @@ internal static class ArchiveLiteTestRunner
                 browser.SelectedRole.Role == ArchiveEntryRole.Image,
                 "the navigator cannot move the role filter to another category");
 
-            browser.ViewMode = ArchiveViewMode.Flat;
+            browser.ShowCategories = false;
             Require(
                 browser.SelectedRole.Role is null && browser.SelectedCategory is null,
                 "the role filter outlived the navigator that is the only control able to clear it");
 
+            // The navigator is a setting of its own now, so it has to survive every arrangement of
+            // the entry list rather than belonging to two of them.
+            browser.ShowCategories = true;
+            foreach (var mode in Enum.GetValues<ArchiveViewMode>())
+            {
+                browser.ViewMode = mode;
+                Require(browser.ShowCategories, $"the {mode} view dropped the category navigator");
+            }
+
             // The folder filter is reachable from the folder pane and the tree view and nowhere else,
             // so it has to be released on the way into a view that shows neither.
+            browser.ViewMode = ArchiveViewMode.Flat;
             Require(
-                browser.ShowFolderNavigator == false && browser.ShowEntryTree == false && browser.ShowEntryGrid,
+                !browser.ShowFolderNavigator && !browser.ShowEntryTree && browser.ShowEntryGrid,
                 "the flat view offers a folder control after all");
             browser.ViewMode = ArchiveViewMode.Folders;
             Require(
@@ -5342,7 +5354,7 @@ internal static class ArchiveLiteTestRunner
         var queries = new ArchiveQueryService(sessions);
 
         var unfiltered = await queries.QueryAsync(
-            new ArchiveQuerySpec(opened.SessionId, ViewMode: ArchiveViewMode.CategoriesAndFolders),
+            new ArchiveQuerySpec(opened.SessionId, IncludeCategoryFacets: true),
             1,
             CancellationToken.None).ConfigureAwait(false);
         Require(unfiltered.Categories.Count > 1, "the synthetic archive does not cover more than one role");
@@ -5353,7 +5365,7 @@ internal static class ArchiveLiteTestRunner
             new ArchiveQuerySpec(
                 opened.SessionId,
                 Roles: [parsedRole],
-                ViewMode: ArchiveViewMode.CategoriesAndFolders),
+                IncludeCategoryFacets: true),
             2,
             CancellationToken.None).ConfigureAwait(false);
         Require(
@@ -5372,7 +5384,7 @@ internal static class ArchiveLiteTestRunner
             new ArchiveQuerySpec(
                 opened.SessionId,
                 Folder: "unrelated",
-                ViewMode: ArchiveViewMode.CategoriesAndFolders),
+                IncludeCategoryFacets: true),
             3,
             CancellationToken.None).ConfigureAwait(false);
         Require(

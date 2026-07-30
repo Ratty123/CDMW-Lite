@@ -77,14 +77,18 @@ public enum ArchiveTextureUsage
     MaterialMap,
 }
 
+/// <summary>
+/// How the entry list is arranged. The category navigator used to be two of these; it is a setting of
+/// its own now, so those two are gone. The remaining values keep the numbers they have always had,
+/// because settings files store this enum as a number and renumbering would silently move a saved
+/// choice onto a different view.
+/// </summary>
 public enum ArchiveViewMode
 {
-    Folders,
-    Categories,
-    CategoriesAndFolders,
-    Flat,
+    Folders = 0,
+    Flat = 3,
     /// <summary>The entry list is itself the archive's tree, with files under their folders.</summary>
-    Tree,
+    Tree = 4,
 }
 
 public enum ArchiveSortField
@@ -135,6 +139,11 @@ public sealed record ArchiveQuerySpec(
     long? MinimumSize = null,
     bool PreviewableOnly = false,
     ArchiveViewMode ViewMode = ArchiveViewMode.Flat,
+    /// <summary>
+    /// Whether the caller needs the per-role counts. The flat view can otherwise page straight out of
+    /// the sorted index without visiting every entry, and that shortcut cannot count anything.
+    /// </summary>
+    bool IncludeCategoryFacets = false,
     ArchiveSortField SortField = ArchiveSortField.Path,
     bool SortDescending = false,
     int PageStart = 0,

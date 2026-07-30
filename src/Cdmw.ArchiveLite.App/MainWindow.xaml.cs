@@ -1,8 +1,10 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Cdmw.ArchiveLite.App.Infrastructure;
 using Cdmw.ArchiveLite.App.Dialogs;
 using Cdmw.ArchiveLite.App.Services;
@@ -59,6 +61,7 @@ public partial class MainWindow : Window
         StateChanged += OnWindowStateChanged;
         ThemeManager.ThemeChanged += OnThemeChanged;
         _viewModel.ArchiveBrowser.PropertyChanged += OnArchiveBrowserPropertyChanged;
+        _viewModel.ArchiveBrowser.Entries.CollectionChanged += OnArchiveEntriesChanged;
         ApplyWindowPlacement();
     }
 
@@ -144,6 +147,7 @@ public partial class MainWindow : Window
         StateChanged -= OnWindowStateChanged;
         ThemeManager.ThemeChanged -= OnThemeChanged;
         _viewModel.ArchiveBrowser.PropertyChanged -= OnArchiveBrowserPropertyChanged;
+        _viewModel.ArchiveBrowser.Entries.CollectionChanged -= OnArchiveEntriesChanged;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs eventArgs)
@@ -235,6 +239,31 @@ public partial class MainWindow : Window
                 item.IsSelected = true;
                 return;
             }
+        }
+    }
+
+    /// <summary>
+    /// Re-measures the columns that size to their content when the page changes. A WPF auto column
+    /// only ever grows: it remembers the widest cell it has been given and keeps that width even
+    /// after those rows are gone, so one long name early on would leave the column oversized for
+    /// every page after it. Clearing the width first is what forces the fresh measurement.
+    /// </summary>
+    private void OnArchiveEntriesChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
+    {
+        if (eventArgs.Action != NotifyCollectionChangedAction.Reset && eventArgs.Action != NotifyCollectionChangedAction.Add)
+        {
+            return;
+        }
+        // The rows arrive one at a time, so the measurement has to wait until the page is complete
+        // and its containers have been generated.
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, ResetAutoSizedArchiveColumns);
+    }
+
+    private void ResetAutoSizedArchiveColumns()
+    {
+        foreach (var column in ArchiveGrid.Columns.Where(static column => column.Width.IsAuto))
+        {
+            column.Width = new DataGridLength(0, DataGridLengthUnitType.Auto);
         }
     }
 

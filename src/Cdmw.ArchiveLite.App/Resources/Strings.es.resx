@@ -124,8 +124,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>No se pudo iniciar la aplicación de solo lectura.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Deteniendo el trabajo en segundo plano…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Carpetas</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>Categorías</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>Categorías + carpetas</value></data>
   <data name="TreeView" xml:space="preserve"><value>Árbol</value></data>
   <data name="FlatView" xml:space="preserve"><value>Plano</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Carpeta</value></data>

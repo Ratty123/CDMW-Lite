@@ -124,8 +124,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>Die schreibgeschützte Anwendung konnte nicht gestartet werden.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Hintergrundarbeit wird beendet…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Ordner</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>Kategorien</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>Kategorien + Ordner</value></data>
   <data name="TreeView" xml:space="preserve"><value>Baum</value></data>
   <data name="FlatView" xml:space="preserve"><value>Flach</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Ordner</value></data>

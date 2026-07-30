@@ -133,8 +133,6 @@
   <data name="StartupFailureMessage" xml:space="preserve"><value>L'application en lecture seule n'a pas pu démarrer.\n\n{0}</value></data>
   <data name="Closing" xml:space="preserve"><value>Arrêt des tâches en arrière-plan…</value></data>
   <data name="FoldersView" xml:space="preserve"><value>Dossiers</value></data>
-  <data name="CategoriesView" xml:space="preserve"><value>Catégories</value></data>
-  <data name="CategoriesFoldersView" xml:space="preserve"><value>Catégories + dossiers</value></data>
   <data name="TreeView" xml:space="preserve"><value>Arborescence</value></data>
   <data name="FlatView" xml:space="preserve"><value>Plat</value></data>
   <data name="FolderFilter" xml:space="preserve"><value>Dossier</value></data>
