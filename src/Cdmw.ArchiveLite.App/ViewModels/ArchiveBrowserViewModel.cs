@@ -52,6 +52,11 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     /// Storing the formatted text alone left the counts frozen in whichever language produced them.
     /// </summary>
     private Func<string>? _catalogueStatusSource;
+    /// <summary>
+    /// The same arrangement for the item scope banner, which stays on screen for as long as the
+    /// scope is applied and so outlives any number of language changes.
+    /// </summary>
+    private Func<string>? _itemScopeStatusSource;
     private IReadOnlyList<long> _selectedEntryIds = [];
     private string _previewTitle = LocalizationManager.Get("Preview");
     private string _previewMetadata = string.Empty;
@@ -60,6 +65,12 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private string _previewWarnings = string.Empty;
     private BitmapSource? _previewImage;
     private Uri? _previewMediaSource;
+    private PreviewTrack? _selectedPreviewTrack;
+    /// <summary>
+    /// Set while a finished preview publishes its own track list, so that filling the list does not
+    /// read as the reader asking for a different sound.
+    /// </summary>
+    private bool _suppressPreviewTrackSelection;
     private string? _modelPreviewPackagePath;
     private bool _showModelTextures;
     private double _modelPreviewOrbitSensitivity;
@@ -280,7 +291,14 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         }
         else if (_catalogueStatusSource is not null)
         {
-            CatalogueStatus = _catalogueStatusSource();
+            // Re-publish through the helper rather than the property: the setter drops the stored
+            // resolver, so assigning directly here would re-resolve once and then leave the next
+            // language change with nothing to rebuild from.
+            SetCatalogueStatus(_catalogueStatusSource);
+        }
+        if (_itemScopeStatusSource is not null)
+        {
+            SetItemScopeStatus(_itemScopeStatusSource);
         }
 
         // Grid cells resolve their labels through value converters bound to the row's own DTO, so
@@ -533,7 +551,23 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     public string ItemScopeStatus
     {
         get => _itemScopeStatus;
-        private set => SetProperty(ref _itemScopeStatus, value);
+        // As with the catalogue line, a direct assignment is a transient or cleared banner that a
+        // later language change must not resurrect, so it drops the stored source.
+        private set
+        {
+            _itemScopeStatusSource = null;
+            SetProperty(ref _itemScopeStatus, value);
+        }
+    }
+
+    /// <summary>
+    /// Publishes an item scope banner that survives a language change, by keeping the resolver
+    /// rather than the resolved text.
+    /// </summary>
+    private void SetItemScopeStatus(Func<string> localized)
+    {
+        ItemScopeStatus = localized();
+        _itemScopeStatusSource = localized;
     }
 
     public bool HasItemScope => _itemScopeEntryIds is not null;
@@ -690,6 +724,27 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     {
         get => _previewMediaSource;
         private set => SetProperty(ref _previewMediaSource, value);
+    }
+
+    /// <summary>The sounds a container preview holds, which today is a Wwise sound bank's media table.</summary>
+    public ObservableCollection<PreviewTrack> PreviewTracks { get; } = [];
+
+    public bool HasPreviewTracks => PreviewTracks.Count > 0;
+
+    public PreviewTrack? SelectedPreviewTrack
+    {
+        get => _selectedPreviewTrack;
+        set
+        {
+            if (!SetProperty(ref _selectedPreviewTrack, value)
+                || _suppressPreviewTrackSelection
+                || value is null
+                || SelectedEntry is not { } entry)
+            {
+                return;
+            }
+            _ = LoadPreviewLatestAsync(entry, value.Index);
+        }
     }
 
     public PreviewKind PreviewKind
@@ -1268,11 +1323,13 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             SelectedFolder = Folders.FirstOrDefault(static folder => folder.Path is null);
             SelectedRole = RoleFilters.First(static role => role.Role is null);
             SelectedCategory = null;
-            ItemScopeStatus = LocalizationManager.Format(
+            var scopedCount = scope.EntryIds.Count;
+            var directCount = scope.DirectCount;
+            SetItemScopeStatus(() => LocalizationManager.Format(
                 includeRelated ? "ItemFinderRelatedScopeApplied" : "ItemFinderExactScopeApplied",
                 displayName,
-                scope.EntryIds.Count,
-                scope.DirectCount);
+                scopedCount,
+                directCount));
             ApplyActiveExtensionFacets(scope.Extensions ?? []);
             await QueryPageCoreAsync(0, generation, operation.Token).ConfigureAwait(true);
             if (generation != Volatile.Read(ref _foregroundGeneration)
@@ -1998,7 +2055,10 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         FolderTree.Clear();
     }
 
-    private async Task LoadPreviewLatestAsync(ArchiveEntryDto? entry)
+    /// <param name="trackIndex">
+    /// The one-based sound to decode from a multi-sound container, or zero for its first sound.
+    /// </param>
+    private async Task LoadPreviewLatestAsync(ArchiveEntryDto? entry, int trackIndex = 0)
     {
         var sessionId = SessionId;
         var generation = Interlocked.Increment(ref _previewGeneration);
@@ -2032,7 +2092,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 new PreviewRequest(
                     sessionId,
                     entry.EntryId,
-                    IncludeModelTextures: isNativeModel && ShowModelTextures),
+                    IncludeModelTextures: isNativeModel && ShowModelTextures,
+                    TrackIndex: trackIndex),
                 operation.Token,
                 progress).ConfigureAwait(true);
             if (generation != Volatile.Read(ref _previewGeneration))
@@ -2131,6 +2192,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         PreviewMediaSource = result.Kind is PreviewKind.Audio or PreviewKind.Video && !string.IsNullOrWhiteSpace(result.ArtifactPath)
             ? new Uri(result.ArtifactPath, UriKind.Absolute)
             : null;
+        ApplyPreviewTracks(result.Tracks, result.TrackIndex);
         ModelPreviewPackagePath = result.Kind == PreviewKind.Model && !string.IsNullOrWhiteSpace(result.ArtifactPath)
             ? result.ArtifactPath
             : null;
@@ -2142,6 +2204,30 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         OnPropertyChanged(nameof(CanOpenPreviewSettings));
     }
 
+    /// <summary>
+    /// Republishes the sounds a preview offers. The list is filled under a suppression flag because
+    /// a list box drops its selection while its items change, and a dropped selection must not be
+    /// read back as a request to decode a different sound.
+    /// </summary>
+    private void ApplyPreviewTracks(IReadOnlyList<PreviewTrack>? tracks, int selectedIndex)
+    {
+        _suppressPreviewTrackSelection = true;
+        try
+        {
+            PreviewTracks.Clear();
+            foreach (var track in tracks ?? [])
+            {
+                PreviewTracks.Add(track);
+            }
+            SelectedPreviewTrack = PreviewTracks.FirstOrDefault(track => track.Index == selectedIndex);
+        }
+        finally
+        {
+            _suppressPreviewTrackSelection = false;
+        }
+        OnPropertyChanged(nameof(HasPreviewTracks));
+    }
+
     private void ClearPreview()
     {
         PreviewTitle = LocalizationManager.Get("Preview");
@@ -2151,6 +2237,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         PreviewWarnings = string.Empty;
         PreviewImage = null;
         PreviewMediaSource = null;
+        ApplyPreviewTracks(null, 0);
         ModelPreviewPackagePath = null;
         PreviewKind = PreviewKind.Metadata;
         IsPreviewBusy = false;

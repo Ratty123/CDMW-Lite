@@ -773,6 +773,7 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="*" />
                                             <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                         <Border Grid.Row="0"
                                                 Padding="7,6"
@@ -814,7 +815,7 @@
                                         </Border>
                                         <controls:DotNetModelPreviewHost x:Name="ModelPreviewHost"
                                                                           Grid.Row="0"
-                                                                          Grid.RowSpan="3"
+                                                                          Grid.RowSpan="4"
                                                                           PackagePath="{Binding ArchiveBrowser.ModelPreviewPackagePath, Mode=OneWay}"
                                                                           Prewarm="{Binding ArchiveBrowser.ShouldPrewarmModelRenderer, Mode=OneWay}"
                                                                           OrbitSensitivity="{Binding ArchiveBrowser.ModelPreviewOrbitSensitivity, Mode=OneWay}"
@@ -826,7 +827,7 @@
                                                                           PreviewBackgroundColor="{Binding ArchiveBrowser.PreviewBackgroundColorHex, Mode=OneWay}"
                                                                           Visibility="{Binding ArchiveBrowser.IsModelPreview, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         <Grid Grid.Row="0"
-                                              Grid.RowSpan="3"
+                                              Grid.RowSpan="4"
                                               ClipToBounds="True"
                                               Background="{Binding ArchiveBrowser.PreviewBackgroundBrush, Mode=OneWay}"
                                               Visibility="{Binding ArchiveBrowser.IsImagePreview, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -879,6 +880,39 @@
                                                         Content="{infra:Loc Key=Stop}"
                                                         Click="OnMediaStopClick" />
                                             </StackPanel>
+                                        </Border>
+                                        <!-- A sound bank holds many sounds, so the reader picks which one plays. -->
+                                        <Border Grid.Row="3"
+                                                Padding="7,6"
+                                                Background="{DynamicResource SurfaceRaisedBrush}"
+                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="0,1,0,0"
+                                                Visibility="{Binding ArchiveBrowser.HasPreviewTracks, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Top"
+                                                           Margin="0,0,0,4"
+                                                           Foreground="{DynamicResource TextMutedBrush}"
+                                                           Text="{infra:Loc Key=PreviewBankSounds}" />
+                                                <ListBox x:Name="ArchivePreviewTrackList"
+                                                         MaxHeight="120"
+                                                         BorderThickness="0"
+                                                         Background="Transparent"
+                                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                         ItemsSource="{Binding ArchiveBrowser.PreviewTracks}"
+                                                         SelectedItem="{Binding ArchiveBrowser.SelectedPreviewTrack, Mode=TwoWay}">
+                                                    <ListBox.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <TextBlock>
+                                                                <Run Text="{Binding Index, Mode=OneWay, StringFormat={}{0}.}"
+                                                                     Foreground="{DynamicResource TextMutedBrush}" />
+                                                                <Run Text="{Binding Name, Mode=OneWay}" />
+                                                                <Run Text="{Binding Size, Mode=OneWay, StringFormat={}({0:N0} bytes)}"
+                                                                     Foreground="{DynamicResource TextMutedBrush}" />
+                                                            </TextBlock>
+                                                        </DataTemplate>
+                                                    </ListBox.ItemTemplate>
+                                                </ListBox>
+                                            </DockPanel>
                                         </Border>
                                     </Grid>
                                 </Border>

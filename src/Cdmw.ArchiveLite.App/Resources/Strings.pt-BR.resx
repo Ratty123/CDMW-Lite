@@ -114,6 +114,7 @@
   <data name="ShowAllColumns" xml:space="preserve"><value>Mostrar todas as colunas</value></data>
   <data name="Preview" xml:space="preserve"><value>Visualização</value></data>
   <data name="PreviewEmpty" xml:space="preserve"><value>Selecione um arquivo para visualizá-lo.</value></data>
+  <data name="PreviewBankSounds" xml:space="preserve"><value>Sons neste banco</value></data>
   <data name="SearchSource" xml:space="preserve"><value>Fonte da busca</value></data>
   <data name="Archive" xml:space="preserve"><value>Arquivo</value></data>
   <data name="LooseFolder" xml:space="preserve"><value>Pasta avulsa</value></data>

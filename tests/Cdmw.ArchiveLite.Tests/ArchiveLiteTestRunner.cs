@@ -62,6 +62,7 @@ internal static class ArchiveLiteTestRunner
             ("UTF-8, UTF-16, and Latin-1 text decode without Python codecs", TestTextDecodingAsync),
             ("native archive ABI scans and decodes synthetic PAMT/PAZ", TestNativeArchiveAsync),
             ("archive query, preview, and text search are read-only", TestArchiveServicesAsync),
+            ("Wwise sound banks list their sounds and play one at a time", TestWwiseSoundBankPreviewAsync),
             ("the category navigator owns the whole life of the role filter", TestCategoryNavigatorOwnsRoleFilterAsync),
             ("category facets stay complete under a role filter", TestCategoryFacetsIgnoreRoleFilterAsync),
             ("the folder tree counts descendants and expands one level at a time", TestArchiveFolderTreeAsync),
@@ -118,6 +119,31 @@ internal static class ArchiveLiteTestRunner
             texturedPreviewJson.Contains("\"include_model_textures\":true", StringComparison.Ordinal)
             && new PreviewRequest("session", 17).IncludeModelTextures == false,
             "opt-in model texture intent is not snake case or no longer defaults off");
+        // A sound bank holds many sounds, so which one to decode travels with the request and the
+        // list of the rest travels back with the result.
+        var bankPreview = new PreviewRequest("session", 17, TrackIndex: 2);
+        var bankPreviewJson = JsonSerializer.Serialize(bankPreview, WorkerProtocol.JsonOptions);
+        Require(
+            bankPreviewJson.Contains("\"track_index\":2", StringComparison.Ordinal)
+            && new PreviewRequest("session", 17).TrackIndex == 0,
+            "the chosen bank sound is not snake case or no longer defaults to the first sound");
+        var bankResult = WorkerProtocol.Request(
+            Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            10,
+            WorkerProtocol.Preview,
+            new PreviewResult(
+                "session",
+                17,
+                PreviewKind.Audio,
+                "voice.bnk",
+                "metadata",
+                Tracks: [new PreviewTrack(1, "100", 4_096), new PreviewTrack(2, "101", 2_048)],
+                TrackIndex: 2));
+        var bankReadBack = WorkerProtocol.ReadPayload<PreviewResult>(bankResult);
+        Require(
+            bankReadBack is { TrackIndex: 2, Tracks.Count: 2 }
+            && bankReadBack.Tracks[1] is { Index: 2, Name: "101", Size: 2_048 },
+            "a sound bank's track list did not survive the worker boundary");
         // The folder tree carries a filter across the protocol, and the filter record exposes
         // computed members. Those go out as extra JSON that the worker has to ignore rather than
         // reject, or every attempt to open a folder would fail with only a status line to show it.
@@ -395,16 +421,23 @@ internal static class ArchiveLiteTestRunner
                 "ArchiveBrowserViewModel.cs"));
             var refreshBody = browserSource[browserSource.IndexOf("public void RefreshLocalization()", StringComparison.Ordinal)..];
             refreshBody = refreshBody[..refreshBody.IndexOf("\n    public ", StringComparison.Ordinal)];
+            // Re-resolving is not enough on its own: the property setter drops the stored resolver,
+            // so a refresh that assigns directly works once and then leaves the second language
+            // change with nothing to rebuild from. Both lines must re-publish through their helper.
             Require(
-                refreshBody.Contains("_catalogueStatusSource()", StringComparison.Ordinal),
-                "a language change no longer re-resolves the settled catalogue line");
+                refreshBody.Contains("SetCatalogueStatus(_catalogueStatusSource)", StringComparison.Ordinal),
+                "a language change no longer re-resolves the settled catalogue line for the change after it");
+            Require(
+                refreshBody.Contains("SetItemScopeStatus(_itemScopeStatusSource)", StringComparison.Ordinal),
+                "a language change no longer re-resolves the item scope banner for the change after it");
             Require(
                 refreshBody.Contains("GetDefaultView(Entries)", StringComparison.Ordinal)
                 && refreshBody.Contains(".Refresh()", StringComparison.Ordinal),
                 "a language change no longer re-runs the archive grid's label converters");
             Require(
-                browserSource.Contains("_catalogueStatusSource = null;", StringComparison.Ordinal),
-                "a transient catalogue line can be overwritten by a stale settled result");
+                browserSource.Contains("_catalogueStatusSource = null;", StringComparison.Ordinal)
+                && browserSource.Contains("_itemScopeStatusSource = null;", StringComparison.Ordinal),
+                "a transient status line can be overwritten by a stale settled result");
         }
         finally
         {
@@ -4397,6 +4430,34 @@ internal static class ArchiveLiteTestRunner
                 await Task.Delay(320).ConfigureAwait(true);
                 Require(fakeWorker.SearchCount == 3, "programmatic localized facet refresh triggered a search");
 
+                // Switching away and back is the case that broke: text resolved once and then
+                // stored kept whichever language produced it, so the first switch looked correct
+                // and the second left the old language on screen for good.
+                LocalizationManager.ApplyCulture("en");
+                viewModel.RefreshLocalization();
+                var englishStatus = viewModel.Status;
+                var englishAllMaterials = viewModel.MaterialTagOptions[0].Label;
+                var englishAllCategories = viewModel.CategoryOptions[0].Label;
+                var englishLinkedSummary = viewModel.Items[0].LinkedSummary;
+                LocalizationManager.ApplyCulture("ko");
+                viewModel.RefreshLocalization();
+                Require(
+                    viewModel.Status != englishStatus
+                    && viewModel.MaterialTagOptions[0].Label != englishAllMaterials
+                    && viewModel.CategoryOptions[0].Label != englishAllCategories
+                    && viewModel.Items[0].LinkedSummary != englishLinkedSummary,
+                    "an Item Finder language change left settled text in the previous language");
+                LocalizationManager.ApplyCulture("en");
+                viewModel.RefreshLocalization();
+                Require(
+                    viewModel.Status == englishStatus
+                    && viewModel.MaterialTagOptions[0].Label == englishAllMaterials
+                    && viewModel.CategoryOptions[0].Label == englishAllCategories
+                    && viewModel.Items[0].LinkedSummary == englishLinkedSummary,
+                    "returning to a language left Item Finder text stuck in the one before it");
+                await Task.Delay(320).ConfigureAwait(true);
+                Require(fakeWorker.SearchCount == 3, "a language round trip triggered an Item Finder search");
+
                 fakeWorker.SearchDelay = TimeSpan.FromMilliseconds(350);
                 fakeWorker.IgnoreSearchCancellation = true;
                 viewModel.Query = "late-session";
@@ -4417,6 +4478,9 @@ internal static class ArchiveLiteTestRunner
         }
         finally
         {
+            // This test walks the language selection, so a failure mid-walk must not hand the rest
+            // of the run a non-English culture.
+            LocalizationManager.ApplyCulture("en");
             File.Delete(iconPath);
         }
     }
@@ -5711,6 +5775,220 @@ internal static class ArchiveLiteTestRunner
         Require(await Sha256Async(fixture.Pamt).ConfigureAwait(false) == beforePamt, "PAMT changed during read-only services");
         Require(await Sha256Async(fixture.Paz).ConfigureAwait(false) == beforePaz, "PAZ changed during read-only services");
         Require(await Sha256Async(fixture.Pathc).ConfigureAwait(false) == beforePathc, "PATHC changed during read-only services");
+    }
+
+    /// <summary>
+    /// A Wwise bank is a container: the sounds it embeds are listed from its DIDX table and decoded
+    /// one at a time, while a bank that only carries events keeps its readable analysis because it
+    /// holds no audio to play.
+    /// </summary>
+    private static async Task TestWwiseSoundBankPreviewAsync()
+    {
+        var bank = BuildSyntheticSoundBank();
+        var media = ArchiveWwiseBank.ReadEmbeddedMedia(bank);
+        Require(media.Count == 2, "the DIDX table did not list both embedded sounds");
+        Require(
+            media[0] is { Ordinal: 1, SourceId: 100 } && media[1] is { Ordinal: 2, SourceId: 101 },
+            "embedded sounds lost their DIDX order or their Wwise source ids");
+        Require(
+            ArchiveWwiseBank.ReadEmbeddedMedia(BuildEventOnlySoundBank()).Count == 0,
+            "an event-only bank reported audio it does not carry");
+
+        var capability = ArchiveContentRegistry.Find(".bnk")
+            ?? throw new InvalidOperationException("The shared manifest no longer describes .bnk");
+        Require(capability.Playback, "the shared manifest still marks sound banks as unplayable");
+        Require(
+            NativeMediaPreviewService.Supports(".bnk") && NativeMediaPreviewService.IsSoundBank(".bnk"),
+            "sound banks are not routed to the bundled decoder");
+        var document = new ArchiveContentAnalyzer().Analyze(".bnk", "sound/synthetic.bnk", bank);
+        var readable = document.ToReadableText();
+        Require(
+            readable.Contains("Embedded sound count", StringComparison.Ordinal)
+            && readable.Contains("101", StringComparison.Ordinal),
+            "the readable bank analysis does not report the sounds it embeds");
+
+        await using var fixture = await SyntheticArchiveFixture.CreateAsync().ConfigureAwait(false);
+        await fixture.AddSingleEntryPackageAsync("0031", "sound/synthetic.bnk", bank).ConfigureAwait(false);
+        await fixture.AddSingleEntryPackageAsync("0032", "sound/events.bnk", BuildEventOnlySoundBank())
+            .ConfigureAwait(false);
+        await fixture.AddSingleEntryPackageAsync(
+            "0033",
+            "sound/mislabelled.bnk",
+            [0xFF, 0x00, 0xFE, 0x01, 0xFD, 0x02, 0xFC, 0x03, 0x00, 0x80, 0x7F, 0x90])
+            .ConfigureAwait(false);
+        var native = new NativeArchiveCore();
+        using var sessions = new ArchiveSessionManager(native);
+        var opened = await sessions.OpenAsync(
+            new OpenArchiveRequest(fixture.Root, true),
+            CancellationToken.None).ConfigureAwait(false);
+        var banks = await new ArchiveQueryService(sessions).QueryAsync(
+            new ArchiveQuerySpec(opened.SessionId, Extensions: [".bnk"]),
+            300,
+            CancellationToken.None).ConfigureAwait(false);
+        var embedded = banks.Entries.Single(entry => entry.Path.EndsWith("synthetic.bnk", StringComparison.Ordinal));
+        var eventsOnly = banks.Entries.Single(entry => entry.Path.EndsWith("events.bnk", StringComparison.Ordinal));
+
+        var previews = new ArchivePreviewService(sessions, native);
+        var eventPreview = await previews.BuildAsync(
+            new PreviewRequest(opened.SessionId, eventsOnly.EntryId),
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            eventPreview.Kind == PreviewKind.StructuredData && eventPreview.Tracks is null,
+            "an event-only bank offered sounds to play");
+        Require(
+            eventPreview.Warnings?.Any(warning =>
+                warning.Contains("stream from separate .wem", StringComparison.Ordinal)) == true,
+            "an event-only bank did not explain where its audio actually lives");
+        var mislabelled = banks.Entries.Single(entry => entry.Path.EndsWith("mislabelled.bnk", StringComparison.Ordinal));
+        var mislabelledPreview = await previews.BuildAsync(
+            new PreviewRequest(opened.SessionId, mislabelled.EntryId),
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            mislabelledPreview.Tracks is null
+            && mislabelledPreview.Warnings?.Any(warning =>
+                warning.Contains("Wwise bank header", StringComparison.Ordinal)) == true,
+            "a file that only carries the .bnk name was treated as a playable bank");
+
+        if (!HasBundledAudioDecoder())
+        {
+            Console.WriteLine("  note: bank decoding was not exercised because vgmstream is not bootstrapped");
+            return;
+        }
+
+        var first = await previews.BuildAsync(
+            new PreviewRequest(opened.SessionId, embedded.EntryId),
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            first is { Kind: PreviewKind.Audio, TrackIndex: 1, Tracks.Count: 2 }
+            && first.Tracks[1].Name == "101",
+            "a bank preview did not open on the first of its listed sounds");
+        var second = await previews.BuildAsync(
+            new PreviewRequest(opened.SessionId, embedded.EntryId, TrackIndex: 2),
+            CancellationToken.None).ConfigureAwait(false);
+        Require(second is { Kind: PreviewKind.Audio, TrackIndex: 2 }, "a bank did not honour the chosen sound");
+        var firstAudio = await File.ReadAllBytesAsync(first.ArtifactPath!).ConfigureAwait(false);
+        var secondAudio = await File.ReadAllBytesAsync(second.ArtifactPath!).ConfigureAwait(false);
+        Require(
+            firstAudio.AsSpan(0, 4).SequenceEqual("RIFF"u8) && secondAudio.AsSpan(0, 4).SequenceEqual("RIFF"u8),
+            "a bank sound was not decoded to playable WAV");
+        Require(
+            !firstAudio.AsSpan().SequenceEqual(secondAudio),
+            "both bank sounds decoded to the same audio, so the subsong was not selected");
+        Require(
+            first.Metadata.Contains("Embedded sounds: 2", StringComparison.Ordinal),
+            $"a bank preview did not report how many sounds the container holds: {first.Metadata}");
+        Require(
+            second.Metadata.Contains("Codec: PCM", StringComparison.Ordinal)
+            && second.Metadata.Contains("Sample rate: 8", StringComparison.Ordinal),
+            $"a bank preview did not report the decoded sound's own codec facts: {second.Metadata}");
+
+        var clamped = await previews.BuildAsync(
+            new PreviewRequest(opened.SessionId, embedded.EntryId, TrackIndex: 99),
+            CancellationToken.None).ConfigureAwait(false);
+        Require(clamped.TrackIndex == 1, "a sound outside the bank's table was not brought back in range");
+    }
+
+    private static void WriteUInt32(Stream stream, uint value)
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(uint)];
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes, value);
+        stream.Write(bytes);
+    }
+
+    private static void WriteUInt16(Stream stream, ushort value)
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(ushort)];
+        BinaryPrimitives.WriteUInt16LittleEndian(bytes, value);
+        stream.Write(bytes);
+    }
+
+    private static bool HasBundledAudioDecoder()
+    {
+        var configured = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_VGMSTREAM_PATH");
+        return (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
+            || File.Exists(Path.Combine(AppContext.BaseDirectory, "media", "vgmstream-cli.exe"))
+            || File.Exists(Path.Combine(FindRepositoryRoot(), ".tools", "vgmstream", "vgmstream-cli.exe"));
+    }
+
+    /// <summary>A bank whose DIDX table embeds two distinguishable PCM sounds.</summary>
+    private static byte[] BuildSyntheticSoundBank()
+    {
+        var sounds = new[] { BuildPcmWave(440), BuildPcmWave(880) };
+        using var directory = new MemoryStream();
+        using var data = new MemoryStream();
+        for (var index = 0; index < sounds.Length; index++)
+        {
+            while (data.Length % 16 != 0)
+            {
+                data.WriteByte(0);
+            }
+            WriteUInt32(directory, checked((uint)(100 + index)));
+            WriteUInt32(directory, checked((uint)data.Length));
+            WriteUInt32(directory, checked((uint)sounds[index].Length));
+            data.Write(sounds[index]);
+        }
+        return BuildSoundBank(directory.ToArray(), data.ToArray());
+    }
+
+    /// <summary>A bank that carries only event objects, the way a streamed bank does.</summary>
+    private static byte[] BuildEventOnlySoundBank()
+    {
+        using var bank = new MemoryStream();
+        bank.Write("BKHD"u8);
+        WriteUInt32(bank, 24);
+        WriteUInt32(bank, 0x8C);
+        WriteUInt32(bank, 0x12345678);
+        bank.Write(new byte[16]);
+        bank.Write("HIRC"u8);
+        WriteUInt32(bank, 8);
+        WriteUInt32(bank, 1);
+        WriteUInt32(bank, 0);
+        return bank.ToArray();
+    }
+
+    private static byte[] BuildSoundBank(byte[] directory, byte[] data)
+    {
+        using var bank = new MemoryStream();
+        bank.Write("BKHD"u8);
+        WriteUInt32(bank, 24);
+        WriteUInt32(bank, 0x8C);
+        WriteUInt32(bank, 0x12345678);
+        bank.Write(new byte[16]);
+        bank.Write("DIDX"u8);
+        WriteUInt32(bank, checked((uint)directory.Length));
+        bank.Write(directory);
+        bank.Write("DATA"u8);
+        WriteUInt32(bank, checked((uint)data.Length));
+        bank.Write(data);
+        return bank.ToArray();
+    }
+
+    private static byte[] BuildPcmWave(double frequency)
+    {
+        const int sampleRate = 8_000;
+        const int sampleCount = sampleRate / 4;
+        var samples = new byte[sampleCount * sizeof(short)];
+        for (var index = 0; index < sampleCount; index++)
+        {
+            var value = (short)(12_000 * Math.Sin(2 * Math.PI * frequency * index / sampleRate));
+            BinaryPrimitives.WriteInt16LittleEndian(samples.AsSpan(index * sizeof(short)), value);
+        }
+        using var wave = new MemoryStream();
+        wave.Write("RIFF"u8);
+        WriteUInt32(wave, checked((uint)(4 + 24 + 8 + samples.Length)));
+        wave.Write("WAVE"u8);
+        wave.Write("fmt "u8);
+        WriteUInt32(wave, 16);
+        WriteUInt16(wave, 1);
+        WriteUInt16(wave, 1);
+        WriteUInt32(wave, sampleRate);
+        WriteUInt32(wave, sampleRate * sizeof(short));
+        WriteUInt16(wave, sizeof(short));
+        WriteUInt16(wave, 16);
+        wave.Write("data"u8);
+        WriteUInt32(wave, checked((uint)samples.Length));
+        wave.Write(samples);
+        return wave.ToArray();
     }
 
     private static async Task TestArchiveExportAsync()

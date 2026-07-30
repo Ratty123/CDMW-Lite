@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Cdmw.ArchiveLite.Contracts;
@@ -8,21 +9,30 @@ namespace Cdmw.ArchiveLite.Core;
 
 public sealed class NativeMediaPreviewService
 {
-    private const string ArtifactVersion = "vgmstream_preview_v1";
+    private const string ArtifactVersion = "vgmstream_preview_v2_subsong";
     private static readonly TimeSpan DecodeTimeout = TimeSpan.FromSeconds(90);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _decodeGates = new(StringComparer.Ordinal);
 
-    public static bool Supports(string extension) => extension.Equals(".wem", StringComparison.OrdinalIgnoreCase);
+    public static bool Supports(string extension) =>
+        extension.Equals(".wem", StringComparison.OrdinalIgnoreCase) || IsSoundBank(extension);
 
+    /// <summary>A sound bank holds many sounds, so it is decoded one subsong at a time.</summary>
+    public static bool IsSoundBank(string extension) => extension.Equals(".bnk", StringComparison.OrdinalIgnoreCase);
+
+    /// <param name="subsong">
+    /// The one-based sound to decode inside a multi-sound container, or zero for the decoder's default.
+    /// </param>
     public async Task<string> BuildAsync(
         ArchiveSession session,
         ArchiveEntryDto entry,
         string sourcePath,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int subsong = 0)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        ArgumentOutOfRangeException.ThrowIfNegative(subsong);
         if (!Supports(entry.Extension))
         {
             throw new NotSupportedException($"vgmstream preview does not support {entry.Extension}.");
@@ -37,7 +47,8 @@ public sealed class NativeMediaPreviewService
             entry.Path,
             entry.Offset,
             entry.StoredSize,
-            entry.OriginalSize));
+            entry.OriginalSize,
+            subsong));
         var key = Convert.ToHexString(SHA256.HashData(identity)).ToLowerInvariant();
         var mediaRoot = Path.Combine(ArchiveLiteDataPaths.PreviewCache, "media");
         Directory.CreateDirectory(mediaRoot);
@@ -58,7 +69,7 @@ public sealed class NativeMediaPreviewService
             var staging = Path.Combine(mediaRoot, $".{key}.{Guid.NewGuid():N}.staging.wav");
             try
             {
-                await RunDecoderAsync(sourcePath, staging, cancellationToken).ConfigureAwait(false);
+                await RunDecoderAsync(sourcePath, staging, subsong, cancellationToken).ConfigureAwait(false);
                 if (!IsWave(staging))
                 {
                     throw new InvalidDataException("vgmstream did not produce a valid WAV preview.");
@@ -87,6 +98,7 @@ public sealed class NativeMediaPreviewService
     private static async Task RunDecoderAsync(
         string sourcePath,
         string outputPath,
+        int subsong,
         CancellationToken cancellationToken)
     {
         var executable = ResolveDecoderPath();
@@ -101,6 +113,11 @@ public sealed class NativeMediaPreviewService
         };
         startInfo.ArgumentList.Add("-o");
         startInfo.ArgumentList.Add(outputPath);
+        if (subsong > 0)
+        {
+            startInfo.ArgumentList.Add("-s");
+            startInfo.ArgumentList.Add(subsong.ToString(CultureInfo.InvariantCulture));
+        }
         startInfo.ArgumentList.Add(Path.GetFullPath(sourcePath));
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("vgmstream-cli could not be started.");

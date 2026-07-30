@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Cdmw.Archive.Content;
@@ -158,6 +159,18 @@ public sealed class ArchivePreviewService
         if (entry.Role is ArchiveEntryRole.Audio or ArchiveEntryRole.Video)
         {
             var artifact = await PublishArtifactAsync(session, entry, decoded.Bytes, cancellationToken).ConfigureAwait(false);
+            if (NativeMediaPreviewService.IsSoundBank(entry.Extension))
+            {
+                return await BuildSoundBankResultAsync(
+                    session,
+                    entry,
+                    artifact,
+                    decoded.Bytes,
+                    metadata,
+                    warnings,
+                    request.TrackIndex,
+                    cancellationToken).ConfigureAwait(false);
+            }
             if (NativeMediaPreviewService.Supports(entry.Extension))
             {
                 try
@@ -250,6 +263,102 @@ public sealed class ArchivePreviewService
             ArtifactPath: artifact.JsonPath,
             Warnings: warnings,
             Syntax: ".txt");
+    }
+
+    /// <summary>
+    /// Presents a Wwise sound bank as the list of sounds it embeds, decoding the requested one for
+    /// playback. A bank that only carries events keeps its readable analysis, because there is no
+    /// audio inside it to play.
+    /// </summary>
+    private async Task<PreviewResult> BuildSoundBankResultAsync(
+        ArchiveSession session,
+        ArchiveEntryDto entry,
+        string bankPath,
+        byte[] bytes,
+        string metadata,
+        List<string> warnings,
+        int requestedTrack,
+        CancellationToken cancellationToken)
+    {
+        if (!ArchiveWwiseBank.IsSoundBank(bytes))
+        {
+            warnings.Add("This .bnk does not carry a Wwise bank header, so no audio decoder was applied.");
+            return await BuildSemanticResultAsync(session, entry, bytes, metadata, warnings, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        var media = ArchiveWwiseBank.ReadEmbeddedMedia(bytes);
+        if (media.Count == 0)
+        {
+            warnings.Add(
+                "This sound bank embeds no audio; its sounds stream from separate .wem files, "
+                + "so there is nothing here to play.");
+            return await BuildSemanticResultAsync(session, entry, bytes, metadata, warnings, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var tracks = media
+            .Select(sound => new PreviewTrack(
+                sound.Ordinal,
+                sound.SourceId.ToString(CultureInfo.InvariantCulture),
+                sound.Size))
+            .ToArray();
+        var selected = requestedTrack >= 1 && requestedTrack <= tracks.Length ? requestedTrack : 1;
+        var bankMetadata = string.Join(
+            Environment.NewLine,
+            metadata,
+            $"Embedded sounds: {tracks.Length:N0}",
+            $"Playing sound: {selected:N0} of {tracks.Length:N0} (source id {tracks[selected - 1].Name})");
+        try
+        {
+            var wave = await _mediaPreviews
+                .BuildAsync(session, entry, bankPath, cancellationToken, selected)
+                .ConfigureAwait(false);
+            warnings.Add($"Decoded sound {selected:N0} of {tracks.Length:N0} for playback with bundled vgmstream.");
+            return new PreviewResult(
+                session.Id,
+                entry.EntryId,
+                PreviewKind.Audio,
+                entry.Name,
+                await AppendWaveSummaryAsync(bankMetadata, wave, cancellationToken).ConfigureAwait(false),
+                ArtifactPath: wave,
+                MediaKind: ArchiveEntryRole.Audio.ToString().ToLowerInvariant(),
+                Warnings: warnings,
+                Tracks: tracks,
+                TrackIndex: selected);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // A codec the decoder cannot read is a property of the one sound, so the bank keeps its
+            // list and the reader can move to another sound instead of losing the whole preview.
+            warnings.Add($"Wwise sound {selected:N0} could not be decoded: {exception.Message}");
+            var readable = await BuildSemanticResultAsync(session, entry, bytes, metadata, warnings, cancellationToken)
+                .ConfigureAwait(false);
+            return readable with { Tracks = tracks, TrackIndex = selected };
+        }
+    }
+
+    /// <summary>Adds the decoded sound's own codec facts, read from the WAV header alone.</summary>
+    private static async Task<string> AppendWaveSummaryAsync(
+        string metadata,
+        string wavePath,
+        CancellationToken cancellationToken)
+    {
+        var header = new byte[1024];
+        int read;
+        try
+        {
+            await using var stream = new FileStream(wavePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            read = await stream.ReadAsync(header, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return metadata;
+        }
+        return AssetMetadataInspector.Enrich(metadata, ".wav", header.AsSpan(0, read));
     }
 
     private static string BuildMetadata(ArchiveEntryDto entry) => string.Join(

@@ -90,29 +90,43 @@ internal static class ArchiveStructuredAnalyzers
     {
         var data = payload.Span;
         var fields = HeaderFields(data);
-        var lines = new List<string>();
         var warnings = new List<string>();
-        var offset = 0;
-        while (offset <= data.Length - 8 && lines.Count < 128)
+        var chunks = ArchiveWwiseBank.ReadChunks(data, out var consumed);
+        var lines = chunks
+            .Select(chunk => $"0x{chunk.Start - 8:X8} {chunk.Id} | {chunk.Length:N0} byte(s)")
+            .ToList();
+        if (consumed < data.Length && !truncated)
         {
-            var id = Encoding.ASCII.GetString(data.Slice(offset, 4));
-            var size = ArchiveContentBinary.ReadUInt32(data, offset + 4);
-            var end = (long)offset + 8 + size;
-            lines.Add($"0x{offset:X8} {id} | {size:N0} byte(s)");
-            if (!id.All(character => character is >= 'A' and <= 'Z') || end > data.Length)
-            {
-                warnings.Add($"Chunk at 0x{offset:X} is not fully available or has an unexpected identifier.");
-                break;
-            }
-            offset = checked((int)end);
+            warnings.Add($"The chunk at 0x{consumed:X} is not fully available or has an unexpected identifier.");
         }
         fields.Add(new("Parsed chunk count", lines.Count.ToString("N0"), "integer", Confidence: "proven"));
+
+        // The embedded media table is what decides whether the bank can be played at all, so it is
+        // reported even when it is empty rather than left to be inferred from a missing DIDX line.
+        var media = ArchiveWwiseBank.ReadEmbeddedMedia(data);
+        fields.Add(new("Embedded sound count", media.Count.ToString("N0"), "integer", Confidence: "proven"));
+        var mediaLines = media
+            .Take(256)
+            .Select(sound => $"#{sound.Ordinal} {sound.SourceId} | {sound.Size:N0} byte(s) @ 0x{sound.Offset:X}")
+            .ToList();
+        if (media.Count > mediaLines.Count)
+        {
+            mediaLines.Add($"... {media.Count - mediaLines.Count:N0} more embedded sound(s).");
+        }
+        if (media.Count == 0)
+        {
+            mediaLines.Add("This bank embeds no audio; its sounds stream from separate .wem files.");
+        }
         var strings = ArchiveContentBinary.ExtractStrings(data);
         return Document(
             capability, path, sourceLength, truncated,
             "Wwise sound bank metadata",
-            "Decoded the BNK chunk envelope and exposed bounded names/references; HIRC object semantics remain heuristic.",
-            [new ArchiveContentSection("BNK chunks", fields, lines), ArchiveContentBinary.BuildStringSection(strings)],
+            "Decoded the BNK chunk envelope and the DIDX media table; HIRC object semantics remain heuristic.",
+            [
+                new ArchiveContentSection("BNK chunks", fields, lines),
+                new ArchiveContentSection("Embedded sounds", Array.Empty<ArchiveContentField>(), mediaLines),
+                ArchiveContentBinary.BuildStringSection(strings),
+            ],
             ArchiveContentBinary.ExtractReferences(strings), warnings);
     }
 

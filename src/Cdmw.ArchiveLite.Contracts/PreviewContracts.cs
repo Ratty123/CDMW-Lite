@@ -18,7 +18,15 @@ public sealed record PreviewRequest(
     long EntryId,
     int TextCharacterLimit = 120_000,
     int BinaryByteLimit = 256,
-    bool IncludeModelTextures = false);
+    bool IncludeModelTextures = false,
+    int TrackIndex = 0);
+
+/// <summary>
+/// One playable sound inside a container that holds several, such as a Wwise sound bank.
+/// </summary>
+/// <param name="Index">The one-based position the decoder uses to select this sound.</param>
+/// <param name="Name">The sound's own identity, which for a bank is its Wwise source id.</param>
+public sealed record PreviewTrack(int Index, string Name, long Size);
 
 public sealed record PreviewResult(
     string SessionId,
@@ -30,4 +38,6 @@ public sealed record PreviewResult(
     string? ArtifactPath = null,
     string? MediaKind = null,
     IReadOnlyList<string>? Warnings = null,
-    string? Syntax = null);
+    string? Syntax = null,
+    IReadOnlyList<PreviewTrack>? Tracks = null,
+    int TrackIndex = 0);
