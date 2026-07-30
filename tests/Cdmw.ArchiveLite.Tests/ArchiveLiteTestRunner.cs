@@ -39,6 +39,7 @@ internal static class ArchiveLiteTestRunner
             ("preview drawer and syntax colors stay readable across themes", TestPreviewPresentationAsync),
             ("archive grid exposes configurable sortable columns and categorized extensions", TestArchiveGridFeaturesAsync),
             ("associated assets resolve references and same-family companions read-only", TestAssociatedAssetsAsync),
+            ("every registered format is linkable and no reference is clipped short", TestAssociationVocabularyAsync),
             ("export paths reject traversal and roots", TestExportPathPolicyAsync),
             ("isolated cache maintenance is bounded, lease-aware, and deterministic", TestCacheMaintenanceAsync),
             ("DDS header facts bound decode cost and preview resource use", TestDdsHeaderAndResourceLimitsAsync),
@@ -2043,6 +2044,83 @@ internal static class ArchiveLiteTestRunner
 
         Require(await Sha256Async(fixture.Pamt).ConfigureAwait(false) == beforePamt, "associated-asset lookup changed PAMT bytes");
         Require(await Sha256Async(fixture.Paz).ConfigureAwait(false) == beforePaz, "associated-asset lookup changed PAZ bytes");
+    }
+
+    /// <summary>
+    /// Every format the capability manifest registers is linkable, and a name is followed whole: an
+    /// extension that begins with a shorter registered one must not resolve to the shorter one's file.
+    /// </summary>
+    private static async Task TestAssociationVocabularyAsync()
+    {
+        await using var fixture = await SyntheticArchiveFixture.CreateAssociationVocabularyAsync().ConfigureAwait(false);
+        var beforePaz = await Sha256Async(fixture.Paz).ConfigureAwait(false);
+        var native = new NativeArchiveCore();
+        using var sessions = new ArchiveSessionManager(native);
+        var opened = await sessions.OpenAsync(
+            new OpenArchiveRequest(fixture.Root, true, ArchiveCacheMode.SessionOnly),
+            CancellationToken.None).ConfigureAwait(false);
+        var query = new ArchiveQueryService(sessions);
+        var levelPage = await query.QueryAsync(
+            new ArchiveQuerySpec(opened.SessionId, PathText: "world/city.palevel"),
+            1,
+            CancellationToken.None).ConfigureAwait(false);
+        var level = levelPage.Entries.Single(entry => entry.Path == "world/city.palevel");
+        var associations = new ArchiveAssociationService(sessions, native);
+        var result = await associations.FindAsync(
+            new FindAssociatedAssetsRequest(opened.SessionId, level.EntryId),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+
+        var byPath = result.Assets.ToDictionary(static asset => asset.Entry.Path, StringComparer.Ordinal);
+        foreach (var (path, category) in new (string Path, AssociatedAssetCategory Category)[]
+                 {
+                     ("world/track.paccd", AssociatedAssetCategory.PrefabMetadata),
+                     ("world/track.pampg", AssociatedAssetCategory.PrefabMetadata),
+                     ("world/mesh.pat", AssociatedAssetCategory.Model),
+                     ("shader/surface.material", AssociatedAssetCategory.Material),
+                     ("motion/walk.pai", AssociatedAssetCategory.AnimationMotion),
+                     ("props/crate.prefab_xml", AssociatedAssetCategory.PrefabMetadata),
+                 })
+        {
+            Require(byPath.TryGetValue(path, out var asset), $"{path} was not linked from the level that names it");
+            Require(
+                asset!.Evidence == AssociationEvidence.ExplicitReference,
+                $"{path} was linked without crediting the reference that names it");
+            Require(asset.Category == category, $"{path} was grouped as {asset.Category} instead of {category}");
+        }
+
+        foreach (var decoy in new[] { "world/track.pac", "world/track.pam", "props/crate.prefab" })
+        {
+            // The decoy has to be in the archive, or its absence from the result proves nothing.
+            var decoyPage = await query.QueryAsync(
+                new ArchiveQuerySpec(opened.SessionId, PathText: decoy),
+                1,
+                CancellationToken.None).ConfigureAwait(false);
+            Require(
+                decoyPage.Entries.Any(entry => entry.Path == decoy),
+                $"the {decoy} decoy is missing, so a clipped reference would go unnoticed");
+            Require(
+                !byPath.ContainsKey(decoy),
+                $"a reference was clipped to a shorter extension and resolved to {decoy}");
+        }
+
+        Require(
+            byPath.TryGetValue($"stream/{SyntheticArchiveFixture.SoundBankSourceId}.wem", out var streamed)
+            && streamed!.Category == AssociatedAssetCategory.AudioVideo,
+            "the sound a bank names by source id was not linked to the bank that carries it");
+
+        // Opening a companion first must not leave it showing a shallower family than the pass that
+        // discovered it: the mesh still resolves the level and the surface it shares a family with.
+        var mesh = byPath["world/mesh.pat"].Entry;
+        var reverse = await associations.FindAsync(
+            new FindAssociatedAssetsRequest(opened.SessionId, mesh.EntryId),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            reverse.Assets.Any(asset => asset.Entry.Path == "shader/surface.material"),
+            "a learned family answered for a companion instead of letting it resolve its own links");
+
+        Require(await Sha256Async(fixture.Paz).ConfigureAwait(false) == beforePaz, "vocabulary lookup changed PAZ bytes");
     }
 
     private static Task TestExportPathPolicyAsync()

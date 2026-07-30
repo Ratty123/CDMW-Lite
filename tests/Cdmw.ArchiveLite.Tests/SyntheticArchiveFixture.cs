@@ -103,6 +103,89 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
     }
 
     /// <summary>
+    /// A level that names files whose extensions the association vocabulary used to either clip to a
+    /// shorter format or not know at all. Every name it references has a decoy beside it that carries
+    /// the clipped extension, so resolving the wrong one is visible rather than merely unproven.
+    /// </summary>
+    public static async Task<SyntheticArchiveFixture> CreateAssociationVocabularyAsync()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-vocabulary-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var fixture = new SyntheticArchiveFixture(root);
+        Directory.CreateDirectory(Path.GetDirectoryName(fixture.Pamt)!);
+
+        var level = Encoding.UTF8.GetBytes(
+            "<level><collision path=\"world/track.paccd\" /><gimmick path=\"world/track.pampg\" />"
+            + "<mesh path=\"world/mesh.pat\" /><surface path=\"shader/surface.material\" />"
+            + "<motion path=\"motion/walk.pai\" /><prop path=\"props/crate.prefab_xml\" />"
+            + "<audio path=\"banks/music.bnk\" /></level>");
+        var payloads = new (string Path, byte[] Bytes)[]
+        {
+            ("world/city.palevel", level),
+
+            // The referenced files.
+            ("world/track.paccd", "collision"u8.ToArray()),
+            ("world/track.pampg", "gimmick"u8.ToArray()),
+            ("world/mesh.pat", "PAT mesh"u8.ToArray()),
+            ("shader/surface.material", "surface shader"u8.ToArray()),
+            ("motion/walk.pai", "motion"u8.ToArray()),
+            ("props/crate.prefab_xml", "<prefab />"u8.ToArray()),
+            ("banks/music.bnk", BuildSourceIdSoundBank(SoundBankSourceId)),
+            ($"stream/{SoundBankSourceId}.wem", "streamed sound"u8.ToArray()),
+
+            // The decoys: each is what a clipped extension would have resolved to instead.
+            ("world/track.pac", "decoy model"u8.ToArray()),
+            ("world/track.pam", "decoy model"u8.ToArray()),
+            ("props/crate.prefab", "decoy prefab"u8.ToArray()),
+        };
+
+        var entries = new List<EntrySpec>(payloads.Length);
+        uint offset = 0;
+        await using (var stream = new FileStream(fixture.Paz, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous))
+        {
+            foreach (var payload in payloads)
+            {
+                await stream.WriteAsync(payload.Bytes).ConfigureAwait(false);
+                entries.Add(new EntrySpec(
+                    payload.Path,
+                    offset,
+                    checked((uint)payload.Bytes.Length),
+                    checked((uint)payload.Bytes.Length),
+                    0));
+                offset = checked(offset + (uint)payload.Bytes.Length);
+            }
+            await stream.FlushAsync().ConfigureAwait(false);
+            stream.Flush(flushToDisk: true);
+        }
+        await File.WriteAllBytesAsync(fixture.Pamt, BuildPamt(entries)).ConfigureAwait(false);
+        return fixture;
+    }
+
+    /// <summary>The Wwise source id the synthetic bank lists and the streamed sound is named after.</summary>
+    public const uint SoundBankSourceId = 771294;
+
+    /// <summary>A bank whose DIDX table names one sound and whose DATA chunk carries it.</summary>
+    private static byte[] BuildSourceIdSoundBank(uint sourceId)
+    {
+        var sound = "synthetic sound payload"u8.ToArray();
+        using var bank = new MemoryStream();
+        bank.Write("BKHD"u8);
+        WriteUInt32(bank, 24);
+        WriteUInt32(bank, 0x8C);
+        WriteUInt32(bank, 0x12345678);
+        bank.Write(new byte[16]);
+        bank.Write("DIDX"u8);
+        WriteUInt32(bank, 12);
+        WriteUInt32(bank, sourceId);
+        WriteUInt32(bank, 0);
+        WriteUInt32(bank, checked((uint)sound.Length));
+        bank.Write("DATA"u8);
+        WriteUInt32(bank, checked((uint)sound.Length));
+        bank.Write(sound);
+        return bank.ToArray();
+    }
+
+    /// <summary>
     /// An archive whose only texture clears the preview resource guard and then fails inside the
     /// texture helper, so a real worker records and forwards a decode failure.
     /// </summary>

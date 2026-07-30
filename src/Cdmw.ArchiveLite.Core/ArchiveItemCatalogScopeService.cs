@@ -1,3 +1,4 @@
+using Cdmw.Archive.Content;
 using Cdmw.ArchiveLite.Contracts;
 
 namespace Cdmw.ArchiveLite.Core;
@@ -7,7 +8,20 @@ public sealed class ArchiveItemCatalogScopeService(
     ArchiveItemNameIndexService catalogueBuilder,
     ArchiveAssociationService associations)
 {
-    private static readonly string[] ModelExtensions = [".pac", ".pam", ".pamlod", ".pat", ".prefab", ".pact"];
+    /// <summary>
+    /// Every mesh format the capability manifest registers, plus the prefab that names one. Reading
+    /// the manifest keeps a model stem resolvable for a format the app already understands, and drops
+    /// the unregistered <c>.pact</c> this list used to probe for and could never find.
+    /// </summary>
+    private static readonly string[] ModelExtensions =
+    [
+        .. ArchiveContentRegistry.All
+            .Where(static capability => capability.Role == "model")
+            .Select(static capability => capability.Extension)
+            .Append(".prefab")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.Ordinal),
+    ];
 
     public async Task<ItemCatalogScopeResult> ResolveAsync(
         ItemCatalogScopeRequest request,
