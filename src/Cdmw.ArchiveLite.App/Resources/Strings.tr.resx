@@ -94,6 +94,8 @@
   <data name="ExportFiltered" xml:space="preserve"><value>Filtrelenenleri dışa aktar</value></data>
   <data name="ExportAssociatedSelected" xml:space="preserve"><value>Seçili varlığı dışa aktar</value></data>
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>Aileyi dışa aktar</value></data>
+  <data name="CopyFileName" xml:space="preserve"><value>Dosya adını kopyala</value></data>
+  <data name="CopiedFileName" xml:space="preserve"><value>{0} panoya kopyalandı.</value></data>
   <data name="Path" xml:space="preserve"><value>Yol</value></data>
   <data name="Name" xml:space="preserve"><value>Ad</value></data>
   <data name="ItemName" xml:space="preserve"><value>Eşya adı</value></data>

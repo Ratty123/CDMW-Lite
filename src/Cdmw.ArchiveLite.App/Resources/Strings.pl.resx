@@ -94,6 +94,8 @@
   <data name="ExportFiltered" xml:space="preserve"><value>Eksportuj filtrowane</value></data>
   <data name="ExportAssociatedSelected" xml:space="preserve"><value>Eksportuj wybrany zasób</value></data>
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>Eksportuj rodzinę</value></data>
+  <data name="CopyFileName" xml:space="preserve"><value>Kopiuj nazwę pliku</value></data>
+  <data name="CopiedFileName" xml:space="preserve"><value>Skopiowano {0} do schowka.</value></data>
   <data name="Path" xml:space="preserve"><value>Ścieżka</value></data>
   <data name="Name" xml:space="preserve"><value>Nazwa</value></data>
   <data name="ItemName" xml:space="preserve"><value>Nazwa przedmiotu</value></data>

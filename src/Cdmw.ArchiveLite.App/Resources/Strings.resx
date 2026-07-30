@@ -94,6 +94,8 @@
   <data name="ExportFiltered" xml:space="preserve"><value>Export filtered</value></data>
   <data name="ExportAssociatedSelected" xml:space="preserve"><value>Export selected asset</value></data>
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>Export family</value></data>
+  <data name="CopyFileName" xml:space="preserve"><value>Copy file name</value></data>
+  <data name="CopiedFileName" xml:space="preserve"><value>Copied {0} to the clipboard.</value></data>
   <data name="Path" xml:space="preserve"><value>Path</value></data>
   <data name="Name" xml:space="preserve"><value>Name</value></data>
   <data name="ItemName" xml:space="preserve"><value>Item name</value></data>

@@ -94,6 +94,8 @@
   <data name="ExportFiltered" xml:space="preserve"><value>絞り込み結果をエクスポート</value></data>
   <data name="ExportAssociatedSelected" xml:space="preserve"><value>選択したアセットをエクスポート</value></data>
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>ファミリーをエクスポート</value></data>
+  <data name="CopyFileName" xml:space="preserve"><value>ファイル名をコピー</value></data>
+  <data name="CopiedFileName" xml:space="preserve"><value>{0} をクリップボードにコピーしました。</value></data>
   <data name="Path" xml:space="preserve"><value>パス</value></data>
   <data name="Name" xml:space="preserve"><value>名前</value></data>
   <data name="ItemName" xml:space="preserve"><value>アイテム名</value></data>

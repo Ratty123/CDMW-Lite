@@ -94,6 +94,8 @@
   <data name="ExportFiltered" xml:space="preserve"><value>Экспорт отфильтрованных</value></data>
   <data name="ExportAssociatedSelected" xml:space="preserve"><value>Экспорт выбранного ресурса</value></data>
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>Экспорт семейства</value></data>
+  <data name="CopyFileName" xml:space="preserve"><value>Копировать имя файла</value></data>
+  <data name="CopiedFileName" xml:space="preserve"><value>{0} скопировано в буфер обмена.</value></data>
   <data name="Path" xml:space="preserve"><value>Путь</value></data>
   <data name="Name" xml:space="preserve"><value>Имя</value></data>
   <data name="ItemName" xml:space="preserve"><value>Название предмета</value></data>

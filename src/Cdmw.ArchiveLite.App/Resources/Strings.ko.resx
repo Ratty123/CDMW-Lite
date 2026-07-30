@@ -94,6 +94,8 @@
   <data name="ExportFiltered" xml:space="preserve"><value>필터 결과 내보내기</value></data>
   <data name="ExportAssociatedSelected" xml:space="preserve"><value>선택한 애셋 내보내기</value></data>
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>계열 내보내기</value></data>
+  <data name="CopyFileName" xml:space="preserve"><value>파일 이름 복사</value></data>
+  <data name="CopiedFileName" xml:space="preserve"><value>{0}을(를) 클립보드에 복사했습니다.</value></data>
   <data name="Path" xml:space="preserve"><value>경로</value></data>
   <data name="Name" xml:space="preserve"><value>이름</value></data>
   <data name="ItemName" xml:space="preserve"><value>아이템 이름</value></data>

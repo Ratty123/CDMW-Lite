@@ -94,6 +94,8 @@
   <data name="ExportFiltered" xml:space="preserve"><value>导出筛选结果</value></data>
   <data name="ExportAssociatedSelected" xml:space="preserve"><value>导出所选资源</value></data>
   <data name="ExportAssociatedFamily" xml:space="preserve"><value>导出资源系列</value></data>
+  <data name="CopyFileName" xml:space="preserve"><value>复制文件名</value></data>
+  <data name="CopiedFileName" xml:space="preserve"><value>已将 {0} 复制到剪贴板。</value></data>
   <data name="Path" xml:space="preserve"><value>路径</value></data>
   <data name="Name" xml:space="preserve"><value>名称</value></data>
   <data name="ItemName" xml:space="preserve"><value>物品名称</value></data>
