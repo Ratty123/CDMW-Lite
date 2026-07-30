@@ -5396,6 +5396,42 @@ internal static class ArchiveLiteTestRunner
         Require(
             rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "unrelated"]),
             "closing a folder left the rows it had revealed behind");
+
+        // A row left over from a superseded load gets an empty level back rather than a fetch,
+        // because the generation its context captured is no longer the current one. Such a row must
+        // not end up permanently unopenable: the stand-in goes back and the next click tries again.
+        var supersededLevels = 0;
+        var superseded = new ArchiveFolderTreeContext(
+            _ =>
+            {
+                supersededLevels++;
+                return Task.FromResult<IReadOnlyList<ArchiveFolderNode>>([]);
+            },
+            _ => Task.FromResult<IReadOnlyList<ArchiveEntryDto>>([]),
+            _ => { },
+            _ => { },
+            includesFiles: true);
+        var stale = new ArchiveEntryTreeRows();
+        stale.Reset([ArchiveFolderNodeViewModel.Create(superseded, Folder("character", true, 7))]);
+        var staleRoot = stale.Rows[0];
+
+        staleRoot.IsExpanded = true;
+        for (var attempt = 0; attempt < 50 && stale.Rows.Count > 1; attempt++)
+        {
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+        Require(supersededLevels == 1, "a superseded row did not ask for its level at all");
+        Require(
+            stale.Rows.Count == 2 && stale.Rows[1].IsPlaceholder,
+            "a row whose level came back empty was left open and showing nothing");
+
+        staleRoot.IsExpanded = false;
+        staleRoot.IsExpanded = true;
+        for (var attempt = 0; attempt < 50 && supersededLevels < 2; attempt++)
+        {
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+        Require(supersededLevels == 2, "a row that came back empty never tried again, so it was dead for good");
     }
 
     /// <summary>
@@ -5468,6 +5504,27 @@ internal static class ArchiveLiteTestRunner
             Require(
                 browser.ShowEntryTree && !browser.ShowEntryGrid && !browser.ShowFolderNavigator,
                 "the tree view did not replace the entry grid, or kept a second folder pane beside it");
+
+            // The rows the tree view shows must not outlive the roots they came from. A row left over
+            // from a replaced load has a superseded generation behind it, so every level it asks for
+            // comes back empty and it opens onto nothing - which is what starting a load discards it
+            // for. Replacing the roots is what every load does first, so the rows follow them.
+            var context = new ArchiveFolderTreeContext(
+                _ => Task.FromResult<IReadOnlyList<ArchiveFolderNode>>([]),
+                _ => Task.FromResult<IReadOnlyList<ArchiveEntryDto>>([]),
+                _ => { },
+                _ => { },
+                includesFiles: true);
+            browser.FolderTree.Add(ArchiveFolderNodeViewModel.Create(
+                context,
+                new ArchiveFolderNode("character", "character", 0, 7, true, [])));
+            Require(
+                browser.EntryTreeRows.Count == 1 && browser.EntryTreeRows[0].Name == "character",
+                "the tree view's rows do not follow the roots they are built from");
+            browser.FolderTree.Clear();
+            Require(
+                browser.EntryTreeRows.Count == 0,
+                "rows outlived the roots they came from, so a replaced load leaves rows that open onto nothing");
             return Task.CompletedTask;
         });
 

@@ -200,6 +200,11 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         MostCommonExtensionChoices.Add(ArchiveExtensionChoice.AllFiles(LocalizationManager.Get("AllFiles"), LocalizationManager.Get("ExtensionGroupAll")));
         ExtensionChoicesView = CollectionViewSource.GetDefaultView(ExtensionChoices);
         ExtensionChoicesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ArchiveExtensionChoice.Group)));
+        // The flattened rows follow the roots rather than being cleared alongside them by hand. A row
+        // that outlives the load it came from is a row whose every request is answered by a
+        // superseded generation, so it opens onto nothing; making that impossible by construction
+        // beats remembering to clear two collections at each of the places one of them is replaced.
+        FolderTree.CollectionChanged += (_, _) => RebuildEntryTreeRows();
     }
 
     public ObservableCollection<ArchiveEntryDto> Entries { get; } = [];
@@ -2070,7 +2075,6 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         _folderTreeContext = null;
         IsFolderTreeBusy = false;
         FolderTree.Clear();
-        _entryTreeRows.Clear();
     }
 
     private async Task LoadPreviewLatestAsync(ArchiveEntryDto? entry)
