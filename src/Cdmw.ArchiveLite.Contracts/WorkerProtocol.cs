@@ -16,6 +16,7 @@ public static class WorkerProtocol
     public const string InspectArchiveCache = "inspect_archive_cache";
     public const string QueryArchive = "query_archive";
     public const string ArchiveFacets = "archive_facets";
+    public const string ArchiveFolderTree = "archive_folder_tree";
     public const string BuildNameIndex = "build_name_index";
     public const string SearchItemCatalog = "search_item_catalog";
     public const string LoadItemIcons = "load_item_icons";

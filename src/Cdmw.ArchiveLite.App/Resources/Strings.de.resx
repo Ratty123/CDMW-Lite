@@ -129,6 +129,8 @@
   <data name="SortBy" xml:space="preserve"><value>Sortieren nach</value></data>
   <data name="Descending" xml:space="preserve"><value>Absteigend</value></data>
   <data name="Folders" xml:space="preserve"><value>Ordner</value></data>
+  <data name="FolderTreeLoading" xml:space="preserve"><value>Ordner werden geladen...</value></data>
+  <data name="FolderTreeTruncated" xml:space="preserve"><value>Es werden die ersten {0} Ordner dieser Ebene angezeigt.</value></data>
   <data name="Categories" xml:space="preserve"><value>Kategorien</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>Zurück</value></data>
   <data name="NextPage" xml:space="preserve"><value>Weiter</value></data>

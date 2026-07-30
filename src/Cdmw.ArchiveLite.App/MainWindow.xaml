@@ -466,9 +466,22 @@
 
                                 <GroupBox Header="{infra:Loc Key=Folders}"
                                           Visibility="{Binding ArchiveBrowser.ShowFolderNavigator, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <ListBox MaxHeight="180"
-                                             ItemsSource="{Binding ArchiveBrowser.Folders}"
-                                             SelectedItem="{Binding ArchiveBrowser.SelectedFolder}" />
+                                    <TreeView x:Name="ArchiveFolderTree"
+                                              MaxHeight="320"
+                                              ItemsSource="{Binding ArchiveBrowser.FolderTree}"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                        <TreeView.ItemContainerStyle>
+                                            <Style TargetType="TreeViewItem">
+                                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                                            </Style>
+                                        </TreeView.ItemContainerStyle>
+                                        <TreeView.ItemTemplate>
+                                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                                <TextBlock Text="{Binding Label}" ToolTip="{Binding Path}" />
+                                            </HierarchicalDataTemplate>
+                                        </TreeView.ItemTemplate>
+                                    </TreeView>
                                 </GroupBox>
 
                                 <GroupBox Header="{infra:Loc Key=Categories}"

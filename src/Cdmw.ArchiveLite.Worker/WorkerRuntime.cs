@@ -13,6 +13,7 @@ internal sealed class WorkerRuntime : IDisposable
     private readonly ArchiveCacheHealthService _cacheHealth;
     private readonly GameInstallDiscoveryService _gameDiscovery;
     private readonly ArchiveFacetsService _facets;
+    private readonly ArchiveFolderTreeService _folderTree;
     private readonly ArchiveItemNameIndexService _nameIndex;
     private readonly ArchiveItemCatalogService _itemCatalog;
     private readonly ArchiveItemIconService _itemIcons;
@@ -53,6 +54,7 @@ internal sealed class WorkerRuntime : IDisposable
         _cacheHealth = new ArchiveCacheHealthService();
         _gameDiscovery = new GameInstallDiscoveryService();
         _facets = new ArchiveFacetsService(_sessions);
+        _folderTree = new ArchiveFolderTreeService(_sessions);
         _nameIndex = new ArchiveItemNameIndexService(_sessions, _native, _workPriority);
         _itemCatalog = new ArchiveItemCatalogService(_sessions, _nameIndex);
         _associations = new ArchiveAssociationService(_sessions, _native);
@@ -107,6 +109,12 @@ internal sealed class WorkerRuntime : IDisposable
                 {
                     var payload = RequirePayload<ArchiveFacetsRequest>(request);
                     var result = await _facets.LoadAsync(payload, publishProgress, cancellationToken).ConfigureAwait(false);
+                    return WorkerProtocol.Response(request, WorkerMessageStatus.Result, result);
+                }
+            case WorkerProtocol.ArchiveFolderTree:
+                {
+                    var payload = RequirePayload<ArchiveFolderTreeRequest>(request);
+                    var result = await _folderTree.LoadAsync(payload, publishProgress, cancellationToken).ConfigureAwait(false);
                     return WorkerProtocol.Response(request, WorkerMessageStatus.Result, result);
                 }
             case WorkerProtocol.BuildNameIndex:

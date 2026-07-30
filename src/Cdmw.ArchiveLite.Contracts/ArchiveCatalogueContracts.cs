@@ -22,6 +22,35 @@ public enum ArchiveExtensionCategory
     Other,
 }
 
+/// <summary>
+/// Asks for the direct children of one archive folder. The navigator expands a level at a time so a
+/// deep archive never has to fit its whole directory structure inside one protocol message.
+/// </summary>
+public sealed record ArchiveFolderTreeRequest(
+    string SessionId,
+    string? Path = null,
+    int Depth = 1);
+
+public sealed record ArchiveFolderTreeResult(
+    string SessionId,
+    string? Path,
+    long DirectCount,
+    long TotalCount,
+    IReadOnlyList<ArchiveFolderNode> Nodes,
+    bool Truncated = false);
+
+/// <summary>
+/// One folder in the archive. <paramref name="DirectCount"/> counts the files stored in the folder
+/// itself; <paramref name="TotalCount"/> counts every file at or below it.
+/// </summary>
+public sealed record ArchiveFolderNode(
+    string Name,
+    string Path,
+    long DirectCount,
+    long TotalCount,
+    bool HasChildren,
+    IReadOnlyList<ArchiveFolderNode> Children);
+
 public sealed record BuildNameIndexRequest(string SessionId);
 
 public sealed record BuildNameIndexResult(

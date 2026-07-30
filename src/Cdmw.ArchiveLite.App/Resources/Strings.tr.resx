@@ -137,6 +137,8 @@
   <data name="SortBy" xml:space="preserve"><value>Sıralama ölçütü</value></data>
   <data name="Descending" xml:space="preserve"><value>Azalan</value></data>
   <data name="Folders" xml:space="preserve"><value>Klasörler</value></data>
+  <data name="FolderTreeLoading" xml:space="preserve"><value>Klasörler yükleniyor...</value></data>
+  <data name="FolderTreeTruncated" xml:space="preserve"><value>Bu düzeydeki ilk {0} klasör gösteriliyor.</value></data>
   <data name="Categories" xml:space="preserve"><value>Kategoriler</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>Önceki</value></data>
   <data name="NextPage" xml:space="preserve"><value>Sonraki</value></data>
