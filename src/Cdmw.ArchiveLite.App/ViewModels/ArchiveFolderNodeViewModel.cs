@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Windows;
 using Cdmw.ArchiveLite.App.Infrastructure;
 using Cdmw.ArchiveLite.App.Services;
 using Cdmw.ArchiveLite.Contracts;
@@ -24,9 +25,11 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         string path,
         long directCount,
         long totalCount,
-        bool hasChildren)
+        bool hasChildren,
+        int depth = 0)
     {
         _context = context;
+        Depth = depth;
         Name = name;
         Path = path;
         DirectCount = directCount;
@@ -43,9 +46,10 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
     }
 
     /// <summary>Creates the row for one archive entry inside a folder.</summary>
-    private ArchiveFolderNodeViewModel(ArchiveFolderTreeContext context, ArchiveEntryDto entry)
+    private ArchiveFolderNodeViewModel(ArchiveFolderTreeContext context, ArchiveEntryDto entry, int depth)
     {
         _context = context;
+        Depth = depth;
         Entry = entry;
         Name = entry.Name;
         Path = entry.Path;
@@ -66,6 +70,19 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
     public bool HasChildren { get; }
     public bool IsPlaceholder { get; }
 
+    /// <summary>How deep this row sits, which is the indent the flattened tree grid draws it at.</summary>
+    public int Depth { get; }
+
+    public Thickness IndentMargin => new(Depth * 15, 0, 0, 0);
+
+    /// <summary>Files at or below a folder. Null on a file row, which leaves the cell blank.</summary>
+    public long? ItemCount => IsFile || IsPlaceholder ? null : TotalCount;
+
+    /// <summary>The per-file columns, all null on a folder row so its cells stay empty.</summary>
+    public ArchiveEntryFileType? FileType => Entry?.FileType;
+    public long? Size => Entry?.OriginalSize;
+    public string PackageName => Entry?.Package ?? string.Empty;
+
     /// <summary>The archive entry this row stands for, or null when the row is a folder.</summary>
     public ArchiveEntryDto? Entry { get; }
 
@@ -81,13 +98,34 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         get => _isExpanded;
         set
         {
-            if (!SetProperty(ref _isExpanded, value) || !value || _childrenRequested || _context is null || IsFile)
+            if (!SetProperty(ref _isExpanded, value))
+            {
+                return;
+            }
+            if (!value || _childrenRequested || _context is null || IsFile)
             {
                 return;
             }
 
             _childrenRequested = true;
             _ = LoadChildrenAsync();
+        }
+    }
+
+    /// <summary>Every row visible below this one: its children when open, and theirs in turn.</summary>
+    public IEnumerable<ArchiveFolderNodeViewModel> VisibleDescendants()
+    {
+        if (!IsExpanded)
+        {
+            yield break;
+        }
+        foreach (var child in Children)
+        {
+            yield return child;
+            foreach (var descendant in child.VisibleDescendants())
+            {
+                yield return descendant;
+            }
         }
     }
 
@@ -131,13 +169,13 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
             Children.Clear();
             foreach (var folder in folders)
             {
-                Children.Add(Create(_context, folder));
+                Children.Add(Create(_context, folder, Depth + 1));
             }
             // Folders first, then the folder's own files, so a level reads the way a file manager
             // presents one rather than interleaving the two by name.
             foreach (var file in files)
             {
-                Children.Add(new ArchiveFolderNodeViewModel(_context, file));
+                Children.Add(new ArchiveFolderNodeViewModel(_context, file, Depth + 1));
             }
         }
         catch (OperationCanceledException)
@@ -153,7 +191,7 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
         }
     }
 
-    public static ArchiveFolderNodeViewModel Create(ArchiveFolderTreeContext context, ArchiveFolderNode node)
+    public static ArchiveFolderNodeViewModel Create(ArchiveFolderTreeContext context, ArchiveFolderNode node, int depth = 0)
     {
         var created = new ArchiveFolderNodeViewModel(
             context,
@@ -161,21 +199,22 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
             node.Path,
             node.DirectCount,
             node.TotalCount,
-            node.HasChildren);
+            node.HasChildren,
+            depth);
         if (node.Children.Count > 0)
         {
             created.Children.Clear();
             created._childrenRequested = true;
             foreach (var child in node.Children)
             {
-                created.Children.Add(Create(context, child));
+                created.Children.Add(Create(context, child, depth + 1));
             }
         }
         return created;
     }
 
     public static ArchiveFolderNodeViewModel CreateFile(ArchiveFolderTreeContext context, ArchiveEntryDto entry) =>
-        new(context, entry);
+        new(context, entry, 0);
 
     /// <summary>Creates the row that releases the folder filter, shown above the top-level folders.</summary>
     public static ArchiveFolderNodeViewModel CreateAllFolders(ArchiveFolderTreeContext context) =>

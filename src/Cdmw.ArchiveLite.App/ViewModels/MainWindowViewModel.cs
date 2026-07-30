@@ -83,6 +83,8 @@ public sealed class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<string>? ArchiveVisibleColumns => _settings.ArchiveVisibleColumns;
 
+    public IReadOnlyList<string>? ArchiveTreeVisibleColumns => _settings.ArchiveTreeVisibleColumns;
+
     public bool ArchiveColumnDefaultsAreStale =>
         _settings.ArchiveColumnDefaultsRevision < ArchiveColumnDefaults.Revision;
 
@@ -103,6 +105,17 @@ public sealed class MainWindowViewModel : ObservableObject
                 .Distinct(StringComparer.Ordinal)
                 .ToArray(),
             ArchiveColumnDefaultsRevision = ArchiveColumnDefaults.Revision,
+        };
+    }
+
+    public void SetArchiveTreeVisibleColumns(IEnumerable<string> columns)
+    {
+        _settings = _settings with
+        {
+            ArchiveTreeVisibleColumns = columns
+                .Where(static column => !string.IsNullOrWhiteSpace(column))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray(),
         };
     }
 

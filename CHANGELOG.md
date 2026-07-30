@@ -6,7 +6,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Added
 
-- `View` offers a `Tree` mode in which the entry list is itself the archive's tree: folders open onto their own files, and selecting one previews it as a grid row does. It is the whole list rather than a companion to it, so that mode shows no separate Folders pane.
+- `View` offers a `Tree` mode in which the entry list is itself the archive's tree: folders open onto their own files, and selecting one previews it as a grid row does. It is the whole list rather than a companion to it, so that mode shows no separate Folders pane. It carries columns of its own — the number of files below a folder, and the type, size and package of a file — behind its own `Columns` button, because a row there can be a folder and the flat list's columns mostly describe files. Both choices are remembered separately.
 - The Archive Browser has a Folders pane, a tree sitting between the filters and the file list with its own splitter, shown in the `Folders` view and replacing the flat list of every directory in the current result that used to sit inside the filter column. Each folder carries the number of files at or below it, so the shape of an archive is readable at a glance — `character (419,660)` above `motion (314,816)` — and a level is fetched only when it is expanded. The structure is derived once per archive from a single pass over its paths and then kept resident in the worker, so the first expansion pays for that pass and every later one is a lookup. Selecting a folder filters the list to it; right-clicking one exports that folder and everything beneath it with its structure preserved. The pane's width is remembered between runs, and the folder picker in Filters is unchanged and remains the way back to all folders.
 
 ### Changed
@@ -20,6 +20,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- Turning the category navigator on fills it straight away instead of leaving `All (0)` until the next search. Whether the counts are gathered is decided when a query runs, so switching the navigator on now runs one.
 - Context menus are no longer drawn in Windows' default light colours. A menu opens in a popup window of its own and so takes none of the shell's chrome with it; it now carries the theme's own surface, border and hover colours, and a disabled entry reads as disabled instead of merely pale.
 - The file list's `Name` column sizes itself to the names on the page in front of you, and `Path` takes the width left over, so names are no longer clipped at a fixed 170 pixels and no empty strip is left past the last column. A column the design sizes to its content or to the remaining width now keeps doing so; a stored pixel width from an earlier session no longer overrides it. The column is also re-measured as each page arrives, because a self-sizing column otherwise only ever grows and one long name early on would leave it oversized for every page after.
 - Starting in the flat view no longer leaves a gap between the filters and the file list. The folder pane is hidden there, but its column kept the width it would have had, and on a first run with nothing saved the layout pass that collapses it never ran at all.
