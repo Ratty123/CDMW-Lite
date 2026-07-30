@@ -670,6 +670,7 @@
                                           CanUserResizeColumns="True"
                                           MinColumnWidth="48"
                                           AlternationCount="2"
+                                          VirtualizingPanel.VirtualizationMode="Standard"
                                           Visibility="{Binding ArchiveBrowser.ShowEntryTree, Converter={StaticResource BooleanToVisibilityConverter}}"
                                           SelectionChanged="OnArchiveEntryTreeSelectionChanged"
                                           PreviewMouseRightButtonDown="OnArchiveEntryTreeRightButtonDown"

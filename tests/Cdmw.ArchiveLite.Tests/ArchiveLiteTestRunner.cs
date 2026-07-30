@@ -62,6 +62,7 @@ internal static class ArchiveLiteTestRunner
             ("UTF-8, UTF-16, and Latin-1 text decode without Python codecs", TestTextDecodingAsync),
             ("native archive ABI scans and decodes synthetic PAMT/PAZ", TestNativeArchiveAsync),
             ("archive query, preview, and text search are read-only", TestArchiveServicesAsync),
+            ("opening a folder in the tree view reveals the level below it", TestEntryTreeRowsAsync),
             ("the category navigator owns the whole life of the role filter", TestCategoryNavigatorOwnsRoleFilterAsync),
             ("category facets stay complete under a role filter", TestCategoryFacetsIgnoreRoleFilterAsync),
             ("the folder tree counts descendants and expands one level at a time", TestArchiveFolderTreeAsync),
@@ -5329,6 +5330,72 @@ internal static class ArchiveLiteTestRunner
         var partialDds = native.Decode(entries.Single(entry => entry.Path == "texture/test.dds"));
         Require(partialDds.Bytes.Length == 0x88 && partialDds.Bytes.AsSpan(0, 4).SequenceEqual("DDS "u8), "managed PATHC DDS decode failed");
         Require(partialDds.Note == "PartialDDS+PATHC", "managed PATHC DDS diagnostic note is missing");
+    }
+
+    /// <summary>
+    /// The tree view is a grid of the tree flattened to rows, so opening a folder has to splice the
+    /// level below it into those rows. This drives that directly, with the worker replaced by a
+    /// canned level, because it is the piece that decides whether the tree opens at all.
+    /// </summary>
+    private static async Task TestEntryTreeRowsAsync()
+    {
+        static ArchiveFolderNode Folder(string name, bool hasChildren, long total) =>
+            new(name, name, 0, total, hasChildren, []);
+
+        var levels = new Dictionary<string, IReadOnlyList<ArchiveFolderNode>>(StringComparer.Ordinal)
+        {
+            [string.Empty] = [Folder("character", true, 7), Folder("unrelated", false, 1)],
+            ["character"] = [new ArchiveFolderNode("model", "character/model", 3, 3, false, [])],
+        };
+        var files = new Dictionary<string, IReadOnlyList<ArchiveEntryDto>>(StringComparer.Ordinal)
+        {
+            ["character/model"] = [CreateArchiveEntry("character/model/hero.pac")],
+        };
+
+        var rows = new ArchiveEntryTreeRows();
+        var context = new ArchiveFolderTreeContext(
+            path => Task.FromResult(levels.TryGetValue(path, out var level) ? level : []),
+            path => Task.FromResult(files.TryGetValue(path, out var found) ? found : []),
+            _ => { },
+            _ => { },
+            includesFiles: true);
+
+        rows.Reset(levels[string.Empty].Select(node => ArchiveFolderNodeViewModel.Create(context, node)));
+        Require(
+            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "unrelated"]),
+            "the flattened tree did not start at its top level");
+
+        var character = rows.Rows[0];
+        character.IsExpanded = true;
+        // A row appears the moment the folder opens - the stand-in while the level is being fetched,
+        // or the level itself when it was already to hand.
+        Require(rows.Rows.Count == 3, "opening a folder showed nothing at all below it");
+
+        // The level arrives on its own continuation, so let the load that opening started finish.
+        for (var attempt = 0; attempt < 50 && rows.Rows[1].IsPlaceholder; attempt++)
+        {
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+        Require(
+            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "model", "unrelated"]),
+            "opening a folder never replaced its placeholder with the level below it");
+        Require(rows.Rows[1].Depth == 1, "a revealed row is not indented under the folder that revealed it");
+
+        var model = rows.Rows[1];
+        model.IsExpanded = true;
+        for (var attempt = 0; attempt < 50 && rows.Rows.Count != 4; attempt++)
+        {
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+        Require(
+            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "model", "hero.pac", "unrelated"]),
+            "opening a folder did not reveal the files it holds");
+        Require(rows.Rows[2].Depth == 2, "a file is not indented under its folder");
+
+        character.IsExpanded = false;
+        Require(
+            rows.Rows.Select(static row => row.Name).SequenceEqual(["character", "unrelated"]),
+            "closing a folder left the rows it had revealed behind");
     }
 
     /// <summary>
