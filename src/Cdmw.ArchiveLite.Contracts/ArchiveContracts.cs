@@ -144,6 +144,11 @@ public sealed record ArchiveQuerySpec(
     /// the sorted index without visiting every entry, and that shortcut cannot count anything.
     /// </summary>
     bool IncludeCategoryFacets = false,
+    /// <summary>
+    /// Whether this scan should also derive the folder tree. The tree covers the same entries under
+    /// the same filters, so deriving it here spares the archive a second pass to build it alone.
+    /// </summary>
+    bool IncludeFolderTree = false,
     ArchiveSortField SortField = ArchiveSortField.Path,
     bool SortDescending = false,
     int PageStart = 0,

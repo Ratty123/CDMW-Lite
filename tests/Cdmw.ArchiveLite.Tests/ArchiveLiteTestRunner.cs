@@ -5636,6 +5636,36 @@ internal static class ArchiveLiteTestRunner
             null,
             CancellationToken.None).ConfigureAwait(false);
         Require(again.TotalCount == 8, "the unfiltered folder tree did not survive a filtered one");
+
+        // A query can derive the tree as it scans, which is what spares the archive a second pass.
+        // What it leaves behind has to be the same tree the standalone build produces, or the saving
+        // would be paid for in a tree that quietly disagrees with the one it replaced.
+        await using var second = await SyntheticArchiveFixture.CreateAssociatedAssetsAsync().ConfigureAwait(false);
+        using var pairedSessions = new ArchiveSessionManager(new NativeArchiveCore());
+        var paired = await pairedSessions.OpenAsync(
+            new OpenArchiveRequest(second.Root, true),
+            CancellationToken.None).ConfigureAwait(false);
+        var pairedTrees = new ArchiveFolderTreeService(pairedSessions);
+        await new ArchiveQueryService(pairedSessions).QueryAsync(
+            new ArchiveQuerySpec(
+                paired.SessionId,
+                Extensions: [".dds"],
+                Folder: "character/texture",
+                ViewMode: ArchiveViewMode.Folders,
+                IncludeFolderTree: true),
+            1,
+            CancellationToken.None).ConfigureAwait(false);
+        var derived = await pairedTrees.LoadAsync(
+            new ArchiveFolderTreeRequest(paired.SessionId, Filter: new ArchiveEntryFilter(Extensions: [".dds"])),
+            update => throw new InvalidOperationException("the query's tree was rebuilt instead of reused"),
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            derived.TotalCount == filtered.TotalCount
+            && derived.Nodes.Select(static node => node.Name).SequenceEqual(filtered.Nodes.Select(static node => node.Name)),
+            "the tree a query derived is not the tree the standalone build produces");
+        Require(
+            derived.Nodes.Single(static node => node.Name == "character").TotalCount == 2,
+            "the query's tree applied the folder filter that the tree is how you choose");
     }
 
     private static async Task TestArchiveServicesAsync()

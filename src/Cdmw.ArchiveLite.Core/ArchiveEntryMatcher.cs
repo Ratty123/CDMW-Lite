@@ -12,16 +12,27 @@ public static class ArchiveEntryMatcher
     public static bool Matches(ArchiveEntryDto entry, ArchiveEntryFilter filter) =>
         MatchesExceptRole(entry, filter) && MatchesRole(entry, filter);
 
-    public static bool MatchesExceptRole(ArchiveEntryDto entry, ArchiveEntryFilter filter)
+    public static bool MatchesExceptRole(ArchiveEntryDto entry, ArchiveEntryFilter filter) =>
+        MatchesExceptRoleAndFolder(entry, filter) && MatchesFolder(entry, filter);
+
+    /// <summary>
+    /// Everything but the role and the folder. The folder is separate because the folder tree is how
+    /// a folder is chosen and so narrows itself by everything except that, while the entry list
+    /// narrows itself by all of it - and both want the answer from one pass over the archive.
+    /// </summary>
+    public static bool MatchesExceptRoleAndFolder(ArchiveEntryDto entry, ArchiveEntryFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
         if (!MatchesPath(entry, filter.PathText)) return false;
         if (filter.Extensions is { Count: > 0 } && !filter.Extensions.Any(value => MatchesExtension(entry.Extension, value))) return false;
         if (!string.IsNullOrWhiteSpace(filter.Package) && !entry.Package.Contains(filter.Package, StringComparison.OrdinalIgnoreCase)) return false;
-        if (!string.IsNullOrWhiteSpace(filter.Folder) && !entry.Path.StartsWith(filter.Folder.Trim().Replace('\\', '/').Trim('/') + "/", StringComparison.OrdinalIgnoreCase)) return false;
         if (filter.MinimumSize is { } minimum && entry.OriginalSize < minimum) return false;
         return !filter.PreviewableOnly || entry.IsPreviewable;
     }
+
+    public static bool MatchesFolder(ArchiveEntryDto entry, ArchiveEntryFilter filter) =>
+        string.IsNullOrWhiteSpace(filter.Folder)
+        || entry.Path.StartsWith(filter.Folder.Trim().Replace('\\', '/').Trim('/') + "/", StringComparison.OrdinalIgnoreCase);
 
     public static bool MatchesRole(ArchiveEntryDto entry, ArchiveEntryFilter filter) =>
         filter.Roles is not { Count: > 0 } || filter.Roles.Contains(entry.Role);

@@ -92,6 +92,8 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
         var descendingPath = query.SortField == ArchiveSortField.Path && query.SortDescending;
         var usesExtensionIndex = session.ExtensionIndex.TryGetEntryIds(query.Extensions, out var extensionEntryIds);
         var candidateCount = usesExtensionIndex ? extensionEntryIds.Count : session.Index.EntryCount;
+        var filter = FilterOf(query);
+        var treeRoot = query.IncludeFolderTree ? ArchiveFolderTreeService.CreateRoot() : null;
         for (long position = 0; position < candidateCount; position++)
         {
             if ((position & 0xFF) == 0) cancellationToken.ThrowIfCancellationRequested();
@@ -102,13 +104,21 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
             {
                 entry = session.EnrichEntry(entry);
             }
-            if (!MatchesExceptRole(entry, query, entryIds: null)) continue;
+            if (!ArchiveEntryMatcher.MatchesExceptRoleAndFolder(entry, filter)) continue;
+            var matchesRole = ArchiveEntryMatcher.MatchesRole(entry, filter);
+            // The tree is how a folder gets chosen, so it is built from everything the folder filter
+            // has not been applied to. Deriving it here is what spares the archive a second pass.
+            if (treeRoot is not null && matchesRole)
+            {
+                ArchiveFolderTreeService.Add(treeRoot, entry.Path, entryId);
+            }
+            if (!ArchiveEntryMatcher.MatchesFolder(entry, filter)) continue;
             // The category navigator selects the role filter, so counting it under that same filter
             // would collapse the list to whichever role is already selected and leave no way back.
             // A facet dimension is counted against every other filter but never against itself.
             var category = entry.Role.ToString();
             categories[category] = categories.GetValueOrDefault(category) + 1;
-            if (!MatchesRole(entry, query)) continue;
+            if (!matchesRole) continue;
             total++;
             var folder = Path.GetDirectoryName(entry.Path.Replace('/', Path.DirectorySeparatorChar))?.Replace('\\', '/');
             if (!string.IsNullOrEmpty(folder) && folders.Count < 10_000) folders.Add(folder);
@@ -137,6 +147,12 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
         for (var index = 0; index < page.Count; index++)
         {
             page[index] = session.EnrichEntry(page[index]);
+        }
+        if (treeRoot is not null)
+        {
+            // Under the key the tree itself would use, so the request that follows finds it resident
+            // rather than scanning the archive again for the answer this scan already has.
+            session.SetFolderTree((filter with { Folder = null }).CacheKey, new ArchiveFolderTree(treeRoot));
         }
         session.StoreQuery(query, generation, total);
         return new ArchivePageResult(
