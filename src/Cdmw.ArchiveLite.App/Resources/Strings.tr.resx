@@ -114,6 +114,7 @@
   <data name="ShowAllColumns" xml:space="preserve"><value>Tüm sütunları göster</value></data>
   <data name="Preview" xml:space="preserve"><value>Önizleme</value></data>
   <data name="PreviewEmpty" xml:space="preserve"><value>Önizlemek için bir dosya seçin.</value></data>
+  <data name="PreviewBankSounds" xml:space="preserve"><value>Bu bankadaki sesler</value></data>
   <data name="SearchSource" xml:space="preserve"><value>Arama kaynağı</value></data>
   <data name="Archive" xml:space="preserve"><value>Arşiv</value></data>
   <data name="LooseFolder" xml:space="preserve"><value>Serbest klasör</value></data>

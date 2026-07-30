@@ -114,6 +114,7 @@
   <data name="ShowAllColumns" xml:space="preserve"><value>显示所有列</value></data>
   <data name="Preview" xml:space="preserve"><value>预览</value></data>
   <data name="PreviewEmpty" xml:space="preserve"><value>选择一个文件以进行预览。</value></data>
+  <data name="PreviewBankSounds" xml:space="preserve"><value>此音频库中的声音</value></data>
   <data name="SearchSource" xml:space="preserve"><value>搜索来源</value></data>
   <data name="Archive" xml:space="preserve"><value>档案</value></data>
   <data name="LooseFolder" xml:space="preserve"><value>普通文件夹</value></data>

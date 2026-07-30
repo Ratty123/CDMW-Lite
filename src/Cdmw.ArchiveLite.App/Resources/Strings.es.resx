@@ -105,6 +105,7 @@
   <data name="Package" xml:space="preserve"><value>Paquete</value></data>
   <data name="Preview" xml:space="preserve"><value>Vista previa</value></data>
   <data name="PreviewEmpty" xml:space="preserve"><value>Seleccione un archivo para previsualizarlo.</value></data>
+  <data name="PreviewBankSounds" xml:space="preserve"><value>Sonidos de este banco</value></data>
   <data name="SearchSource" xml:space="preserve"><value>Origen de búsqueda</value></data>
   <data name="Archive" xml:space="preserve"><value>Archivo</value></data>
   <data name="LooseFolder" xml:space="preserve"><value>Carpeta suelta</value></data>
