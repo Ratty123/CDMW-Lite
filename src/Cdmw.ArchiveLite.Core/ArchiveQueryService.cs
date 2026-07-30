@@ -102,12 +102,16 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
             {
                 entry = session.EnrichEntry(entry);
             }
-            if (!Matches(entry, query, entryIds: null)) continue;
+            if (!MatchesExceptRole(entry, query, entryIds: null)) continue;
+            // The category navigator selects the role filter, so counting it under that same filter
+            // would collapse the list to whichever role is already selected and leave no way back.
+            // A facet dimension is counted against every other filter but never against itself.
+            var category = entry.Role.ToString();
+            categories[category] = categories.GetValueOrDefault(category) + 1;
+            if (!MatchesRole(entry, query)) continue;
             total++;
             var folder = Path.GetDirectoryName(entry.Path.Replace('/', Path.DirectorySeparatorChar))?.Replace('\\', '/');
             if (!string.IsNullOrEmpty(folder) && folders.Count < 10_000) folders.Add(folder);
-            var category = entry.Role.ToString();
-            categories[category] = categories.GetValueOrDefault(category) + 1;
             if (candidates is not null)
             {
                 if (candidates.Count < candidateLimit)
@@ -162,15 +166,19 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
                 continue;
             }
             var entry = session.EnrichEntry(session.Index.ReadEntry(entryId));
-            if (!Matches(entry, query, entryIds: null))
+            if (!MatchesExceptRole(entry, query, entryIds: null))
+            {
+                continue;
+            }
+            var category = entry.Role.ToString();
+            categories[category] = categories.GetValueOrDefault(category) + 1;
+            if (!MatchesRole(entry, query))
             {
                 continue;
             }
             matches.Add(entry);
             var folder = Path.GetDirectoryName(entry.Path.Replace('/', Path.DirectorySeparatorChar))?.Replace('\\', '/');
             if (!string.IsNullOrEmpty(folder) && folders.Count < 10_000) folders.Add(folder);
-            var category = entry.Role.ToString();
-            categories[category] = categories.GetValueOrDefault(category) + 1;
         }
 
         matches.Sort(CreateComparer(query.SortField, query.SortDescending));
@@ -231,17 +239,22 @@ public sealed class ArchiveQueryService(ArchiveSessionManager sessions)
         !query.PreviewableOnly &&
         query.EntryIds is null;
 
-    private static bool Matches(ArchiveEntryDto entry, ArchiveQuerySpec query, IReadOnlySet<long>? entryIds)
+    private static bool Matches(ArchiveEntryDto entry, ArchiveQuerySpec query, IReadOnlySet<long>? entryIds) =>
+        MatchesExceptRole(entry, query, entryIds) && MatchesRole(entry, query);
+
+    private static bool MatchesExceptRole(ArchiveEntryDto entry, ArchiveQuerySpec query, IReadOnlySet<long>? entryIds)
     {
         if (entryIds is not null && !entryIds.Contains(entry.EntryId)) return false;
         if (!MatchesPath(entry, query.PathText)) return false;
         if (query.Extensions is { Count: > 0 } && !query.Extensions.Any(value => MatchesExtension(entry.Extension, value))) return false;
         if (!string.IsNullOrWhiteSpace(query.Package) && !entry.Package.Contains(query.Package, StringComparison.OrdinalIgnoreCase)) return false;
         if (!string.IsNullOrWhiteSpace(query.Folder) && !entry.Path.StartsWith(query.Folder.Trim().Replace('\\', '/').Trim('/') + "/", StringComparison.OrdinalIgnoreCase)) return false;
-        if (query.Roles is { Count: > 0 } && !query.Roles.Contains(entry.Role)) return false;
         if (query.MinimumSize is { } minimum && entry.OriginalSize < minimum) return false;
         return !query.PreviewableOnly || entry.IsPreviewable;
     }
+
+    private static bool MatchesRole(ArchiveEntryDto entry, ArchiveQuerySpec query) =>
+        query.Roles is not { Count: > 0 } || query.Roles.Contains(entry.Role);
 
     private static void ValidateScopedEntryIds(IReadOnlyList<long>? entryIds)
     {

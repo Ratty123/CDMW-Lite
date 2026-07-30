@@ -137,6 +137,8 @@
   <data name="SortBy" xml:space="preserve"><value>정렬 기준</value></data>
   <data name="Descending" xml:space="preserve"><value>내림차순</value></data>
   <data name="Folders" xml:space="preserve"><value>폴더</value></data>
+  <data name="FolderTreeLoading" xml:space="preserve"><value>폴더를 불러오는 중...</value></data>
+  <data name="FolderTreeTruncated" xml:space="preserve"><value>이 수준의 처음 {0}개 폴더를 표시합니다.</value></data>
   <data name="Categories" xml:space="preserve"><value>범주</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>이전</value></data>
   <data name="NextPage" xml:space="preserve"><value>다음</value></data>

@@ -12,6 +12,7 @@ public sealed class ArchiveSession : IDisposable
     private ArchiveItemNameIndex? _nameIndex;
     private ArchiveItemCatalog? _itemCatalog;
     private IReadOnlyList<ArchiveExtensionFacet>? _extensionFacets;
+    private ArchiveFolderTree? _folderTree;
     private readonly string? _ownedIndexPath;
     private readonly string? _ownedBasenameIndexPath;
     private readonly string? _ownedExtensionIndexPath;
@@ -49,6 +50,7 @@ public sealed class ArchiveSession : IDisposable
     internal ArchiveExtensionIndex ExtensionIndex { get; }
     public IReadOnlyList<string> SourceFiles { get; }
     internal SemaphoreSlim NameIndexBuildGate { get; } = new(1, 1);
+    internal SemaphoreSlim FolderTreeBuildGate { get; } = new(1, 1);
 
     internal ArchiveEntryDto EnrichEntry(ArchiveEntryDto entry)
     {
@@ -115,6 +117,25 @@ public sealed class ArchiveSession : IDisposable
             _extensionFacets = facets;
         }
     }
+
+    internal bool TryGetFolderTree(out ArchiveFolderTree? tree)
+    {
+        lock (_catalogueGate)
+        {
+            tree = _folderTree;
+            return tree is not null;
+        }
+    }
+
+    internal void SetFolderTree(ArchiveFolderTree tree)
+    {
+        ArgumentNullException.ThrowIfNull(tree);
+        lock (_catalogueGate)
+        {
+            _folderTree = tree;
+        }
+    }
+
     internal void StoreQuery(ArchiveQuerySpec query, long generation, long total)
     {
         lock (_queryStateGate)
@@ -139,6 +160,7 @@ public sealed class ArchiveSession : IDisposable
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             NameIndexBuildGate.Dispose();
+            FolderTreeBuildGate.Dispose();
             try
             {
                 ExtensionIndex.Dispose();

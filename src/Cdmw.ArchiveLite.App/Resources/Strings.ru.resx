@@ -137,6 +137,8 @@
   <data name="SortBy" xml:space="preserve"><value>Сортировать по</value></data>
   <data name="Descending" xml:space="preserve"><value>По убыванию</value></data>
   <data name="Folders" xml:space="preserve"><value>Папки</value></data>
+  <data name="FolderTreeLoading" xml:space="preserve"><value>Загрузка папок...</value></data>
+  <data name="FolderTreeTruncated" xml:space="preserve"><value>Показаны первые {0} папок этого уровня.</value></data>
   <data name="Categories" xml:space="preserve"><value>Категории</value></data>
   <data name="PreviousPage" xml:space="preserve"><value>Назад</value></data>
   <data name="NextPage" xml:space="preserve"><value>Вперёд</value></data>

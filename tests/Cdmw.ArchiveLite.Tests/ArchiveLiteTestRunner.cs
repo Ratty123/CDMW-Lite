@@ -62,6 +62,9 @@ internal static class ArchiveLiteTestRunner
             ("UTF-8, UTF-16, and Latin-1 text decode without Python codecs", TestTextDecodingAsync),
             ("native archive ABI scans and decodes synthetic PAMT/PAZ", TestNativeArchiveAsync),
             ("archive query, preview, and text search are read-only", TestArchiveServicesAsync),
+            ("the category navigator owns the whole life of the role filter", TestCategoryNavigatorOwnsRoleFilterAsync),
+            ("category facets stay complete under a role filter", TestCategoryFacetsIgnoreRoleFilterAsync),
+            ("the folder tree counts descendants and expands one level at a time", TestArchiveFolderTreeAsync),
             ("archive export is contained, atomic, and manifested", TestArchiveExportAsync),
             ("named-pipe worker opens and queries an archive", TestWorkerBoundaryAsync),
             ("an unclaimed worker stops instead of outliving its client", TestUnclaimedWorkerExitAsync),
@@ -3575,12 +3578,29 @@ internal static class ArchiveLiteTestRunner
             && rendererHostSource.Contains("session.SupportsResidentHostAttach", StringComparison.Ordinal)
             && rendererHostSource.Contains("AttachToHostAsync(visibleHost", StringComparison.Ordinal)
             && rendererHostSource.Contains("OnWindowPositionChanged", StringComparison.Ordinal)
-            && rendererHostSource.Contains("TryResizeAttachedRenderer(_hostHandle, width, height)", StringComparison.Ordinal)
-            && rendererHostSource.Contains("Volatile.Read(ref _hostPixelWidth)", StringComparison.Ordinal)
+            && rendererHostSource.Contains("TryResizeAttachedRenderer(_hostHandle)", StringComparison.Ordinal)
+            && rendererHostSource.Contains("TryResizeAttachedRenderer(visibleHost)", StringComparison.Ordinal)
             && rendererHostSource.Contains("WsPopup | WsVisible | WsClipChildren", StringComparison.Ordinal)
             && viewModelSource.Contains("ShouldPrewarmModelRenderer = true", StringComparison.Ordinal)
             && viewModelSource.Contains("NativeModelExtension(entry.Extension)", StringComparison.Ordinal),
             "Archive Lite does not safely prewarm, attach, and resize the resident renderer after first-page readiness");
+        var rendererProjectSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "tools",
+            "dotnet_mesh_editor_experiment",
+            "Cdmw.MeshEditorExperiment.csproj"));
+        var hostManifestSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "Cdmw.ArchiveLite.App",
+            "app.manifest"));
+        Require(
+            rendererProjectSource.Contains("<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>", StringComparison.Ordinal)
+            && hostManifestSource.Contains(">PerMonitorV2<", StringComparison.Ordinal)
+            && !rendererHostSource.Contains("_hostPixelWidth", StringComparison.Ordinal)
+            && rendererHostSource.Contains("GetClientRect(parentHandle, out var rect)", StringComparison.Ordinal)
+            && rendererHostSource.Contains("msg == WmEraseBackground", StringComparison.Ordinal),
+            "the hosted renderer can drift from the host window's size or leave an unpainted margin across monitor scales");
         Require(
             buildSource.Contains("-p:PublishSingleFile=false", StringComparison.Ordinal)
             && !buildSource.Contains("-p:IncludeNativeLibrariesForSelfExtract=true", StringComparison.Ordinal),
@@ -5168,6 +5188,158 @@ internal static class ArchiveLiteTestRunner
         var partialDds = native.Decode(entries.Single(entry => entry.Path == "texture/test.dds"));
         Require(partialDds.Bytes.Length == 0x88 && partialDds.Bytes.AsSpan(0, 4).SequenceEqual("DDS "u8), "managed PATHC DDS decode failed");
         Require(partialDds.Note == "PartialDDS+PATHC", "managed PATHC DDS diagnostic note is missing");
+    }
+
+    /// <summary>
+    /// Lite ships no role control, so the category navigator is the only way in and out of the role
+    /// filter. Its "All" row has to release the filter, and leaving the view modes that show the
+    /// navigator has to release it too, or the filter would keep narrowing results invisibly.
+    /// </summary>
+    private static Task TestCategoryNavigatorOwnsRoleFilterAsync() =>
+        RunOnWpfDispatcherAsync(() =>
+        {
+            var browser = new ArchiveBrowserViewModel(
+                null!,
+                "C:\\archive",
+                _ => { },
+                (_, _) => ArchiveCacheMode.Persistent);
+            browser.ViewMode = ArchiveViewMode.CategoriesAndFolders;
+            Require(browser.SelectedRole.Role is null, "a new Archive Browser starts with a role filter applied");
+
+            browser.SelectedCategory = new ArchiveCategoryCount(nameof(ArchiveEntryRole.Model), "Model", 3);
+            Require(
+                browser.SelectedRole.Role == ArchiveEntryRole.Model,
+                "choosing a category did not apply its role filter");
+
+            browser.SelectedCategory = null;
+            Require(
+                browser.SelectedRole.Role == ArchiveEntryRole.Model,
+                "repopulating the navigator cleared the role filter the user chose");
+
+            browser.SelectedCategory = new ArchiveCategoryCount(null, "All", 8);
+            Require(
+                browser.SelectedRole.Role is null,
+                "the category navigator's All row does not release the role filter");
+
+            browser.SelectedCategory = new ArchiveCategoryCount(nameof(ArchiveEntryRole.Image), "Image", 5);
+            Require(
+                browser.SelectedRole.Role == ArchiveEntryRole.Image,
+                "the navigator cannot move the role filter to another category");
+
+            browser.ViewMode = ArchiveViewMode.Flat;
+            Require(
+                browser.SelectedRole.Role is null && browser.SelectedCategory is null,
+                "the role filter outlived the navigator that is the only control able to clear it");
+            return Task.CompletedTask;
+        });
+
+    /// <summary>
+    /// The category navigator selects the role filter, so counting categories under that same filter
+    /// would leave the list showing only the role already chosen and no way back to the others.
+    /// </summary>
+    private static async Task TestCategoryFacetsIgnoreRoleFilterAsync()
+    {
+        await using var fixture = await SyntheticArchiveFixture.CreateAssociatedAssetsAsync().ConfigureAwait(false);
+        var native = new NativeArchiveCore();
+        using var sessions = new ArchiveSessionManager(native);
+        var opened = await sessions.OpenAsync(
+            new OpenArchiveRequest(fixture.Root, true),
+            CancellationToken.None).ConfigureAwait(false);
+        var queries = new ArchiveQueryService(sessions);
+
+        var unfiltered = await queries.QueryAsync(
+            new ArchiveQuerySpec(opened.SessionId, ViewMode: ArchiveViewMode.CategoriesAndFolders),
+            1,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(unfiltered.Categories.Count > 1, "the synthetic archive does not cover more than one role");
+        var role = unfiltered.Categories.Keys.First(static key => key != nameof(ArchiveEntryRole.Other));
+        Require(Enum.TryParse<ArchiveEntryRole>(role, out var parsedRole), "a category facet key is not a role name");
+
+        var filtered = await queries.QueryAsync(
+            new ArchiveQuerySpec(
+                opened.SessionId,
+                Roles: [parsedRole],
+                ViewMode: ArchiveViewMode.CategoriesAndFolders),
+            2,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            filtered.TotalMatches == unfiltered.Categories[role],
+            "the role filter did not narrow the result to its own category");
+        Require(
+            filtered.Categories.Count == unfiltered.Categories.Count,
+            "selecting a category collapsed the category navigator to that one category");
+        Require(
+            unfiltered.Categories.All(facet => filtered.Categories[facet.Key] == facet.Value),
+            "category counts changed under a role filter that should not count against itself");
+
+        // A filter on another dimension must still narrow the categories, or the navigator would be
+        // reporting counts the current result cannot produce.
+        var scoped = await queries.QueryAsync(
+            new ArchiveQuerySpec(
+                opened.SessionId,
+                Folder: "unrelated",
+                ViewMode: ArchiveViewMode.CategoriesAndFolders),
+            3,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            scoped.Categories.Values.Sum() == scoped.TotalMatches && scoped.TotalMatches == 1,
+            "category facets ignored the folder filter");
+    }
+
+    private static async Task TestArchiveFolderTreeAsync()
+    {
+        await using var fixture = await SyntheticArchiveFixture.CreateAssociatedAssetsAsync().ConfigureAwait(false);
+        var native = new NativeArchiveCore();
+        using var sessions = new ArchiveSessionManager(native);
+        var opened = await sessions.OpenAsync(
+            new OpenArchiveRequest(fixture.Root, true),
+            CancellationToken.None).ConfigureAwait(false);
+        var trees = new ArchiveFolderTreeService(sessions);
+        var progress = new List<ProgressUpdate>();
+
+        var root = await trees.LoadAsync(
+            new ArchiveFolderTreeRequest(opened.SessionId),
+            update =>
+            {
+                progress.Add(update);
+                return Task.CompletedTask;
+            },
+            CancellationToken.None).ConfigureAwait(false);
+        Require(progress.Any(static update => update.Phase == "folder_scan"), "the folder scan did not report progress");
+        Require(root.TotalCount == 8, "the archive root does not count every entry below it");
+        Require(root.Nodes.Count == 2, "the archive root does not expose exactly its top-level folders");
+
+        var character = root.Nodes.Single(static node => node.Name == "character");
+        Require(character.TotalCount == 7, "a folder does not count the files below its subfolders");
+        Require(character.DirectCount == 0, "a folder counted its descendants as its own files");
+        Require(character.HasChildren && character.Children.Count == 0, "a depth-one level returned grandchildren");
+        var unrelated = root.Nodes.Single(static node => node.Name == "unrelated");
+        Require(unrelated is { TotalCount: 1, DirectCount: 1, HasChildren: false }, "a leaf folder is wrong");
+
+        var level = await trees.LoadAsync(
+            new ArchiveFolderTreeRequest(opened.SessionId, "character"),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            level.Nodes.Select(static node => node.Name).SequenceEqual(["model", "modelproperty", "physics", "texture"]),
+            "an expanded folder does not list its children in name order");
+        Require(
+            level.Nodes.Single(static node => node.Name == "model") is { DirectCount: 3, TotalCount: 3, HasChildren: false },
+            "an expanded child does not carry its own file counts");
+        Require(
+            level.Nodes.Single(static node => node.Name == "texture").Path == "character/texture",
+            "an expanded child does not carry its full virtual path");
+
+        var deep = await trees.LoadAsync(
+            new ArchiveFolderTreeRequest(opened.SessionId, "character", Depth: 2),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(deep.Nodes.Count == level.Nodes.Count, "a deeper request changed the level it returned");
+        var missing = await trees.LoadAsync(
+            new ArchiveFolderTreeRequest(opened.SessionId, "character/nothing"),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(missing.Nodes.Count == 0 && missing.TotalCount == 0, "an unknown folder returned a level");
     }
 
     private static async Task TestArchiveServicesAsync()

@@ -21,6 +21,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private CancellationTokenSource? _previewOperation;
     private CancellationTokenSource? _catalogueOperation;
     private CancellationTokenSource? _environmentOperation;
+    private CancellationTokenSource? _folderTreeOperation;
     private long _foregroundGeneration;
     private long _previewGeneration;
     private long _catalogueGeneration;
@@ -35,6 +36,9 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     private ArchiveSortField _sortField = ArchiveSortField.Path;
     private bool _sortDescending;
     private ArchiveFolderFilter? _selectedFolder;
+    private ArchiveFolderTreeContext? _folderTreeContext;
+    private bool _isFolderTreeBusy;
+    private long _folderTreeGeneration;
     private ArchiveRoleFilter _selectedRole = null!;
     private ArchiveCategoryCount? _selectedCategory;
     private ArchiveEntryDto? _selectedEntry;
@@ -181,6 +185,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
 
     public ObservableCollection<ArchiveEntryDto> Entries { get; } = [];
     public ObservableCollection<ArchiveFolderFilter> Folders { get; } = [];
+    public ObservableCollection<ArchiveFolderNodeViewModel> FolderTree { get; } = [];
     public ObservableCollection<ArchiveCategoryCount> Categories { get; } = [];
     public ObservableCollection<ArchiveExtensionChoice> ExtensionChoices { get; } = [];
     public ObservableCollection<ArchiveExtensionChoice> MostCommonExtensionChoices { get; } = [];
@@ -386,12 +391,29 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         get => _viewMode;
         set
         {
-            if (SetProperty(ref _viewMode, value))
+            if (!SetProperty(ref _viewMode, value))
             {
-                OnPropertyChanged(nameof(ShowFolderNavigator));
-                OnPropertyChanged(nameof(ShowCategoryNavigator));
+                return;
             }
+
+            OnPropertyChanged(nameof(ShowFolderNavigator));
+            OnPropertyChanged(nameof(ShowCategoryNavigator));
+            // Lite exposes no role control of its own: the category navigator is the only thing that
+            // sets the role filter, so the filter must not outlive the view modes that show it.
+            // Otherwise it would keep narrowing every later result with nothing on screen to release it.
+            if (!ShowCategoryNavigator)
+            {
+                SelectedCategory = null;
+                SelectedRole = RoleFilters.First(static role => role.Role is null);
+            }
+            EnsureFolderTreeLoaded();
         }
+    }
+
+    public bool IsFolderTreeBusy
+    {
+        get => _isFolderTreeBusy;
+        private set => SetProperty(ref _isFolderTreeBusy, value);
     }
 
     public bool ShowFolderNavigator => ViewMode is ArchiveViewMode.Folders or ArchiveViewMode.CategoriesAndFolders;
@@ -516,12 +538,17 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         get => _selectedCategory;
         set
         {
-            if (!SetProperty(ref _selectedCategory, value) || value is null || !Enum.TryParse<ArchiveEntryRole>(value.Name, out var role))
+            // WPF clears a list selection while its items are being repopulated, so a transient null
+            // must not touch the role filter. Only a real choice moves it, and the "All" row - whose
+            // name does not parse as a role - is what clears it again.
+            if (!SetProperty(ref _selectedCategory, value) || value is null)
             {
                 return;
             }
 
-            SelectedRole = RoleFilters.First(option => option.Role == role);
+            SelectedRole = Enum.TryParse<ArchiveEntryRole>(value.Name, out var role)
+                ? RoleFilters.First(option => option.Role == role)
+                : RoleFilters.First(static option => option.Role is null);
         }
     }
 
@@ -1072,6 +1099,7 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             SetOperationProgress(LocalizationManager.Get("ProgressLoadingEntries"));
             await QueryPageCoreAsync(0, generation, operation.Token).ConfigureAwait(true);
             ShouldPrewarmModelRenderer = true;
+            EnsureFolderTreeLoaded();
             StartCatalogueLoad(result.SessionId);
         }
         catch (WorkerRequestException exception) when (exception.Error.Code == "cache_refresh_required")
@@ -1221,24 +1249,9 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             Entries.Add(entry);
         }
 
-        Folders.Clear();
-        var previousFolder = SelectedFolder?.Path;
-        Folders.Add(new ArchiveFolderFilter(null, LocalizationManager.Get("All")));
-        foreach (var folder in result.Folders)
-        {
-            Folders.Add(new ArchiveFolderFilter(folder, folder));
-        }
-        SelectedFolder = Folders.FirstOrDefault(folder => string.Equals(folder.Path, previousFolder, StringComparison.OrdinalIgnoreCase)) ?? Folders[0];
+        ApplyFolderFacets(result.Folders);
 
-        Categories.Clear();
-        foreach (var category in result.Categories.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            var roleLabel = Enum.TryParse<ArchiveEntryRole>(category.Key, out var parsedRole)
-                ? LocalizationManager.Get($"Role{parsedRole}")
-                : category.Key;
-            Categories.Add(new ArchiveCategoryCount(category.Key, roleLabel, category.Value));
-        }
-        SelectedCategory = null;
+        ApplyCategoryFacets(result.Categories);
 
         PageStart = result.PageStart;
         TotalMatches = result.TotalMatches;
@@ -1334,6 +1347,157 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         }
         ApplyActiveExtensionFacets(_globalExtensionFacets);
         ClearItemScopeCommand?.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Starts the folder tree the first time a view mode that shows it is active. Deriving the tree
+    /// costs a pass over every archive path, so a session spent in the flat or category views never
+    /// pays for it.
+    /// </summary>
+    private void EnsureFolderTreeLoaded()
+    {
+        if (!ShowFolderNavigator || _folderTreeContext is not null || SessionId is not { } sessionId || string.IsNullOrWhiteSpace(sessionId))
+        {
+            return;
+        }
+        StartFolderTreeLoad(sessionId);
+    }
+
+    /// <summary>
+    /// Loads the archive's top-level folders. Deeper levels arrive when the user expands them, and the
+    /// worker derives the whole structure once per session, so the first expansion pays for the scan
+    /// and every later one is served from the resident tree.
+    /// </summary>
+    private void StartFolderTreeLoad(string sessionId)
+    {
+        var generation = Interlocked.Increment(ref _folderTreeGeneration);
+        var operation = new CancellationTokenSource();
+        CancelOperation(Interlocked.Exchange(ref _folderTreeOperation, operation));
+        FolderTree.Clear();
+        _folderTreeContext = new ArchiveFolderTreeContext(
+            path => LoadFolderChildrenAsync(sessionId, generation, path),
+            SelectFolderNode,
+            exception => _setShellStatus(exception.Message));
+        _ = LoadFolderTreeRootAsync(sessionId, generation);
+    }
+
+    private async Task LoadFolderTreeRootAsync(string sessionId, long generation)
+    {
+        var context = _folderTreeContext;
+        if (context is null)
+        {
+            return;
+        }
+        try
+        {
+            IsFolderTreeBusy = true;
+            var children = await LoadFolderChildrenAsync(sessionId, generation, string.Empty).ConfigureAwait(true);
+            if (generation != Volatile.Read(ref _folderTreeGeneration))
+            {
+                return;
+            }
+            FolderTree.Clear();
+            foreach (var child in children)
+            {
+                FolderTree.Add(ArchiveFolderNodeViewModel.Create(context, child));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer archive session owns the folder tree.
+        }
+        catch (Exception exception)
+        {
+            if (generation == Volatile.Read(ref _folderTreeGeneration))
+            {
+                _setShellStatus(exception.Message);
+            }
+        }
+        finally
+        {
+            if (generation == Volatile.Read(ref _folderTreeGeneration))
+            {
+                IsFolderTreeBusy = false;
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<ArchiveFolderNode>> LoadFolderChildrenAsync(
+        string sessionId,
+        long generation,
+        string path)
+    {
+        var operation = _folderTreeOperation;
+        if (operation is null || generation != Volatile.Read(ref _folderTreeGeneration))
+        {
+            return [];
+        }
+        var result = await _worker.SendAsync<ArchiveFolderTreeRequest, ArchiveFolderTreeResult>(
+            WorkerProtocol.ArchiveFolderTree,
+            generation,
+            new ArchiveFolderTreeRequest(sessionId, path),
+            operation.Token).ConfigureAwait(true);
+        if (generation != Volatile.Read(ref _folderTreeGeneration)
+            || !string.Equals(SessionId, sessionId, StringComparison.Ordinal))
+        {
+            return [];
+        }
+        if (result.Truncated)
+        {
+            _setShellStatus(LocalizationManager.Format("FolderTreeTruncated", result.Nodes.Count));
+        }
+        return result.Nodes;
+    }
+
+    /// <summary>
+    /// Applies a folder chosen in the tree. The path is added to the folder filter list when the
+    /// current result does not mention it, so the picker and the tree always agree on the filter.
+    /// </summary>
+    private void SelectFolderNode(ArchiveFolderNodeViewModel node)
+    {
+        if (string.IsNullOrEmpty(node.Path))
+        {
+            return;
+        }
+        var existing = Folders.FirstOrDefault(folder =>
+            string.Equals(folder.Path, node.Path, StringComparison.OrdinalIgnoreCase));
+        if (existing is null)
+        {
+            existing = new ArchiveFolderFilter(node.Path, node.Path);
+            Folders.Insert(Folders.Count > 0 ? 1 : 0, existing);
+        }
+        if (Equals(SelectedFolder, existing))
+        {
+            return;
+        }
+        SelectedFolder = existing;
+        ApplyFilterCommand.Execute(null);
+    }
+
+    /// <summary>
+    /// Rebuilds the folder filter list, keeping the active folder present. A folder filter narrows the
+    /// result to that folder's contents, so the folder itself drops out of the rebuilt facet list
+    /// whenever nothing is stored directly in it - which would otherwise release the filter silently.
+    /// </summary>
+    private void ApplyFolderFacets(IReadOnlyList<string> folders)
+    {
+        var previousPath = SelectedFolder?.Path;
+        Folders.Clear();
+        Folders.Add(new ArchiveFolderFilter(null, LocalizationManager.Get("All")));
+        foreach (var folder in folders)
+        {
+            Folders.Add(new ArchiveFolderFilter(folder, folder));
+        }
+        if (!string.IsNullOrEmpty(previousPath)
+            && !Folders.Any(folder => string.Equals(folder.Path, previousPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            Folders.Insert(1, new ArchiveFolderFilter(previousPath, previousPath));
+        }
+
+        _selectedFolder = null;
+        SelectedFolder = Folders.FirstOrDefault(folder =>
+            string.Equals(folder.Path, previousPath, StringComparison.OrdinalIgnoreCase))
+            ?? Folders[0];
     }
 
     private void StartCatalogueLoad(string sessionId)
@@ -1537,33 +1701,50 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
     {
         if (Folders.Count > 0)
         {
-            var selectedPath = SelectedFolder?.Path;
-            var paths = Folders.Select(static folder => folder.Path).ToArray();
-            Folders.Clear();
-            foreach (var path in paths)
-            {
-                Folders.Add(new ArchiveFolderFilter(path, path ?? LocalizationManager.Get("All")));
-            }
-            SelectedFolder = Folders.FirstOrDefault(folder => string.Equals(folder.Path, selectedPath, StringComparison.OrdinalIgnoreCase))
-                ?? Folders[0];
+            ApplyFolderFacets(Folders
+                .Select(static folder => folder.Path)
+                .OfType<string>()
+                .ToArray());
+        }
+
+        foreach (var node in FolderTree)
+        {
+            node.RefreshLabel();
         }
 
         if (Categories.Count > 0)
         {
-            var selectedName = SelectedCategory?.Name;
-            var categories = Categories.Select(static category => (category.Name, category.Count)).ToArray();
-            Categories.Clear();
-            foreach (var category in categories)
-            {
-                var label = Enum.TryParse<ArchiveEntryRole>(category.Name, out var role)
-                    ? LocalizationManager.Get($"Role{role}")
-                    : category.Name;
-                Categories.Add(new ArchiveCategoryCount(category.Name, label, category.Count));
-            }
-            SelectedCategory = selectedName is null
-                ? null
-                : Categories.FirstOrDefault(category => string.Equals(category.Name, selectedName, StringComparison.OrdinalIgnoreCase));
+            ApplyCategoryFacets(Categories
+                .Where(static category => category.Name is not null)
+                .ToDictionary(static category => category.Name!, static category => category.Count, StringComparer.OrdinalIgnoreCase));
         }
+    }
+
+    /// <summary>
+    /// Rebuilds the category navigator from a facet count per role, keeping whichever row the user
+    /// had chosen. The leading "All" row is what releases the role filter the navigator applies, so
+    /// the list is never a one-way funnel into the category that happens to be selected.
+    /// </summary>
+    private void ApplyCategoryFacets(IReadOnlyDictionary<string, long> facets)
+    {
+        var previousName = SelectedCategory?.Name;
+        Categories.Clear();
+        Categories.Add(new ArchiveCategoryCount(null, LocalizationManager.Get("All"), facets.Values.Sum()));
+        foreach (var category in facets.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var roleLabel = Enum.TryParse<ArchiveEntryRole>(category.Key, out var parsedRole)
+                ? LocalizationManager.Get($"Role{parsedRole}")
+                : category.Key;
+            Categories.Add(new ArchiveCategoryCount(category.Key, roleLabel, category.Value));
+        }
+
+        // Clearing the collection already pushed a null selection through the binding. Dropping the
+        // backing field as well keeps the restore below from being swallowed as "no change" when the
+        // rebuilt row compares equal to the old one, which would leave the list visually unselected.
+        _selectedCategory = null;
+        SelectedCategory = Categories.FirstOrDefault(category =>
+            string.Equals(category.Name, previousName, StringComparison.OrdinalIgnoreCase))
+            ?? Categories[0];
     }
 
     private void RefreshExtensionLabels()
@@ -1630,23 +1811,9 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             _suppressPreviewSelection = false;
         }
 
-        Folders.Clear();
-        var previousFolder = SelectedFolder?.Path;
-        Folders.Add(new ArchiveFolderFilter(null, LocalizationManager.Get("All")));
-        foreach (var folder in result.Folders)
-        {
-            Folders.Add(new ArchiveFolderFilter(folder, folder));
-        }
-        SelectedFolder = Folders.FirstOrDefault(folder => string.Equals(folder.Path, previousFolder, StringComparison.OrdinalIgnoreCase)) ?? Folders[0];
+        ApplyFolderFacets(result.Folders);
 
-        Categories.Clear();
-        foreach (var category in result.Categories.OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase))
-        {
-            var roleLabel = Enum.TryParse<ArchiveEntryRole>(category.Key, out var parsedRole)
-                ? LocalizationManager.Get($"Role{parsedRole}")
-                : category.Key;
-            Categories.Add(new ArchiveCategoryCount(category.Key, roleLabel, category.Value));
-        }
+        ApplyCategoryFacets(result.Categories);
         PageStart = result.PageStart;
         TotalMatches = result.TotalMatches;
         OnPropertyChanged(nameof(PageSummary));
@@ -1666,6 +1833,16 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         CatalogueStatus = string.Empty;
         _globalExtensionFacets = [];
         ApplyActiveExtensionFacets([], force: true);
+        CancelFolderTree();
+    }
+
+    private void CancelFolderTree()
+    {
+        Interlocked.Increment(ref _folderTreeGeneration);
+        CancelOperation(Interlocked.Exchange(ref _folderTreeOperation, null));
+        _folderTreeContext = null;
+        IsFolderTreeBusy = false;
+        FolderTree.Clear();
     }
 
     private async Task LoadPreviewLatestAsync(ArchiveEntryDto? entry)
@@ -2282,7 +2459,11 @@ public sealed record ArchiveRoleFilter(ArchiveEntryRole? Role, string Label)
     public override string ToString() => Label;
 }
 
-public sealed record ArchiveCategoryCount(string Name, string Label, long Count)
+/// <summary>
+/// One row of the category navigator. A null <paramref name="Name"/> is the "All" row, which carries
+/// the combined count and releases the role filter rather than naming a role.
+/// </summary>
+public sealed record ArchiveCategoryCount(string? Name, string Label, long Count)
 {
     public override string ToString() => $"{Label} ({Count:N0})";
 }
