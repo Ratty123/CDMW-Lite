@@ -168,6 +168,15 @@ public sealed class ArchiveFolderNodeViewModel : ObservableObject
             var files = _context.IncludesFiles
                 ? await _context.LoadFilesAsync(Path).ConfigureAwait(true)
                 : [];
+            if (folders.Count == 0 && files.Count == 0 && HasChildren)
+            {
+                // This folder was told it holds something, so an empty level means the load was
+                // answered by a superseded generation rather than by the archive. Keep the stand-in
+                // and stay open to trying again: clearing here is what leaves a row that can never
+                // be opened, since nothing would ask a second time.
+                _childrenRequested = false;
+                return;
+            }
             Children.Clear();
             foreach (var folder in folders)
             {
