@@ -361,4 +361,108 @@
   <data name="ClearItemScope" xml:space="preserve"><value>アイテムセットをクリア</value></data>
   <data name="MostCommonExtensions" xml:space="preserve"><value>よく使われる拡張子</value></data>
   <data name="MostCommonExtensionsHint" xml:space="preserve"><value>有効なアーカイブまたはアイテム検索のセットで最もよく使われる拡張子を表示します。</value></data>
+  <data name="ItemCategoryAccessory" xml:space="preserve"><value>アクセサリー</value></data>
+  <data name="ItemCategoryArmor" xml:space="preserve"><value>防具</value></data>
+  <data name="ItemCategoryCharacterCustomization" xml:space="preserve"><value>キャラクターカスタマイズ</value></data>
+  <data name="ItemCategoryConsumable" xml:space="preserve"><value>消費アイテム</value></data>
+  <data name="ItemCategoryCraftingRecipe" xml:space="preserve"><value>製作 / レシピ</value></data>
+  <data name="ItemCategoryGimmickInteractive" xml:space="preserve"><value>ギミック / インタラクティブ</value></data>
+  <data name="ItemCategoryHousingProp" xml:space="preserve"><value>ハウジング / 小物</value></data>
+  <data name="ItemCategoryItem" xml:space="preserve"><value>アイテム</value></data>
+  <data name="ItemCategoryMaterial" xml:space="preserve"><value>素材</value></data>
+  <data name="ItemCategoryMountPet" xml:space="preserve"><value>騎乗 / ペット</value></data>
+  <data name="ItemCategoryProgressionReward" xml:space="preserve"><value>成長 / 報酬</value></data>
+  <data name="ItemCategoryQuestDocument" xml:space="preserve"><value>クエスト / 文書</value></data>
+  <data name="ItemCategoryTool" xml:space="preserve"><value>道具</value></data>
+  <data name="ItemCategoryWeapon" xml:space="preserve"><value>武器</value></data>
+  <data name="ItemGroupAmuletCharm" xml:space="preserve"><value>アミュレット / お守り</value></data>
+  <data name="ItemGroupArtifact" xml:space="preserve"><value>アーティファクト</value></data>
+  <data name="ItemGroupAxeMaceHammer" xml:space="preserve"><value>斧 / メイス / ハンマー</value></data>
+  <data name="ItemGroupBackCloak" xml:space="preserve"><value>背中 / マント</value></data>
+  <data name="ItemGroupBackpackPack" xml:space="preserve"><value>バックパック / 荷物</value></data>
+  <data name="ItemGroupBeltBand" xml:space="preserve"><value>ベルト / バンド</value></data>
+  <data name="ItemGroupBody" xml:space="preserve"><value>胴体</value></data>
+  <data name="ItemGroupBodyAppearance" xml:space="preserve"><value>体型 / 外見</value></data>
+  <data name="ItemGroupBookDiary" xml:space="preserve"><value>本 / 日記</value></data>
+  <data name="ItemGroupBowCrossbow" xml:space="preserve"><value>弓 / クロスボウ</value></data>
+  <data name="ItemGroupClothLeather" xml:space="preserve"><value>布 / 革</value></data>
+  <data name="ItemGroupClueReport" xml:space="preserve"><value>手がかり / 報告書</value></data>
+  <data name="ItemGroupCollectionProp" xml:space="preserve"><value>コレクション小物</value></data>
+  <data name="ItemGroupContainer" xml:space="preserve"><value>容器</value></data>
+  <data name="ItemGroupCrafting" xml:space="preserve"><value>製作</value></data>
+  <data name="ItemGroupCreaturePart" xml:space="preserve"><value>生物素材</value></data>
+  <data name="ItemGroupCrystalGem" xml:space="preserve"><value>結晶 / 宝石</value></data>
+  <data name="ItemGroupCurrency" xml:space="preserve"><value>通貨</value></data>
+  <data name="ItemGroupDaggerRapier" xml:space="preserve"><value>短剣 / レイピア</value></data>
+  <data name="ItemGroupDecor" xml:space="preserve"><value>装飾</value></data>
+  <data name="ItemGroupDocument" xml:space="preserve"><value>文書</value></data>
+  <data name="ItemGroupEarrings" xml:space="preserve"><value>イヤリング</value></data>
+  <data name="ItemGroupFace" xml:space="preserve"><value>顔</value></data>
+  <data name="ItemGroupFeet" xml:space="preserve"><value>足</value></data>
+  <data name="ItemGroupFirearm" xml:space="preserve"><value>銃器</value></data>
+  <data name="ItemGroupFishing" xml:space="preserve"><value>釣り</value></data>
+  <data name="ItemGroupFistMartial" xml:space="preserve"><value>拳 / 格闘</value></data>
+  <data name="ItemGroupFlagMarker" xml:space="preserve"><value>旗 / 目印</value></data>
+  <data name="ItemGroupFoodDrink" xml:space="preserve"><value>食料 / 飲料</value></data>
+  <data name="ItemGroupFurniture" xml:space="preserve"><value>家具</value></data>
+  <data name="ItemGroupGatheringTool" xml:space="preserve"><value>採集道具</value></data>
+  <data name="ItemGroupGimmick" xml:space="preserve"><value>ギミック</value></data>
+  <data name="ItemGroupHair" xml:space="preserve"><value>髪</value></data>
+  <data name="ItemGroupHandTool" xml:space="preserve"><value>手工具</value></data>
+  <data name="ItemGroupHands" xml:space="preserve"><value>手</value></data>
+  <data name="ItemGroupHead" xml:space="preserve"><value>頭</value></data>
+  <data name="ItemGroupHorseGear" xml:space="preserve"><value>馬具</value></data>
+  <data name="ItemGroupKeyPermit" xml:space="preserve"><value>鍵 / 許可証</value></data>
+  <data name="ItemGroupLegs" xml:space="preserve"><value>脚</value></data>
+  <data name="ItemGroupLightLantern" xml:space="preserve"><value>明かり / ランタン</value></data>
+  <data name="ItemGroupMachinePart" xml:space="preserve"><value>機械部品</value></data>
+  <data name="ItemGroupMapTreasure" xml:space="preserve"><value>地図 / 財宝</value></data>
+  <data name="ItemGroupNecklace" xml:space="preserve"><value>ネックレス</value></data>
+  <data name="ItemGroupOreMetal" xml:space="preserve"><value>鉱石 / 金属</value></data>
+  <data name="ItemGroupOtherAccessory" xml:space="preserve"><value>その他アクセサリー</value></data>
+  <data name="ItemGroupOtherArmor" xml:space="preserve"><value>その他防具</value></data>
+  <data name="ItemGroupOtherConsumable" xml:space="preserve"><value>その他消費アイテム</value></data>
+  <data name="ItemGroupOtherMaterial" xml:space="preserve"><value>その他素材</value></data>
+  <data name="ItemGroupOtherTool" xml:space="preserve"><value>その他道具</value></data>
+  <data name="ItemGroupOtherWeapon" xml:space="preserve"><value>その他武器</value></data>
+  <data name="ItemGroupPetGear" xml:space="preserve"><value>ペット装備</value></data>
+  <data name="ItemGroupPolearmSpear" xml:space="preserve"><value>長柄 / 槍</value></data>
+  <data name="ItemGroupPotionMedicine" xml:space="preserve"><value>ポーション / 薬</value></data>
+  <data name="ItemGroupQuest" xml:space="preserve"><value>クエスト</value></data>
+  <data name="ItemGroupRecipeBook" xml:space="preserve"><value>レシピ本</value></data>
+  <data name="ItemGroupReward" xml:space="preserve"><value>報酬</value></data>
+  <data name="ItemGroupRing" xml:space="preserve"><value>指輪</value></data>
+  <data name="ItemGroupShield" xml:space="preserve"><value>盾</value></data>
+  <data name="ItemGroupSkill" xml:space="preserve"><value>スキル</value></data>
+  <data name="ItemGroupStat" xml:space="preserve"><value>ステータス</value></data>
+  <data name="ItemGroupSword" xml:space="preserve"><value>剣</value></data>
+  <data name="ItemGroupThrowableUtility" xml:space="preserve"><value>投擲 / 補助</value></data>
+  <data name="ItemGroupTokenSeal" xml:space="preserve"><value>証 / 印章</value></data>
+  <data name="ItemGroupUnclassified" xml:space="preserve"><value>未分類</value></data>
+  <data name="ItemGroupVehicle" xml:space="preserve"><value>乗り物</value></data>
+  <data name="ItemGroupWandFan" xml:space="preserve"><value>ワンド / 扇</value></data>
+  <data name="ItemGroupWoodStone" xml:space="preserve"><value>木材 / 石材</value></data>
+  <data name="ItemMaterialBone" xml:space="preserve"><value>骨</value></data>
+  <data name="ItemMaterialCloth" xml:space="preserve"><value>布</value></data>
+  <data name="ItemMaterialCrystal" xml:space="preserve"><value>結晶</value></data>
+  <data name="ItemMaterialDirt" xml:space="preserve"><value>土</value></data>
+  <data name="ItemMaterialFur" xml:space="preserve"><value>毛皮</value></data>
+  <data name="ItemMaterialGlass" xml:space="preserve"><value>ガラス</value></data>
+  <data name="ItemMaterialGrass" xml:space="preserve"><value>草</value></data>
+  <data name="ItemMaterialHair" xml:space="preserve"><value>毛髪</value></data>
+  <data name="ItemMaterialLeather" xml:space="preserve"><value>革</value></data>
+  <data name="ItemMaterialMetal" xml:space="preserve"><value>金属</value></data>
+  <data name="ItemMaterialRope" xml:space="preserve"><value>縄</value></data>
+  <data name="ItemMaterialSkin" xml:space="preserve"><value>肌</value></data>
+  <data name="ItemMaterialStone" xml:space="preserve"><value>石</value></data>
+  <data name="ItemMaterialWater" xml:space="preserve"><value>水</value></data>
+  <data name="ItemMaterialWood" xml:space="preserve"><value>木材</value></data>
+  <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo のプレハブハッシュ</value></data>
+  <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>アイコン/モデル参照</value></data>
+  <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>ローカライズ済み表示名</value></data>
+  <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>インベントリアイコンのパス</value></data>
+  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>マテリアルスロットタグ</value></data>
+  <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>アイテムデータベースの記録</value></data>
+  <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>復元されたアイテム/モデル名</value></data>
+  <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>これ以上有力なカテゴリの手がかりは見つかりませんでした</value></data>
 </root>

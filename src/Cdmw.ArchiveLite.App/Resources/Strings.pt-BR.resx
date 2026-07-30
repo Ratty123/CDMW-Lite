@@ -361,4 +361,108 @@
   <data name="ClearItemScope" xml:space="preserve"><value>Limpar conjunto de itens</value></data>
   <data name="MostCommonExtensions" xml:space="preserve"><value>Mais comuns</value></data>
   <data name="MostCommonExtensionsHint" xml:space="preserve"><value>Mostra as extensões mais comuns no arquivo ativo ou no conjunto do Buscar itens.</value></data>
+  <data name="ItemCategoryAccessory" xml:space="preserve"><value>Acessório</value></data>
+  <data name="ItemCategoryArmor" xml:space="preserve"><value>Armadura</value></data>
+  <data name="ItemCategoryCharacterCustomization" xml:space="preserve"><value>Personalização de personagem</value></data>
+  <data name="ItemCategoryConsumable" xml:space="preserve"><value>Consumível</value></data>
+  <data name="ItemCategoryCraftingRecipe" xml:space="preserve"><value>Fabricação / Receita</value></data>
+  <data name="ItemCategoryGimmickInteractive" xml:space="preserve"><value>Mecanismo / Interativo</value></data>
+  <data name="ItemCategoryHousingProp" xml:space="preserve"><value>Moradia / Objeto</value></data>
+  <data name="ItemCategoryItem" xml:space="preserve"><value>Item</value></data>
+  <data name="ItemCategoryMaterial" xml:space="preserve"><value>Material</value></data>
+  <data name="ItemCategoryMountPet" xml:space="preserve"><value>Montaria / Mascote</value></data>
+  <data name="ItemCategoryProgressionReward" xml:space="preserve"><value>Progressão / Recompensa</value></data>
+  <data name="ItemCategoryQuestDocument" xml:space="preserve"><value>Missão / Documento</value></data>
+  <data name="ItemCategoryTool" xml:space="preserve"><value>Ferramenta</value></data>
+  <data name="ItemCategoryWeapon" xml:space="preserve"><value>Arma</value></data>
+  <data name="ItemGroupAmuletCharm" xml:space="preserve"><value>Amuleto / Talismã</value></data>
+  <data name="ItemGroupArtifact" xml:space="preserve"><value>Artefato</value></data>
+  <data name="ItemGroupAxeMaceHammer" xml:space="preserve"><value>Machado / Maça / Martelo</value></data>
+  <data name="ItemGroupBackCloak" xml:space="preserve"><value>Costas / Capa</value></data>
+  <data name="ItemGroupBackpackPack" xml:space="preserve"><value>Mochila / Bolsa</value></data>
+  <data name="ItemGroupBeltBand" xml:space="preserve"><value>Cinto / Faixa</value></data>
+  <data name="ItemGroupBody" xml:space="preserve"><value>Torso</value></data>
+  <data name="ItemGroupBodyAppearance" xml:space="preserve"><value>Corpo / Aparência</value></data>
+  <data name="ItemGroupBookDiary" xml:space="preserve"><value>Livro / Diário</value></data>
+  <data name="ItemGroupBowCrossbow" xml:space="preserve"><value>Arco / Besta</value></data>
+  <data name="ItemGroupClothLeather" xml:space="preserve"><value>Tecido / Couro</value></data>
+  <data name="ItemGroupClueReport" xml:space="preserve"><value>Pista / Relatório</value></data>
+  <data name="ItemGroupCollectionProp" xml:space="preserve"><value>Item de coleção</value></data>
+  <data name="ItemGroupContainer" xml:space="preserve"><value>Recipiente</value></data>
+  <data name="ItemGroupCrafting" xml:space="preserve"><value>Fabricação</value></data>
+  <data name="ItemGroupCreaturePart" xml:space="preserve"><value>Parte de criatura</value></data>
+  <data name="ItemGroupCrystalGem" xml:space="preserve"><value>Cristal / Gema</value></data>
+  <data name="ItemGroupCurrency" xml:space="preserve"><value>Moeda</value></data>
+  <data name="ItemGroupDaggerRapier" xml:space="preserve"><value>Adaga / Rapieira</value></data>
+  <data name="ItemGroupDecor" xml:space="preserve"><value>Decoração</value></data>
+  <data name="ItemGroupDocument" xml:space="preserve"><value>Documento</value></data>
+  <data name="ItemGroupEarrings" xml:space="preserve"><value>Brincos</value></data>
+  <data name="ItemGroupFace" xml:space="preserve"><value>Rosto</value></data>
+  <data name="ItemGroupFeet" xml:space="preserve"><value>Pés</value></data>
+  <data name="ItemGroupFirearm" xml:space="preserve"><value>Arma de fogo</value></data>
+  <data name="ItemGroupFishing" xml:space="preserve"><value>Pesca</value></data>
+  <data name="ItemGroupFistMartial" xml:space="preserve"><value>Punho / Marcial</value></data>
+  <data name="ItemGroupFlagMarker" xml:space="preserve"><value>Bandeira / Marcador</value></data>
+  <data name="ItemGroupFoodDrink" xml:space="preserve"><value>Comida / Bebida</value></data>
+  <data name="ItemGroupFurniture" xml:space="preserve"><value>Mobília</value></data>
+  <data name="ItemGroupGatheringTool" xml:space="preserve"><value>Ferramenta de coleta</value></data>
+  <data name="ItemGroupGimmick" xml:space="preserve"><value>Mecanismo</value></data>
+  <data name="ItemGroupHair" xml:space="preserve"><value>Cabelo</value></data>
+  <data name="ItemGroupHandTool" xml:space="preserve"><value>Ferramenta manual</value></data>
+  <data name="ItemGroupHands" xml:space="preserve"><value>Mãos</value></data>
+  <data name="ItemGroupHead" xml:space="preserve"><value>Cabeça</value></data>
+  <data name="ItemGroupHorseGear" xml:space="preserve"><value>Equipamento de montaria</value></data>
+  <data name="ItemGroupKeyPermit" xml:space="preserve"><value>Chave / Permissão</value></data>
+  <data name="ItemGroupLegs" xml:space="preserve"><value>Pernas</value></data>
+  <data name="ItemGroupLightLantern" xml:space="preserve"><value>Luz / Lanterna</value></data>
+  <data name="ItemGroupMachinePart" xml:space="preserve"><value>Peça de máquina</value></data>
+  <data name="ItemGroupMapTreasure" xml:space="preserve"><value>Mapa / Tesouro</value></data>
+  <data name="ItemGroupNecklace" xml:space="preserve"><value>Colar</value></data>
+  <data name="ItemGroupOreMetal" xml:space="preserve"><value>Minério / Metal</value></data>
+  <data name="ItemGroupOtherAccessory" xml:space="preserve"><value>Outro acessório</value></data>
+  <data name="ItemGroupOtherArmor" xml:space="preserve"><value>Outra armadura</value></data>
+  <data name="ItemGroupOtherConsumable" xml:space="preserve"><value>Outro consumível</value></data>
+  <data name="ItemGroupOtherMaterial" xml:space="preserve"><value>Outro material</value></data>
+  <data name="ItemGroupOtherTool" xml:space="preserve"><value>Outra ferramenta</value></data>
+  <data name="ItemGroupOtherWeapon" xml:space="preserve"><value>Outra arma</value></data>
+  <data name="ItemGroupPetGear" xml:space="preserve"><value>Equipamento de mascote</value></data>
+  <data name="ItemGroupPolearmSpear" xml:space="preserve"><value>Arma de haste / Lança</value></data>
+  <data name="ItemGroupPotionMedicine" xml:space="preserve"><value>Poção / Remédio</value></data>
+  <data name="ItemGroupQuest" xml:space="preserve"><value>Missão</value></data>
+  <data name="ItemGroupRecipeBook" xml:space="preserve"><value>Livro de receitas</value></data>
+  <data name="ItemGroupReward" xml:space="preserve"><value>Recompensa</value></data>
+  <data name="ItemGroupRing" xml:space="preserve"><value>Anel</value></data>
+  <data name="ItemGroupShield" xml:space="preserve"><value>Escudo</value></data>
+  <data name="ItemGroupSkill" xml:space="preserve"><value>Habilidade</value></data>
+  <data name="ItemGroupStat" xml:space="preserve"><value>Atributo</value></data>
+  <data name="ItemGroupSword" xml:space="preserve"><value>Espada</value></data>
+  <data name="ItemGroupThrowableUtility" xml:space="preserve"><value>Arremessável / Utilitário</value></data>
+  <data name="ItemGroupTokenSeal" xml:space="preserve"><value>Ficha / Selo</value></data>
+  <data name="ItemGroupUnclassified" xml:space="preserve"><value>Não classificado</value></data>
+  <data name="ItemGroupVehicle" xml:space="preserve"><value>Veículo</value></data>
+  <data name="ItemGroupWandFan" xml:space="preserve"><value>Varinha / Leque</value></data>
+  <data name="ItemGroupWoodStone" xml:space="preserve"><value>Madeira / Pedra</value></data>
+  <data name="ItemMaterialBone" xml:space="preserve"><value>osso</value></data>
+  <data name="ItemMaterialCloth" xml:space="preserve"><value>tecido</value></data>
+  <data name="ItemMaterialCrystal" xml:space="preserve"><value>cristal</value></data>
+  <data name="ItemMaterialDirt" xml:space="preserve"><value>terra</value></data>
+  <data name="ItemMaterialFur" xml:space="preserve"><value>pelo</value></data>
+  <data name="ItemMaterialGlass" xml:space="preserve"><value>vidro</value></data>
+  <data name="ItemMaterialGrass" xml:space="preserve"><value>grama</value></data>
+  <data name="ItemMaterialHair" xml:space="preserve"><value>cabelo</value></data>
+  <data name="ItemMaterialLeather" xml:space="preserve"><value>couro</value></data>
+  <data name="ItemMaterialMetal" xml:space="preserve"><value>metal</value></data>
+  <data name="ItemMaterialRope" xml:space="preserve"><value>corda</value></data>
+  <data name="ItemMaterialSkin" xml:space="preserve"><value>pele</value></data>
+  <data name="ItemMaterialStone" xml:space="preserve"><value>pedra</value></data>
+  <data name="ItemMaterialWater" xml:space="preserve"><value>água</value></data>
+  <data name="ItemMaterialWood" xml:space="preserve"><value>madeira</value></data>
+  <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>hash de prefab do ItemInfo</value></data>
+  <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>referência de ícone/modelo</value></data>
+  <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>nome de exibição localizado</value></data>
+  <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>caminho do ícone de inventário</value></data>
+  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>tags de slot de material</value></data>
+  <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>registro do banco de dados de itens</value></data>
+  <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Nomenclatura de item/modelo recuperada</value></data>
+  <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Nenhum indício de categoria mais forte foi recuperado</value></data>
 </root>

@@ -361,4 +361,108 @@
   <data name="ClearItemScope" xml:space="preserve"><value>清除物品集合</value></data>
   <data name="MostCommonExtensions" xml:space="preserve"><value>最常見</value></data>
   <data name="MostCommonExtensionsHint" xml:space="preserve"><value>顯示目前封存或物品搜尋器集合中最常見的副檔名。</value></data>
+  <data name="ItemCategoryAccessory" xml:space="preserve"><value>飾品</value></data>
+  <data name="ItemCategoryArmor" xml:space="preserve"><value>防具</value></data>
+  <data name="ItemCategoryCharacterCustomization" xml:space="preserve"><value>角色自訂</value></data>
+  <data name="ItemCategoryConsumable" xml:space="preserve"><value>消耗品</value></data>
+  <data name="ItemCategoryCraftingRecipe" xml:space="preserve"><value>製作 / 配方</value></data>
+  <data name="ItemCategoryGimmickInteractive" xml:space="preserve"><value>機關 / 互動</value></data>
+  <data name="ItemCategoryHousingProp" xml:space="preserve"><value>家園 / 道具</value></data>
+  <data name="ItemCategoryItem" xml:space="preserve"><value>物品</value></data>
+  <data name="ItemCategoryMaterial" xml:space="preserve"><value>材料</value></data>
+  <data name="ItemCategoryMountPet" xml:space="preserve"><value>坐騎 / 寵物</value></data>
+  <data name="ItemCategoryProgressionReward" xml:space="preserve"><value>成長 / 獎勵</value></data>
+  <data name="ItemCategoryQuestDocument" xml:space="preserve"><value>任務 / 文件</value></data>
+  <data name="ItemCategoryTool" xml:space="preserve"><value>工具</value></data>
+  <data name="ItemCategoryWeapon" xml:space="preserve"><value>武器</value></data>
+  <data name="ItemGroupAmuletCharm" xml:space="preserve"><value>護符 / 符咒</value></data>
+  <data name="ItemGroupArtifact" xml:space="preserve"><value>遺物</value></data>
+  <data name="ItemGroupAxeMaceHammer" xml:space="preserve"><value>斧 / 釘頭錘 / 戰錘</value></data>
+  <data name="ItemGroupBackCloak" xml:space="preserve"><value>背部 / 披風</value></data>
+  <data name="ItemGroupBackpackPack" xml:space="preserve"><value>背包 / 行囊</value></data>
+  <data name="ItemGroupBeltBand" xml:space="preserve"><value>腰帶 / 束帶</value></data>
+  <data name="ItemGroupBody" xml:space="preserve"><value>上身</value></data>
+  <data name="ItemGroupBodyAppearance" xml:space="preserve"><value>體型 / 外觀</value></data>
+  <data name="ItemGroupBookDiary" xml:space="preserve"><value>書籍 / 日記</value></data>
+  <data name="ItemGroupBowCrossbow" xml:space="preserve"><value>弓 / 弩</value></data>
+  <data name="ItemGroupClothLeather" xml:space="preserve"><value>布料 / 皮革</value></data>
+  <data name="ItemGroupClueReport" xml:space="preserve"><value>線索 / 報告</value></data>
+  <data name="ItemGroupCollectionProp" xml:space="preserve"><value>收藏道具</value></data>
+  <data name="ItemGroupContainer" xml:space="preserve"><value>容器</value></data>
+  <data name="ItemGroupCrafting" xml:space="preserve"><value>製作</value></data>
+  <data name="ItemGroupCreaturePart" xml:space="preserve"><value>生物部位</value></data>
+  <data name="ItemGroupCrystalGem" xml:space="preserve"><value>結晶 / 寶石</value></data>
+  <data name="ItemGroupCurrency" xml:space="preserve"><value>貨幣</value></data>
+  <data name="ItemGroupDaggerRapier" xml:space="preserve"><value>匕首 / 刺劍</value></data>
+  <data name="ItemGroupDecor" xml:space="preserve"><value>裝飾</value></data>
+  <data name="ItemGroupDocument" xml:space="preserve"><value>文件</value></data>
+  <data name="ItemGroupEarrings" xml:space="preserve"><value>耳環</value></data>
+  <data name="ItemGroupFace" xml:space="preserve"><value>面部</value></data>
+  <data name="ItemGroupFeet" xml:space="preserve"><value>腳部</value></data>
+  <data name="ItemGroupFirearm" xml:space="preserve"><value>火器</value></data>
+  <data name="ItemGroupFishing" xml:space="preserve"><value>釣魚</value></data>
+  <data name="ItemGroupFistMartial" xml:space="preserve"><value>拳 / 格鬥</value></data>
+  <data name="ItemGroupFlagMarker" xml:space="preserve"><value>旗幟 / 標記</value></data>
+  <data name="ItemGroupFoodDrink" xml:space="preserve"><value>食物 / 飲品</value></data>
+  <data name="ItemGroupFurniture" xml:space="preserve"><value>家具</value></data>
+  <data name="ItemGroupGatheringTool" xml:space="preserve"><value>採集工具</value></data>
+  <data name="ItemGroupGimmick" xml:space="preserve"><value>機關</value></data>
+  <data name="ItemGroupHair" xml:space="preserve"><value>頭髮</value></data>
+  <data name="ItemGroupHandTool" xml:space="preserve"><value>手工具</value></data>
+  <data name="ItemGroupHands" xml:space="preserve"><value>手部</value></data>
+  <data name="ItemGroupHead" xml:space="preserve"><value>頭部</value></data>
+  <data name="ItemGroupHorseGear" xml:space="preserve"><value>馬具</value></data>
+  <data name="ItemGroupKeyPermit" xml:space="preserve"><value>鑰匙 / 通行證</value></data>
+  <data name="ItemGroupLegs" xml:space="preserve"><value>腿部</value></data>
+  <data name="ItemGroupLightLantern" xml:space="preserve"><value>照明 / 燈籠</value></data>
+  <data name="ItemGroupMachinePart" xml:space="preserve"><value>機械零件</value></data>
+  <data name="ItemGroupMapTreasure" xml:space="preserve"><value>地圖 / 寶藏</value></data>
+  <data name="ItemGroupNecklace" xml:space="preserve"><value>項鍊</value></data>
+  <data name="ItemGroupOreMetal" xml:space="preserve"><value>礦石 / 金屬</value></data>
+  <data name="ItemGroupOtherAccessory" xml:space="preserve"><value>其他飾品</value></data>
+  <data name="ItemGroupOtherArmor" xml:space="preserve"><value>其他防具</value></data>
+  <data name="ItemGroupOtherConsumable" xml:space="preserve"><value>其他消耗品</value></data>
+  <data name="ItemGroupOtherMaterial" xml:space="preserve"><value>其他材料</value></data>
+  <data name="ItemGroupOtherTool" xml:space="preserve"><value>其他工具</value></data>
+  <data name="ItemGroupOtherWeapon" xml:space="preserve"><value>其他武器</value></data>
+  <data name="ItemGroupPetGear" xml:space="preserve"><value>寵物裝備</value></data>
+  <data name="ItemGroupPolearmSpear" xml:space="preserve"><value>長柄武器 / 槍</value></data>
+  <data name="ItemGroupPotionMedicine" xml:space="preserve"><value>藥水 / 藥品</value></data>
+  <data name="ItemGroupQuest" xml:space="preserve"><value>任務</value></data>
+  <data name="ItemGroupRecipeBook" xml:space="preserve"><value>配方書</value></data>
+  <data name="ItemGroupReward" xml:space="preserve"><value>獎勵</value></data>
+  <data name="ItemGroupRing" xml:space="preserve"><value>戒指</value></data>
+  <data name="ItemGroupShield" xml:space="preserve"><value>盾牌</value></data>
+  <data name="ItemGroupSkill" xml:space="preserve"><value>技能</value></data>
+  <data name="ItemGroupStat" xml:space="preserve"><value>屬性</value></data>
+  <data name="ItemGroupSword" xml:space="preserve"><value>劍</value></data>
+  <data name="ItemGroupThrowableUtility" xml:space="preserve"><value>投擲 / 輔助</value></data>
+  <data name="ItemGroupTokenSeal" xml:space="preserve"><value>令牌 / 印記</value></data>
+  <data name="ItemGroupUnclassified" xml:space="preserve"><value>未分類</value></data>
+  <data name="ItemGroupVehicle" xml:space="preserve"><value>載具</value></data>
+  <data name="ItemGroupWandFan" xml:space="preserve"><value>法杖 / 扇</value></data>
+  <data name="ItemGroupWoodStone" xml:space="preserve"><value>木材 / 石材</value></data>
+  <data name="ItemMaterialBone" xml:space="preserve"><value>骨</value></data>
+  <data name="ItemMaterialCloth" xml:space="preserve"><value>布料</value></data>
+  <data name="ItemMaterialCrystal" xml:space="preserve"><value>結晶</value></data>
+  <data name="ItemMaterialDirt" xml:space="preserve"><value>泥土</value></data>
+  <data name="ItemMaterialFur" xml:space="preserve"><value>毛皮</value></data>
+  <data name="ItemMaterialGlass" xml:space="preserve"><value>玻璃</value></data>
+  <data name="ItemMaterialGrass" xml:space="preserve"><value>草</value></data>
+  <data name="ItemMaterialHair" xml:space="preserve"><value>毛髮</value></data>
+  <data name="ItemMaterialLeather" xml:space="preserve"><value>皮革</value></data>
+  <data name="ItemMaterialMetal" xml:space="preserve"><value>金屬</value></data>
+  <data name="ItemMaterialRope" xml:space="preserve"><value>繩索</value></data>
+  <data name="ItemMaterialSkin" xml:space="preserve"><value>皮膚</value></data>
+  <data name="ItemMaterialStone" xml:space="preserve"><value>石材</value></data>
+  <data name="ItemMaterialWater" xml:space="preserve"><value>水</value></data>
+  <data name="ItemMaterialWood" xml:space="preserve"><value>木材</value></data>
+  <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo 預製物件雜湊</value></data>
+  <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>圖示/模型參照</value></data>
+  <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>本地化顯示名稱</value></data>
+  <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>背包圖示路徑</value></data>
+  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>材質槽標籤</value></data>
+  <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>物品資料庫記錄</value></data>
+  <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>已復原的物品/模型命名</value></data>
+  <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>未找到更有力的分類依據</value></data>
 </root>

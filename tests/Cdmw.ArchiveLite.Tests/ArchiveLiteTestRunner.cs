@@ -288,6 +288,46 @@ internal static class ArchiveLiteTestRunner
             }
         }
 
+        // The Item Finder's categories, groups, material tags, and evidence phrases are catalog
+        // vocabulary rather than UI chrome: they are produced in English, travel back to the worker
+        // unchanged as filters, and are only translated for display. A term with no resource falls
+        // back to its canonical English, which is a safety net for a term the classifier gains
+        // later - not a way to ship a picker half in English.
+        var catalogKeys = ItemCatalogLabels.Categories.Select(ItemCatalogLabels.CategoryKey)
+            .Concat(ItemCatalogLabels.Groups.Select(ItemCatalogLabels.GroupKey))
+            .Concat(ItemCatalogLabels.MaterialTags.Select(ItemCatalogLabels.MaterialTagKey))
+            .Concat(ItemCatalogLabels.EvidencePhrases.Select(ItemCatalogLabels.EvidenceKey))
+            .ToArray();
+        Require(
+            catalogKeys.Distinct(StringComparer.Ordinal).Count() == catalogKeys.Length,
+            "two catalog terms fold onto the same resource key");
+        var unresourced = catalogKeys.Where(key => !neutral.ContainsKey(key)).ToArray();
+        Require(
+            unresourced.Length == 0,
+            $"catalog terms have no resource string: {string.Join(", ", unresourced)}");
+
+        // The vocabulary above is a copy of what the classifier emits, so it can drift. Check it
+        // against the classifier itself rather than trusting the copy.
+        var classifierSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Cdmw.ArchiveLite.Core",
+            "ArchiveItemCatalog.cs"));
+        var classified = System.Text.RegularExpressions.Regex
+            .Matches(classifierSource, @"\(\s*""([A-Z][A-Za-z /]*)""\s*,\s*""([A-Z][A-Za-z0-9 /'-]*)""\s*[,)]")
+            .Select(match => (Category: match.Groups[1].Value, Group: match.Groups[2].Value))
+            .Distinct()
+            .ToArray();
+        Require(classified.Length > 0, "the item classifier's category vocabulary could not be read");
+        var uncovered = classified
+            .Where(pair => !ItemCatalogLabels.Categories.Contains(pair.Category, StringComparer.Ordinal)
+                || !ItemCatalogLabels.Groups.Contains(pair.Group, StringComparer.Ordinal))
+            .Select(pair => $"{pair.Category} / {pair.Group}")
+            .ToArray();
+        Require(
+            uncovered.Length == 0,
+            $"the classifier assigns terms the Item Finder cannot localize: {string.Join(", ", uncovered)}");
+
         return Task.CompletedTask;
     }
 
@@ -4439,6 +4479,15 @@ internal static class ArchiveLiteTestRunner
                 var englishAllMaterials = viewModel.MaterialTagOptions[0].Label;
                 var englishAllCategories = viewModel.CategoryOptions[0].Label;
                 var englishLinkedSummary = viewModel.Items[0].LinkedSummary;
+                // The facet rows and the detail pane carry catalog vocabulary, which is localized
+                // for display while the value the worker filters on stays canonical English.
+                var englishSwordFacet = viewModel.CategoryOptions[1].Label;
+                var englishMetalFacet = viewModel.MaterialTagOptions[1].Label;
+                var englishCategoryPath = viewModel.Items[0].CategoryPath;
+                var englishMaterials = viewModel.Items[0].MaterialTagsText;
+                Require(
+                    englishSwordFacet.StartsWith("Weapon / Sword", StringComparison.Ordinal),
+                    "an English category facet did not read as its canonical catalog term");
                 LocalizationManager.ApplyCulture("ko");
                 viewModel.RefreshLocalization();
                 Require(
@@ -4447,13 +4496,26 @@ internal static class ArchiveLiteTestRunner
                     && viewModel.CategoryOptions[0].Label != englishAllCategories
                     && viewModel.Items[0].LinkedSummary != englishLinkedSummary,
                     "an Item Finder language change left settled text in the previous language");
+                Require(
+                    viewModel.CategoryOptions[1].Label != englishSwordFacet
+                    && viewModel.MaterialTagOptions[1].Label != englishMetalFacet
+                    && viewModel.Items[0].CategoryPath != englishCategoryPath
+                    && viewModel.Items[0].MaterialTagsText != englishMaterials,
+                    "Item Finder catalog vocabulary stayed English after a language change");
+                Require(
+                    viewModel.CategoryOptions[1].Category == "Weapon"
+                    && viewModel.CategoryOptions[1].Group == "Sword"
+                    && viewModel.MaterialTagOptions[1].Value == "metal",
+                    "localizing a facet label also translated the value the worker filters on");
                 LocalizationManager.ApplyCulture("en");
                 viewModel.RefreshLocalization();
                 Require(
                     viewModel.Status == englishStatus
                     && viewModel.MaterialTagOptions[0].Label == englishAllMaterials
                     && viewModel.CategoryOptions[0].Label == englishAllCategories
-                    && viewModel.Items[0].LinkedSummary == englishLinkedSummary,
+                    && viewModel.Items[0].LinkedSummary == englishLinkedSummary
+                    && viewModel.CategoryOptions[1].Label == englishSwordFacet
+                    && viewModel.Items[0].CategoryPath == englishCategoryPath,
                     "returning to a language left Item Finder text stuck in the one before it");
                 await Task.Delay(320).ConfigureAwait(true);
                 Require(fakeWorker.SearchCount == 3, "a language round trip triggered an Item Finder search");
@@ -7027,11 +7089,13 @@ internal static class ArchiveLiteTestRunner
                         ["equipment/sword"],
                         ["ui/icon/item/sword_d.dds"],
                         ["Gilded Longsword"],
-                        ["steel"],
+                        // The accelerator folds its aliases onto canonical tags before publishing,
+                        // so "steel" reaches the UI as "metal".
+                        ["metal"],
                         1,
                         "Synthetic regression row")],
                     categories,
-                    [new ItemCatalogValueFacet("steel", 1)]);
+                    [new ItemCatalogValueFacet("metal", 1)]);
                 return (TResult)(object)result;
             }
             if (kind == WorkerProtocol.LoadItemIcons && payload is ItemIconBatchRequest icons)

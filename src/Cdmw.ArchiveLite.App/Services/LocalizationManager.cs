@@ -33,6 +33,13 @@ public static class LocalizationManager
 
     public static string Get(string key) => Resources.GetString(key, Volatile.Read(ref _selectedCulture)) ?? $"[{key}]";
 
+    /// <summary>
+    /// Resolves a key that may legitimately be absent, for text whose vocabulary comes from the
+    /// catalog rather than the UI. Callers fall back to the canonical value instead of showing the
+    /// bracketed key <see cref="Get"/> produces.
+    /// </summary>
+    public static string? Find(string key) => Resources.GetString(key, Volatile.Read(ref _selectedCulture));
+
     public static string Format(string key, params object?[] values) =>
         string.Format(Volatile.Read(ref _selectedCulture), Get(key), values);
 

@@ -30,12 +30,21 @@ public sealed class ItemFinderViewModel : ObservableObject
     private long _warmupGeneration;
     private string? _sessionId;
     private string? _warmupSessionId;
-    private string _warmupSummary = string.Empty;
+    /// <summary>
+    /// How to rebuild the warm-up line. The dialog is recreated on every open while the warm-up it
+    /// reports belongs to the archive session, so storing the formatted text let a summary produced
+    /// under one language reappear verbatim under the next.
+    /// </summary>
+    private Func<string>? _warmupSummary;
     private string _query = string.Empty;
     private ItemFinderCategoryOption? _selectedCategory;
     private ItemFinderValueOption? _selectedMaterialTag;
     private ItemFinderRowViewModel? _selectedItem;
     private string _status = LocalizationManager.Get("ItemFinderOpenArchive");
+    /// <summary>
+    /// How to rebuild the settled status line, kept so a later language change can re-resolve it.
+    /// </summary>
+    private Func<string>? _statusSource;
     private string _iconWarmupStatus = string.Empty;
     private bool _isBusy;
     private bool _isActive;
@@ -141,7 +150,23 @@ public sealed class ItemFinderViewModel : ObservableObject
     public string Status
     {
         get => _status;
-        private set => SetProperty(ref _status, value);
+        // A direct assignment is a transient line (loading, scoping) that a later language change
+        // must not overwrite with a settled result, so it drops the stored source.
+        private set
+        {
+            _statusSource = null;
+            SetProperty(ref _status, value);
+        }
+    }
+
+    /// <summary>
+    /// Publishes a status line that survives a language change, by keeping the resolver rather than
+    /// the resolved text.
+    /// </summary>
+    private void SetStatus(Func<string> localized)
+    {
+        Status = localized();
+        _statusSource = localized;
     }
 
     public string IconWarmupStatus
@@ -187,7 +212,7 @@ public sealed class ItemFinderViewModel : ObservableObject
         RaiseAvailability();
         if (!IsAvailable)
         {
-            Status = LocalizationManager.Get("ItemFinderOpenArchive");
+            SetStatus(static () => LocalizationManager.Get("ItemFinderOpenArchive"));
             return;
         }
         await SearchLatestAsync(resetPage: true, _activation.Token).ConfigureAwait(true);
@@ -210,15 +235,14 @@ public sealed class ItemFinderViewModel : ObservableObject
         CancelWarmup();
         _sessionId = _getSessionId();
         _warmupSessionId = null;
-        _warmupSummary = string.Empty;
+        _warmupSummary = null;
         Items.Clear();
         SelectedItem = null;
         _pageStart = 0;
         _totalMatches = 0;
         ClearBitmapCache();
-        Status = IsAvailable
-            ? LocalizationManager.Get("ItemFinderReady")
-            : LocalizationManager.Get("ItemFinderOpenArchive");
+        var available = IsAvailable;
+        SetStatus(() => LocalizationManager.Get(available ? "ItemFinderReady" : "ItemFinderOpenArchive"));
         IconWarmupStatus = string.Empty;
         OnPropertyChanged(nameof(PageStart));
         OnPropertyChanged(nameof(TotalMatches));
@@ -249,22 +273,38 @@ public sealed class ItemFinderViewModel : ObservableObject
         _suppressFilterSearch++;
         try
         {
-            if (CategoryOptions.Count > 0)
-            {
-                CategoryOptions[0] = ItemFinderCategoryOption.All();
-                SelectedCategory = CategoryOptions.FirstOrDefault(option => option.Key == selectedCategoryKey) ?? CategoryOptions[0];
-            }
-            if (MaterialTagOptions.Count > 0)
-            {
-                MaterialTagOptions[0] = ItemFinderValueOption.All();
-                SelectedMaterialTag = MaterialTagOptions.FirstOrDefault(option => option.Value == selectedMaterial) ?? MaterialTagOptions[0];
-            }
+            // Every row carries a localized category, group, or material name, not just the leading
+            // "all" entry, so the whole picker is rebuilt and the selection restored by its
+            // canonical value - which is what the worker filters on and never changes with language.
+            RebuildCategoryOptions();
+            SelectedCategory = CategoryOptions.FirstOrDefault(option => option.Key == selectedCategoryKey) ?? CategoryOptions[0];
+            RebuildMaterialTagOptions();
+            SelectedMaterialTag = MaterialTagOptions.FirstOrDefault(option => option.Value == selectedMaterial) ?? MaterialTagOptions[0];
         }
         finally
         {
             _suppressFilterSearch--;
         }
         OnPropertyChanged(nameof(PageSummary));
+
+        // Re-publish through the helpers rather than the properties: those setters drop the stored
+        // resolver, so a direct assignment would re-resolve once and leave the next language change
+        // with nothing to rebuild from.
+        if (_statusSource is not null)
+        {
+            SetStatus(_statusSource);
+        }
+        if (_warmupSummary is not null && !string.IsNullOrEmpty(IconWarmupStatus))
+        {
+            IconWarmupStatus = _warmupSummary();
+        }
+
+        // The detail pane reads counts and placeholders off the row itself, so nothing in a row
+        // tells it the language moved.
+        foreach (var item in Items)
+        {
+            item.RefreshLocalization();
+        }
     }
 
     public ItemFinderSettings CaptureSettings() => new(
@@ -330,7 +370,7 @@ public sealed class ItemFinderViewModel : ObservableObject
         var sessionId = _sessionId;
         if (!_isActive || string.IsNullOrWhiteSpace(sessionId))
         {
-            Status = LocalizationManager.Get("ItemFinderOpenArchive");
+            SetStatus(static () => LocalizationManager.Get("ItemFinderOpenArchive"));
             return;
         }
         if (resetPage)
@@ -388,7 +428,8 @@ public sealed class ItemFinderViewModel : ObservableObject
             OnPropertyChanged(nameof(PageStart));
             OnPropertyChanged(nameof(TotalMatches));
             OnPropertyChanged(nameof(PageSummary));
-            Status = result.Warning ?? PageSummary;
+            var warning = result.Warning;
+            SetStatus(() => warning ?? PageSummary);
             IsBusy = false;
             RaiseCommandStates();
             StartPageIconLoading(Items.ToArray(), sessionId, generation);
@@ -402,7 +443,8 @@ public sealed class ItemFinderViewModel : ObservableObject
         {
             if (IsCurrent(sessionId, generation))
             {
-                Status = LocalizationManager.Format("ItemFinderFailed", exception.Message);
+                var reason = exception.Message;
+                SetStatus(() => LocalizationManager.Format("ItemFinderFailed", reason));
                 _setShellStatus(Status);
             }
         }
@@ -438,27 +480,14 @@ public sealed class ItemFinderViewModel : ObservableObject
             if (!_categoryFacets.SequenceEqual(categoryFacets))
             {
                 _categoryFacets = categoryFacets;
-                CategoryOptions.Clear();
-                CategoryOptions.Add(ItemFinderCategoryOption.All());
-                foreach (var facet in categoryFacets)
-                {
-                    CategoryOptions.Add(new ItemFinderCategoryOption(
-                        facet.Category,
-                        facet.Group,
-                        $"{facet.Category} / {facet.Group} ({facet.Count:N0})"));
-                }
+                RebuildCategoryOptions();
             }
             SelectedCategory = CategoryOptions.FirstOrDefault(option => option.Key == categoryKey) ?? CategoryOptions[0];
 
             if (!_materialFacets.SequenceEqual(materialFacets))
             {
                 _materialFacets = materialFacets;
-                MaterialTagOptions.Clear();
-                MaterialTagOptions.Add(ItemFinderValueOption.All());
-                foreach (var facet in materialFacets)
-                {
-                    MaterialTagOptions.Add(new ItemFinderValueOption(facet.Value, $"{facet.Value} ({facet.Count:N0})"));
-                }
+                RebuildMaterialTagOptions();
             }
             SelectedMaterialTag = MaterialTagOptions.FirstOrDefault(option => option.Value == materialValue) ?? MaterialTagOptions[0];
         }
@@ -469,6 +498,36 @@ public sealed class ItemFinderViewModel : ObservableObject
         _preferredCategory = null;
         _preferredGroup = null;
         _preferredMaterialTag = null;
+    }
+
+    /// <summary>
+    /// Rebuilds the picker from the facets last received. The counts come from the catalog but the
+    /// category and group names are localized, so this runs both when the facets change and when the
+    /// language does.
+    /// </summary>
+    private void RebuildCategoryOptions()
+    {
+        CategoryOptions.Clear();
+        CategoryOptions.Add(ItemFinderCategoryOption.All());
+        foreach (var facet in _categoryFacets)
+        {
+            CategoryOptions.Add(new ItemFinderCategoryOption(
+                facet.Category,
+                facet.Group,
+                $"{ItemCatalogLabels.CategoryPath(facet.Category, facet.Group)} ({facet.Count:N0})"));
+        }
+    }
+
+    private void RebuildMaterialTagOptions()
+    {
+        MaterialTagOptions.Clear();
+        MaterialTagOptions.Add(ItemFinderValueOption.All());
+        foreach (var facet in _materialFacets)
+        {
+            MaterialTagOptions.Add(new ItemFinderValueOption(
+                facet.Value,
+                $"{ItemCatalogLabels.MaterialTag(facet.Value)} ({facet.Count:N0})"));
+        }
     }
 
     private void StartPageIconLoading(
@@ -581,9 +640,9 @@ public sealed class ItemFinderViewModel : ObservableObject
     {
         if (string.Equals(_warmupSessionId, sessionId, StringComparison.Ordinal))
         {
-            if (_isActive && !string.IsNullOrWhiteSpace(_warmupSummary))
+            if (_isActive && _warmupSummary is not null)
             {
-                IconWarmupStatus = _warmupSummary;
+                IconWarmupStatus = _warmupSummary();
             }
             return;
         }
@@ -591,19 +650,21 @@ public sealed class ItemFinderViewModel : ObservableObject
         _warmupOperation?.Dispose();
         _warmupOperation = new CancellationTokenSource();
         _warmupSessionId = sessionId;
-        _warmupSummary = LocalizationManager.Get("ItemFinderIconWarmupStarting");
+        _warmupSummary = static () => LocalizationManager.Get("ItemFinderIconWarmupStarting");
         if (_isActive)
         {
-            IconWarmupStatus = _warmupSummary;
+            IconWarmupStatus = _warmupSummary();
         }
         var progress = new Progress<ProgressUpdate>(update =>
         {
             if (_isActive && string.Equals(_sessionId, sessionId, StringComparison.Ordinal))
             {
-                IconWarmupStatus = update.Total > 0
-                    ? LocalizationManager.Format("ItemFinderIconWarmup", update.Completed, update.Total)
+                var completed = update.Completed;
+                var total = update.Total;
+                _warmupSummary = () => total > 0
+                    ? LocalizationManager.Format("ItemFinderIconWarmup", completed, total)
                     : LocalizationManager.Get("ItemFinderIconWarmupStarting");
-                _warmupSummary = IconWarmupStatus;
+                IconWarmupStatus = _warmupSummary();
             }
         });
         _warmupTask = WarmIconsAsync(sessionId, prioritizedItemIds, _warmupOperation.Token, progress);
@@ -623,11 +684,13 @@ public sealed class ItemFinderViewModel : ObservableObject
                 new WarmItemIconsRequest(sessionId, prioritizedItemIds, MaximumIcons: 0, ThumbnailSize),
                 cancellationToken,
                 progress).ConfigureAwait(true);
+            var ready = result.Ready;
+            var considered = result.Considered;
+            _warmupSummary = () => LocalizationManager.Format("ItemFinderIconWarmupReady", ready, considered);
             if (_isActive && string.Equals(_sessionId, sessionId, StringComparison.Ordinal))
             {
-                IconWarmupStatus = LocalizationManager.Format("ItemFinderIconWarmupReady", result.Ready, result.Considered);
+                IconWarmupStatus = _warmupSummary();
             }
-            _warmupSummary = LocalizationManager.Format("ItemFinderIconWarmupReady", result.Ready, result.Considered);
         }
         catch (OperationCanceledException)
         {
@@ -635,11 +698,12 @@ public sealed class ItemFinderViewModel : ObservableObject
         }
         catch (Exception exception)
         {
+            var reason = exception.Message;
+            _warmupSummary = () => LocalizationManager.Format("ItemFinderIconFailed", reason);
             if (_isActive && string.Equals(_sessionId, sessionId, StringComparison.Ordinal))
             {
-                IconWarmupStatus = LocalizationManager.Format("ItemFinderIconFailed", exception.Message);
+                IconWarmupStatus = _warmupSummary();
             }
-            _warmupSummary = LocalizationManager.Format("ItemFinderIconFailed", exception.Message);
             _warmupSessionId = null;
         }
     }
@@ -819,19 +883,21 @@ public sealed class ItemFinderRowViewModel(ItemCatalogRow source) : ObservableOb
     public string DisplayName => source.DisplayName;
     public string Category => source.Category;
     public string Group => source.Group;
-    public string CategoryPath => $"{Category} / {Group}";
-    public string CategoryEvidence => source.CategoryEvidence;
+    public string CategoryPath => ItemCatalogLabels.CategoryPath(Category, Group);
+    public string CategoryEvidence => ItemCatalogLabels.Evidence(source.CategoryEvidence);
     public IReadOnlyList<string> PacFiles => source.PacFiles;
     public IReadOnlyList<string> ModelStems => source.ModelStems;
     public IReadOnlyList<string> IconPaths => source.IconPaths;
     public IReadOnlyList<string> LocalizedNames => source.LocalizedNames;
     public IReadOnlyList<string> MaterialTags => source.MaterialTags;
     public int VariantCount => source.VariantCount;
-    public string Evidence => source.Evidence;
+    public string Evidence => ItemCatalogLabels.Evidence(source.Evidence);
     public string FallbackText => string.IsNullOrWhiteSpace(DisplayName) ? "?" : DisplayName[..1].ToUpperInvariant();
     public string LinkedSummary => LocalizationManager.Format("ItemFinderLinkedSummary", PacFiles.Count, IconPaths.Count, VariantCount);
     public string LocalizedNamesText => LocalizedNames.Count > 0 ? string.Join(", ", LocalizedNames) : LocalizationManager.Get("None");
-    public string MaterialTagsText => MaterialTags.Count > 0 ? string.Join(", ", MaterialTags) : LocalizationManager.Get("None");
+    public string MaterialTagsText => MaterialTags.Count > 0
+        ? string.Join(", ", MaterialTags.Select(ItemCatalogLabels.MaterialTag))
+        : LocalizationManager.Get("None");
     public string ModelFilesText => PacFiles.Count > 0 ? string.Join(Environment.NewLine, PacFiles) : LocalizationManager.Get("None");
     public string IconPathsText => IconPaths.Count > 0 ? string.Join(Environment.NewLine, IconPaths) : LocalizationManager.Get("None");
 
@@ -839,6 +905,22 @@ public sealed class ItemFinderRowViewModel(ItemCatalogRow source) : ObservableOb
     {
         get => _icon;
         set => SetProperty(ref _icon, value);
+    }
+
+    /// <summary>
+    /// Re-raises the row's computed text so the detail pane repaints after a language change. The
+    /// row wraps an immutable DTO, so only the strings that mix in resources need announcing.
+    /// </summary>
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(CategoryPath));
+        OnPropertyChanged(nameof(Evidence));
+        OnPropertyChanged(nameof(CategoryEvidence));
+        OnPropertyChanged(nameof(LinkedSummary));
+        OnPropertyChanged(nameof(LocalizedNamesText));
+        OnPropertyChanged(nameof(MaterialTagsText));
+        OnPropertyChanged(nameof(ModelFilesText));
+        OnPropertyChanged(nameof(IconPathsText));
     }
 }
 
