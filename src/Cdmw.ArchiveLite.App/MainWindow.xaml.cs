@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Cdmw.ArchiveLite.App.Infrastructure;
 using Cdmw.ArchiveLite.App.Dialogs;
@@ -62,13 +63,16 @@ public partial class MainWindow : Window
         ThemeManager.ThemeChanged += OnThemeChanged;
         _viewModel.ArchiveBrowser.PropertyChanged += OnArchiveBrowserPropertyChanged;
         _viewModel.ArchiveBrowser.Entries.CollectionChanged += OnArchiveEntriesChanged;
-        ApplyWindowPlacement();
     }
 
     private void OnSourceInitialized(object? sender, EventArgs eventArgs)
     {
         ThemedWindowChrome.Apply(this);
         MaximizedWindowBounds.Apply(this);
+        // Placement is applied here rather than in the constructor: until the window has a handle it
+        // belongs to no display, so any size given to it would be read against the primary monitor's
+        // scale even when it is about to open on a monitor at another one.
+        ApplyWindowPlacement();
     }
 
     private void OnThemeChanged(object? sender, EventArgs eventArgs)
@@ -614,34 +618,46 @@ public partial class MainWindow : Window
     private void ApplyWindowPlacement()
     {
         var placement = _viewModel.WindowPlacement;
-        if (placement is null)
+        if (placement is null || !placement.HasRestoredBounds)
+        {
+            // Nothing usable remembered -- including a settings file from a build that stored
+            // device-independent units, whose numbers cannot be reinterpreted safely.
+            return;
+        }
+
+        var saved = new PixelRect(
+            placement.PixelLeft!.Value,
+            placement.PixelTop!.Value,
+            placement.PixelWidth!.Value,
+            placement.PixelHeight!.Value);
+        var resolved = WindowPlacementPolicy.Resolve(saved, NativeWindowPlacement.Monitors());
+        var handle = new WindowInteropHelper(this).Handle;
+        if (!NativeWindowPlacement.Apply(handle, resolved, placement.IsMaximized))
         {
             return;
         }
 
-        var virtualLeft = SystemParameters.VirtualScreenLeft;
-        var virtualTop = SystemParameters.VirtualScreenTop;
-        var virtualWidth = Math.Max(MinWidth, SystemParameters.VirtualScreenWidth);
-        var virtualHeight = Math.Max(MinHeight, SystemParameters.VirtualScreenHeight);
-        var width = NormalizeDimension(placement.Width, Width, MinWidth, virtualWidth);
-        var height = NormalizeDimension(placement.Height, Height, MinHeight, virtualHeight);
-        Width = width;
-        Height = height;
-
-        if (placement.Left is { } left
-            && placement.Top is { } top
-            && double.IsFinite(left)
-            && double.IsFinite(top))
-        {
-            WindowStartupLocation = WindowStartupLocation.Manual;
-            Left = Math.Clamp(left, virtualLeft, virtualLeft + Math.Max(0, virtualWidth - width));
-            Top = Math.Clamp(top, virtualTop, virtualTop + Math.Max(0, virtualHeight - height));
-        }
-
+        WindowStartupLocation = WindowStartupLocation.Manual;
         _lastNonMinimizedWindowState = placement.IsMaximized
             ? WindowState.Maximized
             : WindowState.Normal;
-        WindowState = _lastNonMinimizedWindowState;
+        if (!placement.IsMaximized)
+        {
+            // Opening on a display whose scale differs from the one the window was created against
+            // makes Windows rescale it on the way in, so what was asked for is not what is on
+            // screen. Re-asserting once the change has been delivered lands it exactly; by then the
+            // window is on the target display and nothing rescales it again. Skipped when the
+            // rectangle already holds, so a same-scale desktop never moves the window twice.
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Loaded,
+                new Action(() =>
+                {
+                    if (!NativeWindowPlacement.Matches(handle, resolved))
+                    {
+                        NativeWindowPlacement.Apply(handle, resolved, false);
+                    }
+                }));
+        }
     }
 
     private void ApplyWorkspaceLayout()
@@ -787,16 +803,23 @@ public partial class MainWindow : Window
 
     private WindowPlacementSettings CaptureWindowPlacement()
     {
-        var isMaximized = WindowState == WindowState.Maximized
-            || (WindowState == WindowState.Minimized && _lastNonMinimizedWindowState == WindowState.Maximized);
-        var bounds = WindowState == WindowState.Normal
-            ? new Rect(Left, Top, ActualWidth, ActualHeight)
-            : RestoreBounds;
-        if (!IsUsableBounds(bounds))
+        // Windows keeps the restored rectangle in physical pixels and keeps it correct even while
+        // the window is maximized or minimized, so it needs none of the state juggling that reading
+        // WPF's own scaled properties did -- and none of its ambiguity about which display's scale
+        // the numbers belong to.
+        var captured = NativeWindowPlacement.Capture(new WindowInteropHelper(this).Handle);
+        if (captured is not { } placement || !placement.Restored.IsUsable)
         {
-            bounds = new Rect(Left, Top, Width, Height);
+            return new WindowPlacementSettings(
+                IsMaximized: WindowState == WindowState.Maximized
+                    || (WindowState == WindowState.Minimized && _lastNonMinimizedWindowState == WindowState.Maximized));
         }
-        return new WindowPlacementSettings(bounds.Left, bounds.Top, bounds.Width, bounds.Height, isMaximized);
+        return new WindowPlacementSettings(
+            placement.Restored.Left,
+            placement.Restored.Top,
+            placement.Restored.Width,
+            placement.Restored.Height,
+            placement.IsMaximized);
     }
 
     private static IReadOnlyList<GridColumnSettings> CaptureGridColumnLayout(
@@ -847,14 +870,5 @@ public partial class MainWindow : Window
         var normalized = double.IsFinite(value) ? value : fallback;
         return Math.Clamp(normalized, minimum, Math.Max(minimum, maximum));
     }
-
-    private static bool IsUsableBounds(Rect bounds) =>
-        !bounds.IsEmpty
-        && double.IsFinite(bounds.Left)
-        && double.IsFinite(bounds.Top)
-        && double.IsFinite(bounds.Width)
-        && double.IsFinite(bounds.Height)
-        && bounds.Width > 0
-        && bounds.Height > 0;
 
 }

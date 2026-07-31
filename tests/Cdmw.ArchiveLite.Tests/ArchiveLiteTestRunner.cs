@@ -32,6 +32,7 @@ internal static class ArchiveLiteTestRunner
             ("read-only WPF text bindings are explicitly one-way", TestReadOnlyWpfBindingsAsync),
             ("fatal diagnostics are written to portable log and crash folders", TestFatalDiagnosticsAsync),
             ("portable settings retain filters, window placement, panes, and columns", TestPortableUiSettingsAsync),
+            ("a remembered window reopens on-screen on any display arrangement", TestWindowPlacementPolicyAsync),
             ("preview pane sizing stays inside the live workspace", TestWorkspacePaneSizingAsync),
             ("WPF themes expose the shared palette and safe progress bindings", TestWpfThemesAsync),
             ("Lite branding is distinct and embedded in both user-facing executables", TestApplicationBrandingAsync),
@@ -616,6 +617,8 @@ internal static class ArchiveLiteTestRunner
                 true),
             ItemFinder: new ItemFinderSettings("sword", "Weapon", "Sword", "steel", 1180, 760),
             WindowPlacement: new WindowPlacementSettings(120, 80, 1320, 790, true),
+            // Placement is stored in physical pixels; a file written by a build that stored
+            // device-independent units carries no pixel figures and must not be reinterpreted.
             WorkspaceLayout: new WorkspaceLayoutSettings(336, 488, 318, 452),
             ArchiveColumnLayout:
             [
@@ -3009,6 +3012,94 @@ internal static class ArchiveLiteTestRunner
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    private static Task TestWindowPlacementPolicyAsync()
+    {
+        // Physical pixels, so a layout is written the way Windows reports it: origin, size, and the
+        // work area the taskbar leaves. Scale never appears -- that is the point of the change.
+        static MonitorArea Monitor(int left, int top, int width, int height, bool primary, int taskbar = 48) =>
+            new(
+                new PixelRect(left, top, width, height),
+                new PixelRect(left, top, width, height - taskbar),
+                primary);
+
+        // The reported desktop: a 1920x1080 at 100% sitting left of a 3440x1440 at 150%. The
+        // remembered window is the one that filled the smaller screen.
+        var mixedDpi = new[]
+        {
+            Monitor(-1920, 0, 1920, 1080, primary: false),
+            Monitor(0, 0, 3440, 1440, primary: true),
+        };
+        var onSecondary = WindowPlacementPolicy.Resolve(new PixelRect(-1920, 0, 1920, 1032), mixedDpi);
+        Require(
+            onSecondary == new PixelRect(-1920, 0, 1920, 1032),
+            "a window remembered on a lower-scale monitor did not reopen at the size and place it was left");
+
+        // Every arrangement below is checked against one invariant rather than a hand-computed
+        // rectangle: whatever comes back must sit wholly inside some monitor's work area. That is
+        // the property the user actually cares about, and it holds for displays neither of us has.
+        var layouts = new (string Name, MonitorArea[] Monitors)[]
+        {
+            ("single 1920x1080", [Monitor(0, 0, 1920, 1080, primary: true)]),
+            ("single 4K", [Monitor(0, 0, 3840, 2160, primary: true)]),
+            ("single small laptop", [Monitor(0, 0, 1366, 768, primary: true, taskbar: 40)]),
+            ("mixed-DPI side by side", mixedDpi),
+            ("secondary above primary", [Monitor(0, -1080, 1920, 1080, primary: false), Monitor(0, 0, 2560, 1440, primary: true)]),
+            ("three across, primary in the middle",
+            [
+                Monitor(-1200, 0, 1200, 1920, primary: false),
+                Monitor(0, 0, 2560, 1440, primary: true),
+                Monitor(2560, 200, 1920, 1080, primary: false),
+            ]),
+            ("taskbar at the top", [Monitor(0, 0, 1920, 1080, primary: true, taskbar: 0) with { WorkArea = new PixelRect(0, 48, 1920, 1032) }]),
+        };
+
+        // Rectangles a saved file could plausibly hold, including ones no longer reachable.
+        var savedRectangles = new (string Name, PixelRect Rectangle)[]
+        {
+            ("modest window at the origin", new PixelRect(100, 100, 1440, 880)),
+            ("wider than any single display", new PixelRect(0, 0, 6000, 1200)),
+            ("taller than any single display", new PixelRect(0, 0, 1400, 3000)),
+            ("on a monitor that is gone", new PixelRect(-4000, -2000, 1280, 800)),
+            ("far off to the right", new PixelRect(9000, 300, 1280, 800)),
+            ("straddling two monitors", new PixelRect(-400, 40, 1600, 900)),
+            ("mostly under the taskbar", new PixelRect(200, 1050, 1200, 800)),
+            ("degenerate size", new PixelRect(10, 10, 0, 0)),
+            ("negative size", new PixelRect(10, 10, -50, -50)),
+        };
+
+        foreach (var layout in layouts)
+        {
+            foreach (var saved in savedRectangles)
+            {
+                var resolved = WindowPlacementPolicy.Resolve(saved.Rectangle, layout.Monitors);
+                Require(
+                    resolved.IsUsable,
+                    $"{layout.Name}: {saved.Name} resolved to an unusable rectangle");
+                Require(
+                    layout.Monitors.Any(monitor =>
+                        resolved.Left >= monitor.WorkArea.Left
+                        && resolved.Top >= monitor.WorkArea.Top
+                        && resolved.Right <= monitor.WorkArea.Right
+                        && resolved.Bottom <= monitor.WorkArea.Bottom),
+                    $"{layout.Name}: {saved.Name} reopened outside every monitor's work area as {resolved}");
+            }
+        }
+
+        // A rectangle already sitting inside a work area must be handed back untouched, or the
+        // window would creep every time it is reopened.
+        var settled = new PixelRect(300, 200, 1440, 880);
+        Require(
+            WindowPlacementPolicy.Resolve(settled, [Monitor(0, 0, 2560, 1440, primary: true)]) == settled,
+            "a window already inside the work area was moved on reopening");
+
+        // With no monitors reported there is nothing to validate against, and inventing a position
+        // would be worse than leaving the caller's own defaults alone.
+        Require(
+            WindowPlacementPolicy.Resolve(settled, []) == settled,
+            "placement was rewritten with no monitor information to justify it");
+        return Task.CompletedTask;
     }
 
     private static async Task TestNativeModelPreviewPackageAsync()

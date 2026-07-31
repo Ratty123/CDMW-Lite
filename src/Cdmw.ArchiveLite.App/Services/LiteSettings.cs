@@ -88,12 +88,26 @@ public sealed record ItemFinderSettings(
     double Width = 1240,
     double Height = 800);
 
+/// <summary>
+/// Where the main window was left, in physical screen pixels.
+/// </summary>
+/// <remarks>
+/// These were once WPF device-independent units, which are only meaningful next to the scale of the
+/// display they were measured on: a window remembered on a 100% monitor came back half again as
+/// large on a 150% one. The pixel names are deliberately new, so a settings file written by an
+/// older build supplies nothing here and opens at the default size rather than at a figure whose
+/// units are no longer known.
+/// </remarks>
 public sealed record WindowPlacementSettings(
-    double? Left = null,
-    double? Top = null,
-    double Width = 1440,
-    double Height = 880,
-    bool IsMaximized = false);
+    int? PixelLeft = null,
+    int? PixelTop = null,
+    int? PixelWidth = null,
+    int? PixelHeight = null,
+    bool IsMaximized = false)
+{
+    public bool HasRestoredBounds =>
+        PixelLeft is not null && PixelTop is not null && PixelWidth > 0 && PixelHeight > 0;
+}
 
 public sealed record WorkspaceLayoutSettings(
     double ArchiveFilterWidth = 278,
