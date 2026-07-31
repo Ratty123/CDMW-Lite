@@ -38,6 +38,24 @@ internal static class NativePreviewGeometryIO
         }
     }
 
+    // Positions leave the preview package in the renderer's normalized frame;
+    // an interchange file has to carry the source's own placement and size.
+    public static void WriteRestoredPositionAsF64(
+        byte[] input,
+        int sourceOffset,
+        byte[] output,
+        int outputOffset,
+        NativePreviewNormalization normalization)
+    {
+        for (var component = 0; component < 3; component++)
+        {
+            var value = ReadFiniteSingle(input, sourceOffset + (component * 4), "position");
+            BinaryPrimitives.WriteDoubleLittleEndian(
+                output.AsSpan(outputOffset + (component * 8), 8),
+                normalization.Restore(value, component));
+        }
+    }
+
     public static void WriteFiniteVec2AsF64(
         byte[] input,
         int sourceOffset,

@@ -49,6 +49,16 @@ static void add_package_asset_family_rows(PackageWriteState& state) {
         0, static_cast<int>(state.package.asset_family_rows.size()) - 1);
 }
 
+// The export path reconstructs source-space coordinates by undoing this
+// transform, so the manifest has to state it precisely enough to invert. The
+// stream's default six significant digits round a distant centre by more than
+// a small model's own size; nine round-trips every float exactly.
+static std::string exact_float_json(float value) {
+    std::ostringstream out;
+    out << std::setprecision(9) << value;
+    return out.str();
+}
+
 static std::string package_manifest_json(const PackageWriteState& state) {
     const std::string format = state.job.extension.size() > 1 && state.job.extension.front() == '.'
         ? state.job.extension.substr(1) : state.job.extension;
@@ -74,8 +84,8 @@ static std::string package_manifest_json(const PackageWriteState& state) {
         << "\"source_vertex_count\":" << state.geometry.source_vertex_count << ","
         << "\"vertex_count\":" << state.emitted_vertex_count << ","
         << "\"face_count\":" << state.geometry.face_count << ","
-        << "\"normalization_center\":[" << state.geometry.center.x << "," << state.geometry.center.y << "," << state.geometry.center.z << "],"
-        << "\"normalization_scale\":" << state.geometry.scale << ","
+        << "\"normalization_center\":[" << exact_float_json(state.geometry.center.x) << "," << exact_float_json(state.geometry.center.y) << "," << exact_float_json(state.geometry.center.z) << "],"
+        << "\"normalization_scale\":" << exact_float_json(state.geometry.scale) << ","
         << "\"orbit_sensitivity\":" << state.job.orbit_sensitivity << ","
         << "\"pan_sensitivity\":" << state.job.pan_sensitivity << ","
         << "\"invert_orbit_x\":" << (state.job.invert_orbit_x ? "true" : "false") << ","

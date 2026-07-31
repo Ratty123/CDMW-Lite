@@ -27,6 +27,7 @@ internal static class NativeGlbExportWriter
         {
             var result = await ReadBoundsAsync(
                 batch,
+                package.Normalization,
                 completed,
                 totalWork,
                 progress,
@@ -134,17 +135,21 @@ internal static class NativeGlbExportWriter
                         0,
                         3,
                         flipSecondComponent: false,
+                        package.Normalization,
                         completed,
                         totalWork,
                         progress,
                         currentItem,
                         token).ConfigureAwait(false);
+                    // Only positions carry the preview's framing transform; a
+                    // uniform recentre and rescale leaves normals and UVs alone.
                     completed = await CopyFloatAttributeAsync(
                         batch,
                         output,
                         3,
                         3,
                         flipSecondComponent: false,
+                        restore: null,
                         completed,
                         totalWork,
                         progress,
@@ -156,6 +161,7 @@ internal static class NativeGlbExportWriter
                         9,
                         2,
                         flipSecondComponent: true,
+                        restore: null,
                         completed,
                         totalWork,
                         progress,
@@ -209,6 +215,7 @@ internal static class NativeGlbExportWriter
 
     private static async Task<BoundsProgress> ReadBoundsAsync(
         NativePreviewMeshBatch batch,
+        NativePreviewNormalization normalization,
         long completed,
         long totalWork,
         Func<ProgressUpdate, Task>? progress,
@@ -231,7 +238,7 @@ internal static class NativeGlbExportWriter
                 var offset = localIndex * BytesPerPreviewVertex;
                 for (var component = 0; component < 3; component++)
                 {
-                    var value = ReadFiniteSingle(buffer, offset + (component * sizeof(float)), "position");
+                    var value = RestoredPosition(buffer, offset, component, normalization);
                     minimum[component] = Math.Min(minimum[component], value);
                     maximum[component] = Math.Max(maximum[component], value);
                 }
@@ -249,6 +256,7 @@ internal static class NativeGlbExportWriter
         int sourceFloatOffset,
         int components,
         bool flipSecondComponent,
+        NativePreviewNormalization? restore,
         long completed,
         long totalWork,
         Func<ProgressUpdate, Task>? progress,
@@ -272,7 +280,9 @@ internal static class NativeGlbExportWriter
                 var sourceOffset = (localIndex * BytesPerPreviewVertex) + (sourceFloatOffset * sizeof(float));
                 for (var component = 0; component < components; component++)
                 {
-                    var value = ReadFiniteSingle(inputBuffer, sourceOffset + (component * sizeof(float)), "mesh attribute");
+                    var value = restore is null
+                        ? ReadFiniteSingle(inputBuffer, sourceOffset + (component * sizeof(float)), "mesh attribute")
+                        : RestoredPosition(inputBuffer, sourceOffset, component, restore);
                     if (flipSecondComponent && component == 1)
                     {
                         value = 1.0f - value;
@@ -287,6 +297,16 @@ internal static class NativeGlbExportWriter
             await ReportAsync(progress, completed, totalWork, "mesh_export_write", currentItem).ConfigureAwait(false);
         }
         return completed;
+    }
+
+    private static float RestoredPosition(
+        byte[] buffer,
+        int vertexOffset,
+        int component,
+        NativePreviewNormalization normalization)
+    {
+        var value = ReadFiniteSingle(buffer, vertexOffset + (component * sizeof(float)), "position");
+        return (float)normalization.Restore(value, component);
     }
 
     private static async Task ReportAsync(

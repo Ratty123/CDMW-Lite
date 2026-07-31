@@ -2,6 +2,12 @@
 
 Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and package versions follow semantic versioning.
 
+## [1.0.2] - 2026-07-31
+
+### Fixed
+
+- An exported mesh keeps the position and size the archive gives it. The exporter had been pointed at the wrong one of two similar-looking sets of geometry — a mixup on my part between the model's own vertex data and the copy prepared for the preview window. The preview's copy is deliberately altered so the camera can frame any asset the same way: every position is recentred on the model's bounding box and rescaled into a two-unit cube. A character head, 17 cm across and sitting 1.71 m up the skeleton, therefore arrived in Blender as a 2-unit head at the origin. OBJ, FBX and GLB were all written from that copy, so all three lost the same thing. The transform the preview applied is recorded alongside it, so the export path now undoes it and writes the coordinates the source actually holds. Normals and UVs were never affected — a uniform recentre and rescale leaves them as they were. The recorded transform is also now stated precisely enough to invert cleanly: at the six significant digits it was written with, a model far from the origin has its centre rounded by more than its own size.
+
 ## [1.0.1] - 2026-07-30
 
 ### Added

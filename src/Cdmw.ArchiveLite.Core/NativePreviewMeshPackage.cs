@@ -2,7 +2,10 @@ using System.Text.Json;
 
 namespace Cdmw.ArchiveLite.Core;
 
-internal sealed record NativePreviewMeshPackage(IReadOnlyList<NativePreviewMeshBatch> Batches, int TotalVertices)
+internal sealed record NativePreviewMeshPackage(
+    IReadOnlyList<NativePreviewMeshBatch> Batches,
+    int TotalVertices,
+    NativePreviewNormalization Normalization)
 {
     private const int MaximumVertices = 8_000_000;
 
@@ -65,7 +68,10 @@ internal sealed record NativePreviewMeshPackage(IReadOnlyList<NativePreviewMeshB
         {
             throw new InvalidDataException("Native preview package did not contain renderable batches.");
         }
-        return new NativePreviewMeshPackage(batches, totalVertices);
+        return new NativePreviewMeshPackage(
+            batches,
+            totalVertices,
+            NativePreviewNormalization.Read(manifest.RootElement));
     }
 
     private static string ResolveContainedFile(string packageRoot, string relativePath)
@@ -118,6 +124,66 @@ internal sealed record NativePreviewMeshPackage(IReadOnlyList<NativePreviewMeshB
         return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString() ?? string.Empty
             : string.Empty;
+    }
+}
+
+// The preview package stores geometry the renderer's way: every position is
+// recentred on the model's bounding box and rescaled into a two-unit cube so the
+// camera can frame any asset the same. That normalization is display state, not
+// the asset -- an export that copies those positions straight out hands the user
+// a mesh with the source's own placement and size erased. The manifest publishes
+// the centre and scale that were applied, so the export path can undo them and
+// write the coordinates the archive actually holds.
+internal sealed record NativePreviewNormalization(double CenterX, double CenterY, double CenterZ, double Scale)
+{
+    public static NativePreviewNormalization Identity { get; } = new(0.0, 0.0, 0.0, 1.0);
+
+    public bool IsIdentity => Scale == 1.0 && CenterX == 0.0 && CenterY == 0.0 && CenterZ == 0.0;
+
+    public double RestoreX(double value) => (value / Scale) + CenterX;
+
+    public double RestoreY(double value) => (value / Scale) + CenterY;
+
+    public double RestoreZ(double value) => (value / Scale) + CenterZ;
+
+    public double Restore(double value, int axis) => axis switch
+    {
+        0 => RestoreX(value),
+        1 => RestoreY(value),
+        _ => RestoreZ(value),
+    };
+
+    public static NativePreviewNormalization Read(JsonElement manifest)
+    {
+        var hasCenter = manifest.TryGetProperty("normalization_center", out var center);
+        var hasScale = manifest.TryGetProperty("normalization_scale", out var scale);
+        if (!hasCenter && !hasScale)
+        {
+            // Packages built before the manifest carried the framing transform
+            // were written unnormalized, so their geometry is already source space.
+            return Identity;
+        }
+        if (!hasCenter
+            || center.ValueKind != JsonValueKind.Array
+            || center.GetArrayLength() != 3
+            || !hasScale
+            || !scale.TryGetDouble(out var scaleValue)
+            || !double.IsFinite(scaleValue)
+            || scaleValue <= 0.0)
+        {
+            throw new InvalidDataException("Native preview manifest has an unusable geometry normalization.");
+        }
+        var components = new double[3];
+        var axis = 0;
+        foreach (var component in center.EnumerateArray())
+        {
+            if (!component.TryGetDouble(out var value) || !double.IsFinite(value))
+            {
+                throw new InvalidDataException("Native preview manifest has an unusable geometry normalization.");
+            }
+            components[axis++] = value;
+        }
+        return new NativePreviewNormalization(components[0], components[1], components[2], scaleValue);
     }
 }
 
