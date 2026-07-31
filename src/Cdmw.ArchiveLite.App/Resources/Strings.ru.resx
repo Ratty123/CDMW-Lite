@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>запись в базе данных предметов</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Восстановленные имена предмета/модели</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Более надёжных признаков категории не найдено</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Включить семейство</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Также экспортирует связанные материалы, текстуры, дескрипторы и прочие найденные ресурсы выбранного файла. При экспорте меша они помещаются в папку referenced_files/ рядом с ним.</value></data>
 </root>

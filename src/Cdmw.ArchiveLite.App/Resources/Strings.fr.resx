@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>enregistrement de la base de données d'objets</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Nommage d'objet/modèle récupéré</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Aucun indice de catégorie plus solide n'a été récupéré</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Inclure la famille</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Exporte également les matériaux, textures, descripteurs et autres ressources résolues liés au fichier ciblé. Lors d'un export de maillage, ils sont placés dans un dossier referenced_files/ à côté.</value></data>
 </root>

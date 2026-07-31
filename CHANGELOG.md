@@ -4,7 +4,15 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [1.0.2] - 2026-07-31
 
+### Added
+
+- Any export can bring the focused file's family with it, through an `Include family` tick in the export dialog. A mesh export puts the related materials, textures, descriptors and other resolved assets in a `referenced_files/` folder beside it, and a folder export writes them alongside the selection under the same layout. An OBJ binds any texture that arrives this way as its material's `map_Kd`.
+
 ### Fixed
+
+- An exported mesh is a mesh again rather than a heap of loose triangles. The export was written from the copy the preview window submits to the graphics card, which holds three unshared vertices for every triangle because the index buffer has already been spent on it. Nothing in the result was joined to anything else: it rendered correctly and could not be edited, having no edge loops, nothing to select as linked and no clean way to subdivide, and it was several times larger than it needed to be — a head that indexes 13,740 vertices shipped 75,474. The index buffer is now rebuilt for OBJ, FBX and GLB alike by rejoining corners that came from one vertex, which is exact: they were copied from a single source record, so a seam or a hard edge the source authored differs in its texture coordinate or its normal and stays apart.
+
+- An exported OBJ names materials that exist. It had always written a `usemtl` line per submesh while writing no material library, so every part of the model arrived untextured and indistinguishable. The library is now written beside it, along with the round-trip sidecar that records which archive entry the mesh came from.
 
 - The window reopens at the size and place it was left, on any display. Its remembered position was kept in units that only mean something next to one monitor's scale, so on a desktop mixing scales it came back enlarged by the difference between them and hung off the edges of the screen. It is now kept in physical pixels and checked against the displays actually attached, so it survives a monitor being rescaled, resized, rearranged or unplugged. A position remembered by an earlier build is not carried over, because the scale its numbers were written against was never recorded.
 

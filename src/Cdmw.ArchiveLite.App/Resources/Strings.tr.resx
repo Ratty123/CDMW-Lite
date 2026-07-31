@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>eşya veritabanı kaydı</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Kurtarılan eşya/model adlandırması</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Daha güçlü bir kategori kanıtı bulunamadı</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Aileyi dahil et</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Odaklanılan dosyayla ilişkili materyalleri, dokuları, tanımlayıcıları ve çözümlenmiş diğer varlıkları da dışa aktarır. Mesh dışa aktarımında bunlar yanındaki referenced_files/ klasörüne konur.</value></data>
 </root>

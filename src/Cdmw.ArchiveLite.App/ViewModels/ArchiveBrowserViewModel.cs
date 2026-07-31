@@ -2326,12 +2326,19 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             && selection.Kind != ExportKind.RawEntries
             && focusedEntry is not null)
         {
-            await ExportSelectedModelAsync(focusedEntry, selection.Kind, cancellationToken).ConfigureAwait(true);
+            await ExportSelectedModelAsync(
+                focusedEntry,
+                selection.Kind,
+                selection.IncludeFamily,
+                cancellationToken).ConfigureAwait(true);
             return;
         }
         if (selection.Mode == ExportSelectionMode.FilesOnly && focusedEntry is not null)
         {
-            await ExportSelectedRawFileAsync(focusedEntry, cancellationToken).ConfigureAwait(true);
+            await ExportSelectedRawFileAsync(
+                focusedEntry,
+                selection.IncludeFamily,
+                cancellationToken).ConfigureAwait(true);
             return;
         }
 
@@ -2341,8 +2348,20 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             return;
         }
 
+        // Here the destination is a folder, so the family joins the export set under the same
+        // layout rather than being tucked into a subfolder of its own.
+        var exportedIds = entryIds;
+        if (selection.IncludeFamily && focusedEntry is not null)
+        {
+            var family = await ResolveFamilyEntryIdsAsync(focusedEntry, true, cancellationToken).ConfigureAwait(true);
+            if (family is { Count: > 0 })
+            {
+                exportedIds = entryIds.Concat(family).Distinct().ToArray();
+            }
+        }
+
         await RunExportAsync(
-            entryIds,
+            exportedIds,
             destination,
             ExportKind.RawEntries,
             cancellationToken,
@@ -2351,7 +2370,42 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                 : ExportPathLayout.PreserveStructure).ConfigureAwait(true);
     }
 
-    private async Task ExportSelectedRawFileAsync(ArchiveEntryDto selectedEntry, CancellationToken cancellationToken)
+    /// <summary>
+    /// Resolves the focused file's associated assets when the user asked for them.
+    /// </summary>
+    /// <remarks>
+    /// A lookup that fails is reported and treated as an empty family: the user asked for the
+    /// export, and losing the companions is a smaller failure than losing the export.
+    /// </remarks>
+    private async Task<IReadOnlyList<long>?> ResolveFamilyEntryIdsAsync(
+        ArchiveEntryDto selectedEntry,
+        bool includeFamily,
+        CancellationToken cancellationToken)
+    {
+        if (!includeFamily || string.IsNullOrWhiteSpace(SessionId))
+        {
+            return null;
+        }
+        try
+        {
+            var found = await _worker.SendAsync<FindAssociatedAssetsRequest, FindAssociatedAssetsResult>(
+                WorkerProtocol.FindAssociatedAssets,
+                Interlocked.Increment(ref _foregroundGeneration),
+                new FindAssociatedAssetsRequest(SessionId, selectedEntry.EntryId, 256),
+                cancellationToken).ConfigureAwait(true);
+            return found.Assets.Select(static asset => asset.Entry.EntryId).ToArray();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _setShellStatus(exception.Message);
+            return null;
+        }
+    }
+
+    private async Task ExportSelectedRawFileAsync(
+        ArchiveEntryDto selectedEntry,
+        bool includeFamily,
+        CancellationToken cancellationToken)
     {
         var dialog = new SaveFileDialog
         {
@@ -2378,12 +2432,15 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             cancellationToken,
             singleOutputPath: dialog.FileName,
             manifestFormat: ExportManifestFormat.None,
-            pathLayout: ExportPathLayout.FilesOnly).ConfigureAwait(true);
+            pathLayout: ExportPathLayout.FilesOnly,
+            referencedEntryIds: await ResolveFamilyEntryIdsAsync(selectedEntry, includeFamily, cancellationToken)
+                .ConfigureAwait(true)).ConfigureAwait(true);
     }
 
     private async Task ExportSelectedModelAsync(
         ArchiveEntryDto selectedEntry,
         ExportKind exportKind,
+        bool includeFamily,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(SessionId))
@@ -2426,8 +2483,11 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             cancellationToken,
             singleOutputPath: outputPath,
             manifestFormat: ExportManifestFormat.None,
-            pathLayout: ExportPathLayout.FilesOnly).ConfigureAwait(true);
+            pathLayout: ExportPathLayout.FilesOnly,
+            referencedEntryIds: await ResolveFamilyEntryIdsAsync(selectedEntry, includeFamily, cancellationToken)
+                .ConfigureAwait(true)).ConfigureAwait(true);
     }
+
 
     private async Task ExportFilteredAsync(CancellationToken cancellationToken)
     {
@@ -2506,7 +2566,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         string? singleOutputPath = null,
         ExportManifestFormat? manifestFormat = null,
         string? folderPath = null,
-        ExportPathLayout pathLayout = ExportPathLayout.PreserveStructure)
+        ExportPathLayout pathLayout = ExportPathLayout.PreserveStructure,
+        IReadOnlyList<long>? referencedEntryIds = null)
     {
         if (string.IsNullOrWhiteSpace(SessionId))
         {
@@ -2532,7 +2593,8 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
                     ManifestFormat: manifestFormat ?? ManifestFormat,
                     SingleOutputPath: singleOutputPath,
                     FolderPath: folderPath,
-                    PathLayout: pathLayout),
+                    PathLayout: pathLayout,
+                    ReferencedEntryIds: referencedEntryIds),
                 operation.Token,
                 progress).ConfigureAwait(true);
             if (generation == Volatile.Read(ref _foregroundGeneration))

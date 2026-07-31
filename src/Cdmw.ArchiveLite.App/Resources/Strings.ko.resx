@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>아이템 데이터베이스 레코드</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>복원된 아이템/모델 명명</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>더 강력한 분류 단서를 찾지 못했습니다</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>관련 파일 포함</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>대상 파일과 연결된 머지얼, 텍스처, 기술자 등 확인된 에셋도 함께 내보냅니다. 메시 내보내기에서는 그 옆의 referenced_files/ 폴더에 들어갑니다.</value></data>
 </root>

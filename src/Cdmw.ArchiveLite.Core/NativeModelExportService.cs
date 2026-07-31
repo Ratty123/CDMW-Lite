@@ -23,6 +23,16 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
         _ => throw new NotSupportedException($"{kind} is not a mesh interchange format."),
     };
 
+    public Task ExportAsync(
+        ArchiveSession session,
+        ArchiveEntryDto entry,
+        ExportKind kind,
+        string destination,
+        bool overwrite,
+        Func<ProgressUpdate, Task>? progress,
+        CancellationToken cancellationToken) =>
+        ExportAsync(session, entry, kind, destination, overwrite, progress, [], cancellationToken);
+
     public async Task ExportAsync(
         ArchiveSession session,
         ArchiveEntryDto entry,
@@ -30,6 +40,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
         string destination,
         bool overwrite,
         Func<ProgressUpdate, Task>? progress,
+        IReadOnlyList<string> companionTextures,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -48,9 +59,37 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             overwrite,
             progress,
             entry.Path,
+            companionTextures,
             cancellationToken).ConfigureAwait(false);
     }
 
+    public Task ExportPackageAsync(
+        string packageRoot,
+        string sourcePath,
+        ExportKind kind,
+        string destination,
+        bool overwrite,
+        Func<ProgressUpdate, Task>? progress,
+        string? currentItem,
+        CancellationToken cancellationToken) =>
+        ExportPackageAsync(
+            packageRoot,
+            sourcePath,
+            kind,
+            destination,
+            overwrite,
+            progress,
+            currentItem,
+            [],
+            cancellationToken);
+
+    /// <summary>
+    /// Writes a mesh interchange file, binding any textures exported alongside it.
+    /// </summary>
+    /// <param name="companionTextures">
+    /// Paths, relative to the exported mesh, of textures already written beside it. Only OBJ can
+    /// name them, through its material library; the other formats carry no such reference.
+    /// </param>
     public async Task ExportPackageAsync(
         string packageRoot,
         string sourcePath,
@@ -59,6 +98,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
         bool overwrite,
         Func<ProgressUpdate, Task>? progress,
         string? currentItem,
+        IReadOnlyList<string> companionTextures,
         CancellationToken cancellationToken)
     {
         if (!SupportsFormat(kind))
@@ -99,6 +139,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             overwrite,
             progress,
             currentItem,
+            companionTextures,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -110,6 +151,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
         bool overwrite,
         Func<ProgressUpdate, Task>? progress,
         string? currentItem,
+        IReadOnlyList<string> companionTextures,
         CancellationToken cancellationToken)
     {
         var workRoot = Path.Combine(
@@ -120,6 +162,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
         var stagedOutput = Path.Combine(
             Path.GetDirectoryName(destination)!,
             $".{Path.GetFileNameWithoutExtension(destination)}.{Guid.NewGuid():N}.tmp{FileExtension(kind)}");
+        var stagedManifest = Path.Combine(workRoot, "roundtrip.meta.json");
         try
         {
             var totalWork = checked(package.TotalVertices * 2L);
@@ -152,9 +195,24 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 job["export_path"] = destination;
                 job["source_path"] = sourcePath;
                 job["source_format"] = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant();
-                job["mtl_filename"] = string.Empty;
-                job["total_vertices"] = package.TotalVertices;
+                // Naming the library makes the writer emit the mtllib line that binds the
+                // usemtl names it was already writing to definitions that exist.
+                job["mtl_filename"] = Path.GetFileName(NativeObjMaterialWriter.DestinationFor(destination));
+                // The header comment states what the file holds, which is the indexed vertex count,
+                // not the corner count the package stored.
+                job["total_vertices"] = prepared.Sum(static batch => batch.UniqueVertexCount);
                 job["total_faces"] = package.TotalVertices / 3;
+                // The round-trip sidecar comes from the same writer CDMW Full uses, so an OBJ
+                // exported here carries the manifest that identifies where it came from. It is
+                // staged like the mesh and only moved into place once the export has succeeded.
+                job["manifest_output_path"] = stagedManifest;
+                job["extra_payload"] = new Dictionary<string, object?>
+                {
+                    ["source_archive_path"] = sourcePath,
+                    ["source_archive_format"] = Path.GetExtension(sourcePath).TrimStart('.').ToLowerInvariant(),
+                    ["export_format"] = "obj",
+                    ["exported_by"] = "cdmw_archive_lite",
+                };
             }
             else
             {
@@ -177,6 +235,19 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             File.Move(stagedOutput, destination, overwrite);
+            if (kind == ExportKind.Obj)
+            {
+                await NativeObjMaterialWriter.WriteAsync(
+                    package,
+                    destination,
+                    companionTextures,
+                    overwrite,
+                    cancellationToken).ConfigureAwait(false);
+                if (File.Exists(stagedManifest))
+                {
+                    File.Move(stagedManifest, RoundtripManifestPath(destination), overwrite);
+                }
+            }
             await ReportAsync(progress, totalWork, totalWork, "mesh_export_write", currentItem).ConfigureAwait(false);
         }
         finally
@@ -217,6 +288,17 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             var uvsBuffer = new byte[RecordsPerChunk * 2 * sizeof(double)];
             var facesBuffer = new byte[(RecordsPerChunk / 3) * 3 * sizeof(int)];
 
+            // The package stores one vertex per triangle corner, so the index buffer has to be
+            // rebuilt before anything is written; exporting the corners as they stand hands over a
+            // mesh no two triangles of which share a vertex. Chunks hold whole triangles --
+            // RecordsPerChunk divides by three -- so a face never straddles two reads.
+            var welder = new NativePreviewVertexWelder(batch.VertexCount);
+            // Read in step with the geometry so each corner's source vertex is known as it is
+            // welded. Without it the sidecar can only claim an identity mapping, which welding
+            // has already made untrue.
+            await using var identity = batch.IdentityPath is null ? null : OpenRead(batch.IdentityPath);
+            var identityBuffer = identity is null ? [] : new byte[RecordsPerChunk * 8];
+            var sourceVertexMap = identity is null ? null : new List<int>(batch.VertexCount / 3);
             var batchCompleted = 0;
             while (batchCompleted < batch.VertexCount)
             {
@@ -224,42 +306,50 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 var count = Math.Min(RecordsPerChunk, batch.VertexCount - batchCompleted);
                 var inputBytes = checked(count * BytesPerPreviewVertex);
                 await input.ReadExactlyAsync(inputBuffer.AsMemory(0, inputBytes), cancellationToken).ConfigureAwait(false);
-                var vertexBytes = checked(count * 3 * sizeof(double));
-                var uvBytes = checked(count * 2 * sizeof(double));
+                if (identity is not null)
+                {
+                    await identity.ReadExactlyAsync(identityBuffer.AsMemory(0, count * 8), cancellationToken).ConfigureAwait(false);
+                }
+                var vertexBytes = 0;
+                var uvBytes = 0;
+                var faceBytes = 0;
                 for (var localIndex = 0; localIndex < count; localIndex++)
                 {
                     var sourceOffset = localIndex * BytesPerPreviewVertex;
-                    WriteRestoredPositionAsF64(
-                        inputBuffer,
-                        sourceOffset,
-                        verticesBuffer,
-                        localIndex * 24,
-                        normalization);
-                    // Normals survive the preview transform: it only recentres and
-                    // scales uniformly, so every direction it produced still points
-                    // the way the source authored it.
-                    WriteFiniteVec3AsF64(
-                        inputBuffer,
-                        sourceOffset + (3 * sizeof(float)),
-                        normalsBuffer,
-                        localIndex * 24,
-                        "normal");
-                    WriteFiniteVec2AsF64(
-                        inputBuffer,
-                        sourceOffset + (9 * sizeof(float)),
-                        uvsBuffer,
-                        localIndex * 16,
-                        "UV");
-                }
-
-                var faceBytes = 0;
-                for (var localIndex = 0; localIndex < count; localIndex += 3)
-                {
-                    var index = checked(batchCompleted + localIndex);
-                    BinaryPrimitives.WriteInt32LittleEndian(facesBuffer.AsSpan(faceBytes, 4), index);
-                    BinaryPrimitives.WriteInt32LittleEndian(facesBuffer.AsSpan(faceBytes + 4, 4), index + 1);
-                    BinaryPrimitives.WriteInt32LittleEndian(facesBuffer.AsSpan(faceBytes + 8, 4), index + 2);
-                    faceBytes += 12;
+                    if (welder.TryAssign(
+                            inputBuffer.AsSpan(sourceOffset, BytesPerPreviewVertex),
+                            out var vertexIndex))
+                    {
+                        WriteRestoredPositionAsF64(
+                            inputBuffer,
+                            sourceOffset,
+                            verticesBuffer,
+                            vertexBytes,
+                            normalization);
+                        // Normals survive the preview transform: it only recentres and
+                        // scales uniformly, so every direction it produced still points
+                        // the way the source authored it.
+                        WriteFiniteVec3AsF64(
+                            inputBuffer,
+                            sourceOffset + (3 * sizeof(float)),
+                            normalsBuffer,
+                            vertexBytes,
+                            "normal");
+                        WriteFiniteVec2AsF64(
+                            inputBuffer,
+                            sourceOffset + (9 * sizeof(float)),
+                            uvsBuffer,
+                            uvBytes,
+                            "UV");
+                        vertexBytes += 3 * sizeof(double);
+                        uvBytes += 2 * sizeof(double);
+                        // The second field of the identity pair is the source vertex this corner
+                        // came from; the first names its submesh, which the batch already fixes.
+                        sourceVertexMap?.Add(
+                            BinaryPrimitives.ReadInt32LittleEndian(identityBuffer.AsSpan((localIndex * 8) + 4, 4)));
+                    }
+                    BinaryPrimitives.WriteInt32LittleEndian(facesBuffer.AsSpan(faceBytes, 4), vertexIndex);
+                    faceBytes += sizeof(int);
                 }
 
                 await vertices.WriteAsync(verticesBuffer.AsMemory(0, vertexBytes), cancellationToken).ConfigureAwait(false);
@@ -277,11 +367,13 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 ["index"] = batch.Index,
                 ["name"] = name,
                 ["material"] = name,
-                ["vertices_binary"] = BinaryDescriptor(verticesPath, batch.VertexCount, 3, "f64"),
+                ["vertices_binary"] = BinaryDescriptor(verticesPath, welder.UniqueCount, 3, "f64"),
                 ["faces_binary"] = BinaryDescriptor(facesPath, batch.VertexCount / 3, 3, "i32"),
-                ["normals_binary"] = BinaryDescriptor(normalsPath, batch.VertexCount, 3, "f64"),
-                ["uvs_binary"] = BinaryDescriptor(uvsPath, batch.VertexCount, 2, "f64"),
-            }));
+                ["normals_binary"] = BinaryDescriptor(normalsPath, welder.UniqueCount, 3, "f64"),
+                ["uvs_binary"] = BinaryDescriptor(uvsPath, welder.UniqueCount, 2, "f64"),
+                ["source_vertex_map"] = sourceVertexMap?.ToArray(),
+            },
+            welder.UniqueCount));
         }
         return result;
     }
@@ -489,7 +581,13 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
         }
     }
 
-    private static string CleanName(string? value, string fallback)
+    /// <summary>
+    /// The round-trip sidecar's path: the exported file's own name with the suffix appended, which
+    /// is the name CDMW Full looks for when it reads an OBJ back in.
+    /// </summary>
+    internal static string RoundtripManifestPath(string objDestination) => objDestination + ".meta.json";
+
+    internal static string CleanName(string? value, string fallback)
     {
         var source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
         var builder = new StringBuilder(Math.Min(source.Length, 96));
@@ -546,5 +644,5 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             : string.Empty;
     }
 
-    private sealed record PreparedNativeBatch(Dictionary<string, object?> Payload);
+    private sealed record PreparedNativeBatch(Dictionary<string, object?> Payload, int UniqueVertexCount);
 }

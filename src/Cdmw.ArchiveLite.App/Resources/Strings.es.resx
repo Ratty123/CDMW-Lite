@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>registro de la base de datos de objetos</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Nomenclatura de objeto/modelo recuperada</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>No se recuperaron indicios de categoría más sólidos</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Incluir la familia</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Exporta también los materiales, texturas, descriptores y demás recursos resueltos relacionados con el archivo enfocado. En una exportación de malla se colocan en una carpeta referenced_files/ junto a ella.</value></data>
 </root>
