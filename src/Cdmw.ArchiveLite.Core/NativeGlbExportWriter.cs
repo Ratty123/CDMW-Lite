@@ -22,10 +22,13 @@ internal static class NativeGlbExportWriter
         var totalWork = checked(package.TotalVertices * 4L);
         long completed = 0;
         await ReportAsync(progress, completed, totalWork, "mesh_export_prepare", currentItem).ConfigureAwait(false);
-        var bounds = new List<MeshBounds>(package.Batches.Count);
+        // glTF carries an index buffer of its own, so the package's corner-by-corner geometry is
+        // rejoined into an indexed mesh here exactly as it is for OBJ and FBX. The pass also
+        // measures the bounds, which have to describe the vertices actually written.
+        var meshes = new List<WeldedBatch>(package.Batches.Count);
         foreach (var batch in package.Batches)
         {
-            var result = await ReadBoundsAsync(
+            var result = await WeldBatchAsync(
                 batch,
                 package.Normalization,
                 completed,
@@ -33,7 +36,7 @@ internal static class NativeGlbExportWriter
                 progress,
                 currentItem,
                 cancellationToken).ConfigureAwait(false);
-            bounds.Add(result.Bounds);
+            meshes.Add(result.Welded);
             completed = result.Completed;
         }
 
@@ -45,16 +48,18 @@ internal static class NativeGlbExportWriter
         for (var index = 0; index < package.Batches.Count; index++)
         {
             var batch = package.Batches[index];
+            var welded = meshes[index];
             var positionAccessor = AddFloatAccessor(
                 bufferViews,
                 accessors,
                 ref binaryLength,
-                batch.VertexCount,
+                welded.UniqueCount,
                 3,
-                bounds[index].Minimum,
-                bounds[index].Maximum);
-            var normalAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, batch.VertexCount, 3, null, null);
-            var uvAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, batch.VertexCount, 2, null, null);
+                welded.Bounds.Minimum,
+                welded.Bounds.Maximum);
+            var normalAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, welded.UniqueCount, 3, null, null);
+            var uvAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, welded.UniqueCount, 2, null, null);
+            var indexAccessor = AddIndexAccessor(bufferViews, accessors, ref binaryLength, welded.Indices.Length);
             primitives.Add(new Dictionary<string, object?>
             {
                 ["attributes"] = new Dictionary<string, object?>
@@ -63,6 +68,7 @@ internal static class NativeGlbExportWriter
                     ["NORMAL"] = normalAccessor,
                     ["TEXCOORD_0"] = uvAccessor,
                 },
+                ["indices"] = indexAccessor,
                 ["material"] = index,
                 ["mode"] = 4,
             });
@@ -127,10 +133,13 @@ internal static class NativeGlbExportWriter
                 BinaryPrimitives.WriteUInt32LittleEndian(binaryHeader.AsSpan(4, 4), 0x004E4942);
                 await output.WriteAsync(binaryHeader, token).ConfigureAwait(false);
 
-                foreach (var batch in package.Batches)
+                for (var index = 0; index < package.Batches.Count; index++)
                 {
+                    var batch = package.Batches[index];
+                    var welded = meshes[index];
                     completed = await CopyFloatAttributeAsync(
                         batch,
+                        welded,
                         output,
                         0,
                         3,
@@ -145,6 +154,7 @@ internal static class NativeGlbExportWriter
                     // uniform recentre and rescale leaves normals and UVs alone.
                     completed = await CopyFloatAttributeAsync(
                         batch,
+                        welded,
                         output,
                         3,
                         3,
@@ -157,6 +167,7 @@ internal static class NativeGlbExportWriter
                         token).ConfigureAwait(false);
                     completed = await CopyFloatAttributeAsync(
                         batch,
+                        welded,
                         output,
                         9,
                         2,
@@ -167,6 +178,7 @@ internal static class NativeGlbExportWriter
                         progress,
                         currentItem,
                         token).ConfigureAwait(false);
+                    await WriteIndicesAsync(welded, output, token).ConfigureAwait(false);
                 }
                 for (long padding = binaryLength; padding < binaryPaddedLength; padding++)
                 {
@@ -213,7 +225,7 @@ internal static class NativeGlbExportWriter
         return accessors.Count - 1;
     }
 
-    private static async Task<BoundsProgress> ReadBoundsAsync(
+    private static async Task<WeldProgress> WeldBatchAsync(
         NativePreviewMeshBatch batch,
         NativePreviewNormalization normalization,
         long completed,
@@ -224,6 +236,8 @@ internal static class NativeGlbExportWriter
     {
         var minimum = new[] { float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity };
         var maximum = new[] { float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity };
+        var welder = new NativePreviewVertexWelder(batch.VertexCount);
+        var indices = new int[batch.VertexCount];
         await using var input = OpenRead(batch.GeometryPath);
         var buffer = new byte[RecordsPerChunk * BytesPerPreviewVertex];
         var batchCompleted = 0;
@@ -236,6 +250,16 @@ internal static class NativeGlbExportWriter
             for (var localIndex = 0; localIndex < count; localIndex++)
             {
                 var offset = localIndex * BytesPerPreviewVertex;
+                var isNew = welder.TryAssign(
+                    buffer.AsSpan(offset, BytesPerPreviewVertex),
+                    out var vertexIndex);
+                indices[batchCompleted + localIndex] = vertexIndex;
+                if (!isNew)
+                {
+                    continue;
+                }
+                // Bounds describe the vertices the file will hold, so only a vertex that is
+                // actually written contributes -- a repeated corner cannot widen them anyway.
                 for (var component = 0; component < 3; component++)
                 {
                     var value = RestoredPosition(buffer, offset, component, normalization);
@@ -247,11 +271,33 @@ internal static class NativeGlbExportWriter
             completed += count;
             await ReportAsync(progress, completed, totalWork, "mesh_export_prepare", currentItem).ConfigureAwait(false);
         }
-        return new BoundsProgress(new MeshBounds(minimum, maximum), completed);
+        return new WeldProgress(
+            new WeldedBatch(indices, welder.UniqueCount, new MeshBounds(minimum, maximum)),
+            completed);
+    }
+
+    private static async Task WriteIndicesAsync(WeldedBatch welded, Stream output, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[RecordsPerChunk * sizeof(uint)];
+        var written = 0;
+        while (written < welded.Indices.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = Math.Min(RecordsPerChunk, welded.Indices.Length - written);
+            for (var localIndex = 0; localIndex < count; localIndex++)
+            {
+                BinaryPrimitives.WriteUInt32LittleEndian(
+                    buffer.AsSpan(localIndex * sizeof(uint), sizeof(uint)),
+                    (uint)welded.Indices[written + localIndex]);
+            }
+            await output.WriteAsync(buffer.AsMemory(0, count * sizeof(uint)), cancellationToken).ConfigureAwait(false);
+            written += count;
+        }
     }
 
     private static async Task<long> CopyFloatAttributeAsync(
         NativePreviewMeshBatch batch,
+        WeldedBatch welded,
         Stream output,
         int sourceFloatOffset,
         int components,
@@ -268,6 +314,7 @@ internal static class NativeGlbExportWriter
         var inputBuffer = new byte[RecordsPerChunk * BytesPerPreviewVertex];
         var outputBuffer = new byte[RecordsPerChunk * components * sizeof(float)];
         var batchCompleted = 0;
+        var emitted = 0;
         while (batchCompleted < batch.VertexCount)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -277,6 +324,14 @@ internal static class NativeGlbExportWriter
             var outputOffset = 0;
             for (var localIndex = 0; localIndex < count; localIndex++)
             {
+                // Indices were assigned in order of first appearance, so a corner introduces its
+                // vertex exactly when its index equals the number already written. That replays
+                // the welding decision without keeping a second copy of it.
+                if (welded.Indices[batchCompleted + localIndex] != emitted)
+                {
+                    continue;
+                }
+                emitted++;
                 var sourceOffset = (localIndex * BytesPerPreviewVertex) + (sourceFloatOffset * sizeof(float));
                 for (var component = 0; component < components; component++)
                 {
@@ -352,6 +407,33 @@ internal static class NativeGlbExportWriter
         return builder.Length == 0 ? fallback : builder.ToString();
     }
 
+    private static int AddIndexAccessor(
+        List<Dictionary<string, object?>> views,
+        List<Dictionary<string, object?>> accessors,
+        ref long binaryLength,
+        int count)
+    {
+        var byteLength = checked((long)count * sizeof(uint));
+        var viewIndex = views.Count;
+        views.Add(new Dictionary<string, object?>
+        {
+            ["buffer"] = 0,
+            ["byteOffset"] = binaryLength,
+            ["byteLength"] = byteLength,
+            ["target"] = 34963,
+        });
+        binaryLength = checked(binaryLength + byteLength);
+        accessors.Add(new Dictionary<string, object?>
+        {
+            ["bufferView"] = viewIndex,
+            ["componentType"] = 5125,
+            ["count"] = count,
+            ["type"] = "SCALAR",
+        });
+        return accessors.Count - 1;
+    }
+
     private sealed record MeshBounds(float[] Minimum, float[] Maximum);
-    private sealed record BoundsProgress(MeshBounds Bounds, long Completed);
+    private sealed record WeldedBatch(int[] Indices, int UniqueCount, MeshBounds Bounds);
+    private sealed record WeldProgress(WeldedBatch Welded, long Completed);
 }

@@ -115,6 +115,21 @@ public sealed class ArchiveExportService(
             outputPaths.Add(manifestWriter.DestinationPath);
         }
 
+        // The files the model points at are copied before it is written, so the material library
+        // can name the textures that are already on disk beside it.
+        var companionTextures = Array.Empty<string>() as IReadOnlyList<string>;
+        if (archiveSession is not null && request.ReferencedEntryIds is { Count: > 0 })
+        {
+            companionTextures = await CopyReferencedFilesAsync(
+                archiveSession,
+                request,
+                destination,
+                singleOutputPath,
+                outputPaths,
+                items,
+                cancellationToken).ConfigureAwait(false);
+        }
+
         void RecordOutcome(ExportOutcome outcome)
         {
             outcomeCount++;
@@ -162,6 +177,7 @@ public sealed class ArchiveExportService(
                 request,
                 outputPaths,
                 progress,
+                companionTextures,
                 cancellationToken).ConfigureAwait(false);
             RecordOutcome(outcome);
             completed++;
@@ -221,6 +237,80 @@ public sealed class ArchiveExportService(
         await progress(update).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Copies the chosen referenced entries into <c>referenced_files/</c> beside the export.
+    /// </summary>
+    /// <returns>
+    /// The texture paths among them, relative to the exported mesh, so the material library can
+    /// bind them. Anything that cannot be copied is recorded and skipped: a missing sidecar must
+    /// not cost the user the mesh they asked for.
+    /// </returns>
+    private async Task<IReadOnlyList<string>> CopyReferencedFilesAsync(
+        ArchiveSession session,
+        ExportPlanRequest request,
+        string destination,
+        string? singleOutputPath,
+        HashSet<string> outputPaths,
+        List<ExportItemResult> items,
+        CancellationToken cancellationToken)
+    {
+        const string referencedRootName = "referenced_files";
+        // The mesh can be written anywhere inside the destination, and the library names its
+        // textures relative to itself rather than to the export root.
+        var meshDirectory = singleOutputPath is null
+            ? destination
+            : Path.GetDirectoryName(singleOutputPath) ?? destination;
+        var referencedRoot = Path.Combine(destination, referencedRootName);
+        var textures = new List<string>();
+        foreach (var entryId in request.ReferencedEntryIds!.Distinct())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ArchiveEntryDto entry;
+            try
+            {
+                entry = session.Index.ReadEntry(entryId);
+            }
+            catch (Exception exception) when (exception is InvalidDataException or NativeArchiveException)
+            {
+                items.Add(new ExportItemResult($"#{entryId}", null, "failed", exception.Message));
+                continue;
+            }
+
+            var relative = ExportPathPolicy.NormalizeVirtualPath(entry.Path);
+            var target = Path.GetFullPath(Path.Combine(referencedRoot, relative.Replace('/', Path.DirectorySeparatorChar)));
+            if (!ExportPathPolicy.IsWithinOrEqual(referencedRoot, target))
+            {
+                items.Add(new ExportItemResult(entry.Path, null, "failed", "Referenced file path escaped the export folder."));
+                continue;
+            }
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                var decoded = await Task.Run(() => native.Decode(entry), cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                await AtomicFile.WriteAsync(
+                    target,
+                    async (stream, token) => await stream.WriteAsync(decoded.Bytes, token).ConfigureAwait(false),
+                    cancellationToken,
+                    overwrite: request.CollisionPolicy == ExportCollisionPolicy.Overwrite).ConfigureAwait(false);
+                outputPaths.Add(target);
+                items.Add(new ExportItemResult(entry.Path, $"{referencedRootName}/{relative}", "exported", null));
+                if (entry.Extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    textures.Add(Path.GetRelativePath(meshDirectory, target).Replace('\\', '/'));
+                }
+            }
+            catch (Exception exception) when (exception is IOException
+                or UnauthorizedAccessException
+                or NativeArchiveException
+                or InvalidDataException)
+            {
+                items.Add(new ExportItemResult(entry.Path, null, "failed", exception.Message));
+            }
+        }
+        return textures;
+    }
+
     private ArchiveEntrySet ResolveArchiveEntries(ExportPlanRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.SessionId)) return new ArchiveEntrySet(0, []);
@@ -275,6 +365,7 @@ public sealed class ArchiveExportService(
         ExportPlanRequest request,
         HashSet<string> outputPaths,
         Func<ProgressUpdate, Task>? progress,
+        IReadOnlyList<string> companionTextures,
         CancellationToken cancellationToken)
     {
         var isMeshExport = NativeModelExportService.SupportsFormat(request.Kind);
@@ -300,6 +391,7 @@ public sealed class ArchiveExportService(
                         target,
                         request.CollisionPolicy == ExportCollisionPolicy.Overwrite,
                         progress,
+                        companionTextures,
                         cancellationToken).ConfigureAwait(false);
                 }
                 else

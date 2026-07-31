@@ -3458,6 +3458,19 @@ internal static class ArchiveLiteTestRunner
             {
                 Require(glbDocument.RootElement.GetProperty("meshes")[0].GetProperty("primitives").GetArrayLength() == 1, "GLB export lost its mesh primitive");
                 Require(glbDocument.RootElement.GetProperty("materials").GetArrayLength() == 1, "GLB export lost its material identity");
+                // glTF carries indices of its own, so the corner-by-corner geometry is rejoined
+                // here too rather than shipped as unconnected triangles.
+                var primitive = glbDocument.RootElement.GetProperty("meshes")[0].GetProperty("primitives")[0];
+                Require(primitive.TryGetProperty("indices", out var indexAccessor), "GLB export wrote no index buffer");
+                var glbAccessors = glbDocument.RootElement.GetProperty("accessors");
+                Require(
+                    glbAccessors[indexAccessor.GetInt32()].GetProperty("count").GetInt32() == 3
+                    && glbAccessors[indexAccessor.GetInt32()].GetProperty("componentType").GetInt32() == 5125,
+                    "GLB index buffer does not describe the triangle's corners");
+                Require(
+                    glbAccessors[primitive.GetProperty("attributes").GetProperty("POSITION").GetInt32()]
+                        .GetProperty("count").GetInt32() == 3,
+                    "GLB export did not rebuild an indexed vertex buffer");
                 var views = glbDocument.RootElement.GetProperty("bufferViews");
                 var binaryOffset = checked(20 + jsonLength + 8);
                 var firstPositionOffset = binaryOffset + views[0].GetProperty("byteOffset").GetInt32();
@@ -3494,6 +3507,51 @@ internal static class ArchiveLiteTestRunner
             var obj = await File.ReadAllTextAsync(objPath).ConfigureAwait(false);
             Require(obj.Contains("# Crimson Desert Mesh", StringComparison.Ordinal), "OBJ export did not use the workbench writer");
             Require(obj.Contains("f 1/1/1 2/2/2 3/3/3", StringComparison.Ordinal), "OBJ export has no triangle face");
+
+            // The package stores three corners per triangle with nothing shared. Exported as they
+            // stand they make a mesh of unconnected triangles -- no edge loops, nothing to select
+            // as linked -- so the index buffer has to be rebuilt. The synthetic triangle has three
+            // distinct corners, so all three survive; what must not appear is a fourth.
+            Require(
+                obj.Split("\nv ", StringSplitOptions.None).Length - 1 == 3,
+                "OBJ export did not rebuild an indexed vertex buffer");
+            Require(
+                obj.Contains("mtllib triangle.mtl", StringComparison.Ordinal),
+                "OBJ export did not name the material library it relies on");
+            var mtlPath = Path.Combine(exportRoot, "triangle.mtl");
+            Require(File.Exists(mtlPath), "OBJ export named a material library it did not write");
+            var mtl = await File.ReadAllTextAsync(mtlPath).ConfigureAwait(false);
+            Require(
+                mtl.Contains("newmtl synthetic_metal", StringComparison.Ordinal),
+                "the material library does not define the material the OBJ selects");
+
+            // An OBJ export writes exactly two companions: the material library and the round-trip
+            // sidecar. The sidecar comes from the same native writer CDMW Full reads back, so an
+            // OBJ exported here identifies the archive entry it came from.
+            var sidecarPath = objPath + ".meta.json";
+            Require(File.Exists(sidecarPath), "OBJ export did not write its round-trip sidecar");
+            using (var sidecar = JsonDocument.Parse(await File.ReadAllTextAsync(sidecarPath).ConfigureAwait(false)))
+            {
+                Require(
+                    sidecar.RootElement.GetProperty("format").GetString() == "mesh_roundtrip_manifest_v2",
+                    "the round-trip sidecar does not use the format CDMW Full reads");
+                Require(
+                    sidecar.RootElement.GetProperty("source_archive_path").GetString() == "models/triangle.pac"
+                    && sidecar.RootElement.GetProperty("export_format").GetString() == "obj",
+                    "the round-trip sidecar does not identify the archive entry it came from");
+            }
+            var objCompanions = Directory
+                .EnumerateFiles(exportRoot, "triangle.obj*")
+                .Select(Path.GetFileName)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            Require(
+                objCompanions.SequenceEqual(["triangle.obj", "triangle.obj.meta.json"], StringComparer.Ordinal),
+                $"OBJ export wrote unexpected companions: {string.Join(", ", objCompanions)}");
+            Require(
+                !mtl.Contains("Kd 0.300", StringComparison.Ordinal)
+                && mtl.Contains("Kd 0.800 0.800 0.800", StringComparison.Ordinal),
+                "the material library published the preview's own batch colour as albedo");
             Require(
                 obj.Contains("v 9.875 20 30", StringComparison.Ordinal)
                 && obj.Contains("v 10.125 20 30", StringComparison.Ordinal)

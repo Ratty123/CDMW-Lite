@@ -48,7 +48,14 @@ public sealed record ExportPlanRequest(
     ExportManifestFormat ManifestFormat = ExportManifestFormat.Json,
     string? SingleOutputPath = null,
     string? FolderPath = null,
-    ExportPathLayout PathLayout = ExportPathLayout.PreserveStructure);
+    ExportPathLayout PathLayout = ExportPathLayout.PreserveStructure,
+    /// <summary>
+    /// Archive entries to copy into a <c>referenced_files/</c> folder beside a mesh export, keeping
+    /// their archive paths. These are the physics, prefab, texture and sidecar files the exported
+    /// model points at: they belong to the source asset rather than to the chosen format, so the
+    /// same set is offered whichever interchange format is being written.
+    /// </summary>
+    IReadOnlyList<long>? ReferencedEntryIds = null);
 
 public sealed record ExportItemResult(string SourcePath, string? OutputPath, string Status, string? Message);
 

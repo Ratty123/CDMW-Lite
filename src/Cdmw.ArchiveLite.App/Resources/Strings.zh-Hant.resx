@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>物品資料庫記錄</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>已復原的物品/模型命名</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>未找到更有力的分類依據</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>包含關聯檔案</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>同時匯出與所選檔案相關的材質、貼圖、描述子及其他已解析資源。匯出網格時，它們會放在旁邊的 referenced_files/ 資料夾中。</value></data>
 </root>

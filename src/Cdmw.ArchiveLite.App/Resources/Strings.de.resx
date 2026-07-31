@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>Eintrag in der Gegenstandsdatenbank</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Wiederhergestellte Gegenstands-/Modellbenennung</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Es wurden keine belastbareren Kategoriehinweise gefunden</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Familie einschließen</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Exportiert zusätzlich die zugehörigen Materialien, Texturen, Deskriptoren und weiteren aufgelösten Assets der fokussierten Datei. Bei einem Mesh-Export landen sie in einem Ordner referenced_files/ daneben.</value></data>
 </root>

@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>アイテムデータベースの記録</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>復元されたアイテム/モデル名</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>これ以上有力なカテゴリの手がかりは見つかりませんでした</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>ファミリーも含める</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>対象ファイルに関連するマテリアル、テクスチャ、記述子などの解決済みアセットもエクスポートします。メッシュのエクスポートでは、その隣の referenced_files/ フォルダーに置かれます。</value></data>
 </root>

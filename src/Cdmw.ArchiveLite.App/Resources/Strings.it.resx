@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>record del database degli oggetti</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Denominazione oggetto/modello recuperata</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Non sono stati recuperati indizi di categoria più solidi</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Includi la famiglia</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Esporta anche materiali, texture, descrittori e altre risorse risolte collegate al file selezionato. In un'esportazione di mesh vengono messi in una cartella referenced_files/ accanto a essa.</value></data>
 </root>

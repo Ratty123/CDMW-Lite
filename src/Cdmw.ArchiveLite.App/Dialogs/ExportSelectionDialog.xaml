@@ -185,7 +185,19 @@
                         </StackPanel>
                     </RadioButton>
 
-                    <StackPanel Margin="0,8,0,0"
+                    <CheckBox x:Name="IncludeFamilyCheck"
+                              Margin="2,4,0,0"
+                              VerticalContentAlignment="Center">
+                        <StackPanel>
+                            <TextBlock Text="{infra:Loc Key=ExportIncludeFamily}" />
+                            <TextBlock Margin="0,3,0,0"
+                                       Foreground="{DynamicResource TextMutedBrush}"
+                                       TextWrapping="Wrap"
+                                       Text="{infra:Loc Key=ExportIncludeFamilyBody}" />
+                        </StackPanel>
+                    </CheckBox>
+
+                    <StackPanel Margin="0,14,0,0"
                                 HorizontalAlignment="Right"
                                 Orientation="Horizontal">
                         <Button Margin="0,0,9,0"

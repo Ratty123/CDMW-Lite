@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>item database record</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Recovered item/model naming</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>No stronger category evidence was recovered</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Include family</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Also exports the focused file's related materials, textures, descriptors and other resolved assets. A mesh export puts them in a referenced_files/ folder beside it.</value></data>
 </root>

@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>wpis w bazie przedmiotów</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Odzyskane nazewnictwo przedmiotu/modelu</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Nie odzyskano mocniejszych przesłanek kategorii</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Dołącz rodzinę</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Eksportuje także powiązane materiały, tekstury, deskryptory i inne rozpoznane zasoby wybranego pliku. Przy eksporcie siatki trafiają one do folderu referenced_files/ obok niej.</value></data>
 </root>

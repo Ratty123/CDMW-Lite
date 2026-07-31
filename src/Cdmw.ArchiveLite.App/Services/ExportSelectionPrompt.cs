@@ -29,4 +29,9 @@ public enum ExportSelectionMode
     Family,
 }
 
-public sealed record ExportSelection(ExportSelectionMode Mode, ExportKind Kind);
+/// <param name="IncludeFamily">
+/// Whether the focused file's associated assets travel with the export. It applies to every
+/// output: a mesh interchange file gets them in a <c>referenced_files/</c> folder beside it, and a
+/// folder export gets them alongside the selection under the same layout.
+/// </param>
+public sealed record ExportSelection(ExportSelectionMode Mode, ExportKind Kind, bool IncludeFamily = false);

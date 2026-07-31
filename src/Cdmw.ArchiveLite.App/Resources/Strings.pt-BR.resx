@@ -465,4 +465,6 @@
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>registro do banco de dados de itens</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Nomenclatura de item/modelo recuperada</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Nenhum indício de categoria mais forte foi recuperado</value></data>
+  <data name="ExportIncludeFamily" xml:space="preserve"><value>Incluir a família</value></data>
+  <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Exporta também os materiais, texturas, descritores e demais recursos resolvidos ligados ao arquivo em foco. Em uma exportação de malha, eles vão para uma pasta referenced_files/ ao lado dela.</value></data>
 </root>

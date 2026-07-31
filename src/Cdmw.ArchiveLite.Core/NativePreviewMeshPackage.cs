@@ -59,6 +59,7 @@ internal sealed record NativePreviewMeshPackage(
                 index,
                 vertexCount,
                 geometry,
+                ResolveIdentityFile(root, element, vertexCount),
                 ReadString(element, "material_name"),
                 ReadColor(element),
                 ReadUnitFloat(element, "metalness", 0.0f),
@@ -72,6 +73,39 @@ internal sealed record NativePreviewMeshPackage(
             batches,
             totalVertices,
             NativePreviewNormalization.Read(manifest.RootElement));
+    }
+
+    /// <summary>
+    /// The per-corner record of which source vertex each corner came from, when the package has one.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilding the index buffer numbers vertices in order of first appearance, which is not the
+    /// order the source held them in. This is what lets the round-trip sidecar say truthfully which
+    /// source vertex each exported one is, rather than claiming an identity mapping that welding
+    /// has already broken. A package without it simply exports no mapping.
+    /// </remarks>
+    private static string? ResolveIdentityFile(string packageRoot, JsonElement element, int vertexCount)
+    {
+        if (!element.TryGetProperty("editor_identity", out var identity)
+            || identity.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+        var relative = ReadString(identity, "identity_file");
+        if (string.IsNullOrWhiteSpace(relative))
+        {
+            return null;
+        }
+        try
+        {
+            var path = ResolveContainedFile(packageRoot, relative);
+            // Two 32-bit fields per corner: the source submesh and the source vertex.
+            return new FileInfo(path).Length == checked((long)vertexCount * 8) ? path : null;
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
     }
 
     private static string ResolveContainedFile(string packageRoot, string relativePath)
@@ -191,6 +225,7 @@ internal sealed record NativePreviewMeshBatch(
     int Index,
     int VertexCount,
     string GeometryPath,
+    string? IdentityPath,
     string MaterialName,
     float[] BaseColor,
     float Metalness,

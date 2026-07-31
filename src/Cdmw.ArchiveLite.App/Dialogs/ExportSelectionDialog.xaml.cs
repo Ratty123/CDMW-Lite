@@ -15,6 +15,11 @@ public partial class ExportSelectionDialog : Window
         FormatComboBox.SelectedIndex = 0;
         FormatPanel.Visibility = selectedCount == 1 ? Visibility.Visible : Visibility.Collapsed;
         FamilyRadio.Visibility = canExportFamily ? Visibility.Visible : Visibility.Collapsed;
+        // The family can only be resolved from one focused file, and asking to include it
+        // alongside an export that already is the family would say nothing.
+        IncludeFamilyCheck.Visibility = canExportFamily ? Visibility.Visible : Visibility.Collapsed;
+        FamilyRadio.Checked += (_, _) => IncludeFamilyCheck.IsEnabled = false;
+        FamilyRadio.Unchecked += (_, _) => IncludeFamilyCheck.IsEnabled = true;
         Loaded += (_, _) => FilesOnlyRadio.Focus();
     }
 
@@ -46,7 +51,10 @@ public partial class ExportSelectionDialog : Window
             && FormatComboBox.SelectedItem is ExportFormatOption format
                 ? format.Kind
                 : ExportKind.RawEntries;
-        Selection = new ExportSelection(mode, kind);
+        Selection = new ExportSelection(
+            mode,
+            kind,
+            IncludeFamilyCheck.IsChecked == true && mode != ExportSelectionMode.Family);
         DialogResult = true;
     }
 
