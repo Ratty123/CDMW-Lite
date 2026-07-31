@@ -3066,6 +3066,11 @@ internal static class ArchiveLiteTestRunner
                     schema_version = 8,
                     backend = "d3d11",
                     source_path = "character/model/01_weapon/sword/synthetic.pac",
+                    // The package holds the geometry the renderer frames: recentred
+                    // and rescaled into its display cube. Exports have to hand back
+                    // the placement and size the archive actually stores.
+                    normalization_center = new[] { 10.0f, 20.0f, 30.0f },
+                    normalization_scale = 4.0f,
                     batches = new[]
                     {
                         new
@@ -3365,10 +3370,21 @@ internal static class ArchiveLiteTestRunner
                 var views = glbDocument.RootElement.GetProperty("bufferViews");
                 var binaryOffset = checked(20 + jsonLength + 8);
                 var firstPositionOffset = binaryOffset + views[0].GetProperty("byteOffset").GetInt32();
+                var firstNormalOffset = binaryOffset + views[1].GetProperty("byteOffset").GetInt32();
                 var firstUvOffset = binaryOffset + views[2].GetProperty("byteOffset").GetInt32();
                 Require(
-                    BinaryPrimitives.ReadSingleLittleEndian(glb.AsSpan(firstPositionOffset, 4)) == -0.5f,
-                    "GLB export changed the first vertex position");
+                    BinaryPrimitives.ReadSingleLittleEndian(glb.AsSpan(firstPositionOffset, 4)) == 9.875f
+                    && BinaryPrimitives.ReadSingleLittleEndian(glb.AsSpan(firstPositionOffset + 4, 4)) == 20.0f
+                    && BinaryPrimitives.ReadSingleLittleEndian(glb.AsSpan(firstPositionOffset + 8, 4)) == 30.0f,
+                    "GLB export kept the preview's framing transform instead of the source position and scale");
+                var positionAccessor = glbDocument.RootElement.GetProperty("accessors")[0];
+                Require(
+                    positionAccessor.GetProperty("min")[0].GetSingle() == 9.875f
+                    && positionAccessor.GetProperty("max")[1].GetSingle() == 20.25f,
+                    "GLB export declared bounds in the preview's frame rather than the exported one");
+                Require(
+                    BinaryPrimitives.ReadSingleLittleEndian(glb.AsSpan(firstNormalOffset + 8, 4)) == 1.0f,
+                    "GLB export rescaled a normal that the framing transform left alone");
                 Require(
                     BinaryPrimitives.ReadSingleLittleEndian(glb.AsSpan(firstUvOffset + 4, 4)) == 1.0f,
                     "GLB export did not apply the workbench UV convention");
@@ -3387,6 +3403,14 @@ internal static class ArchiveLiteTestRunner
             var obj = await File.ReadAllTextAsync(objPath).ConfigureAwait(false);
             Require(obj.Contains("# Crimson Desert Mesh", StringComparison.Ordinal), "OBJ export did not use the workbench writer");
             Require(obj.Contains("f 1/1/1 2/2/2 3/3/3", StringComparison.Ordinal), "OBJ export has no triangle face");
+            Require(
+                obj.Contains("v 9.875 20 30", StringComparison.Ordinal)
+                && obj.Contains("v 10.125 20 30", StringComparison.Ordinal)
+                && obj.Contains("v 10 20.25 30", StringComparison.Ordinal),
+                "OBJ export kept the preview's framing transform instead of the source position and scale");
+            Require(
+                obj.Contains("vn 0 0 1", StringComparison.Ordinal),
+                "OBJ export rescaled a normal that the framing transform left alone");
 
             var fbxPath = Path.Combine(exportRoot, "triangle.fbx");
             await exporter.ExportPackageAsync(
@@ -3400,6 +3424,10 @@ internal static class ArchiveLiteTestRunner
                 CancellationToken.None).ConfigureAwait(false);
             var fbx = await File.ReadAllBytesAsync(fbxPath).ConfigureAwait(false);
             Require(Encoding.ASCII.GetString(fbx, 0, 20) == "Kaydara FBX Binary  ", "FBX export is not a binary FBX file");
+            Require(
+                fbx.AsSpan().IndexOf(BitConverter.GetBytes(9.875)) >= 0
+                && fbx.AsSpan().IndexOf(BitConverter.GetBytes(20.25)) >= 0,
+                "FBX export kept the preview's framing transform instead of the source position and scale");
             Require(progressUpdates.Any(update => update.Phase == "mesh_export_prepare" && update.Total > 0), "mesh export did not report determinate preparation progress");
             Require(progressUpdates.Any(update => update.Phase == "mesh_export_write" && update.Completed == update.Total), "mesh export did not report completion progress");
 

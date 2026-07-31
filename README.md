@@ -1,7 +1,7 @@
 # CDMW Archive Lite
 
 [![Archive Lite](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml/badge.svg)](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml)
-![version](https://img.shields.io/badge/version-1.0.1-blue)
+![version](https://img.shields.io/badge/version-1.0.2-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2011%20x64-lightgrey)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![read-only](https://img.shields.io/badge/archives-read--only-brightgreen)

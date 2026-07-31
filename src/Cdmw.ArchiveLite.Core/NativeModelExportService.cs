@@ -126,6 +126,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             await ReportAsync(progress, 0, totalWork, "mesh_export_prepare", currentItem).ConfigureAwait(false);
             var prepared = await PrepareNativeSidecarsAsync(
                 package,
+                package.Normalization,
                 workRoot,
                 totalWork,
                 progress,
@@ -187,6 +188,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
 
     private static async Task<IReadOnlyList<PreparedNativeBatch>> PrepareNativeSidecarsAsync(
         NativePreviewMeshPackage package,
+        NativePreviewNormalization normalization,
         string workRoot,
         long totalWork,
         Func<ProgressUpdate, Task>? progress,
@@ -227,7 +229,15 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 for (var localIndex = 0; localIndex < count; localIndex++)
                 {
                     var sourceOffset = localIndex * BytesPerPreviewVertex;
-                    WriteFiniteVec3AsF64(inputBuffer, sourceOffset, verticesBuffer, localIndex * 24, "position");
+                    WriteRestoredPositionAsF64(
+                        inputBuffer,
+                        sourceOffset,
+                        verticesBuffer,
+                        localIndex * 24,
+                        normalization);
+                    // Normals survive the preview transform: it only recentres and
+                    // scales uniformly, so every direction it produced still points
+                    // the way the source authored it.
                     WriteFiniteVec3AsF64(
                         inputBuffer,
                         sourceOffset + (3 * sizeof(float)),
