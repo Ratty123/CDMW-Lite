@@ -29,6 +29,7 @@ internal sealed record NativePreviewMeshPackage(
             throw new InvalidDataException("Native preview manifest has no batches array.");
         }
 
+        var submeshNames = ReadSubmeshNames(manifest.RootElement);
         var batches = new List<NativePreviewMeshBatch>();
         var totalVertices = 0;
         foreach (var element in batchesElement.EnumerateArray())
@@ -61,6 +62,7 @@ internal sealed record NativePreviewMeshPackage(
                 geometry,
                 ResolveIdentityFile(root, element, vertexCount),
                 ReadString(element, "material_name"),
+                submeshNames.GetValueOrDefault(index, string.Empty),
                 ReadColor(element),
                 ReadUnitFloat(element, "metalness", 0.0f),
                 ReadUnitFloat(element, "roughness", 0.62f)));
@@ -73,6 +75,40 @@ internal sealed record NativePreviewMeshPackage(
             batches,
             totalVertices,
             NativePreviewNormalization.Read(manifest.RootElement));
+    }
+
+    /// <summary>
+    /// The name the source gave each submesh, keyed by batch index.
+    /// </summary>
+    /// <remarks>
+    /// A batch publishes its material but not the submesh that carries it, so parts sharing one
+    /// material would export under one name and stop being tellable apart -- a left and a right eye
+    /// both arriving as the eye material. The name is in the manifest's material slots, which pair
+    /// it with the batch index it belongs to. A package that predates the slots simply exports
+    /// under the material name, as before.
+    /// </remarks>
+    private static Dictionary<int, string> ReadSubmeshNames(JsonElement manifest)
+    {
+        var names = new Dictionary<int, string>();
+        if (!manifest.TryGetProperty("material_slots", out var slots) || slots.ValueKind != JsonValueKind.Array)
+        {
+            return names;
+        }
+        foreach (var slot in slots.EnumerateArray())
+        {
+            if (slot.ValueKind != JsonValueKind.Object
+                || !slot.TryGetProperty("batch_index", out var batchIndex)
+                || !batchIndex.TryGetInt32(out var index))
+            {
+                continue;
+            }
+            var name = ReadString(slot, "submesh_name");
+            if (name.Length > 0)
+            {
+                names[index] = name;
+            }
+        }
+        return names;
     }
 
     /// <summary>
@@ -227,6 +263,7 @@ internal sealed record NativePreviewMeshBatch(
     string GeometryPath,
     string? IdentityPath,
     string MaterialName,
+    string SubmeshName,
     float[] BaseColor,
     float Metalness,
     float Roughness);

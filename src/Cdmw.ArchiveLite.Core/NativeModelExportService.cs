@@ -277,105 +277,99 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             var uvsPath = prefix + "_uvs.bin";
             var facesPath = prefix + "_faces.bin";
 
-            await using var input = OpenRead(batch.GeometryPath);
-            await using var vertices = OpenNew(verticesPath);
-            await using var normals = OpenNew(normalsPath);
-            await using var uvs = OpenNew(uvsPath);
-            await using var faces = OpenNew(facesPath);
-            var inputBuffer = new byte[RecordsPerChunk * BytesPerPreviewVertex];
-            var verticesBuffer = new byte[RecordsPerChunk * 3 * sizeof(double)];
-            var normalsBuffer = new byte[RecordsPerChunk * 3 * sizeof(double)];
-            var uvsBuffer = new byte[RecordsPerChunk * 2 * sizeof(double)];
-            var facesBuffer = new byte[(RecordsPerChunk / 3) * 3 * sizeof(int)];
-
-            // The package stores one vertex per triangle corner, so the index buffer has to be
-            // rebuilt before anything is written; exporting the corners as they stand hands over a
-            // mesh no two triangles of which share a vertex. Chunks hold whole triangles --
-            // RecordsPerChunk divides by three -- so a face never straddles two reads.
-            var welder = new NativePreviewVertexWelder(batch.VertexCount);
-            // Read in step with the geometry so each corner's source vertex is known as it is
-            // welded. Without it the sidecar can only claim an identity mapping, which welding
-            // has already made untrue.
-            await using var identity = batch.IdentityPath is null ? null : OpenRead(batch.IdentityPath);
-            var identityBuffer = identity is null ? [] : new byte[RecordsPerChunk * 8];
-            var sourceVertexMap = identity is null ? null : new List<int>(batch.VertexCount / 3);
-            var batchCompleted = 0;
-            while (batchCompleted < batch.VertexCount)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var count = Math.Min(RecordsPerChunk, batch.VertexCount - batchCompleted);
-                var inputBytes = checked(count * BytesPerPreviewVertex);
-                await input.ReadExactlyAsync(inputBuffer.AsMemory(0, inputBytes), cancellationToken).ConfigureAwait(false);
-                if (identity is not null)
+            // The package stores one vertex per triangle corner, so the array the source held has
+            // to be rebuilt before anything is written, in the source's own order.
+            var rebuilt = await NativePreviewVertexRebuild.BuildAsync(
+                batch,
+                async corners =>
                 {
-                    await identity.ReadExactlyAsync(identityBuffer.AsMemory(0, count * 8), cancellationToken).ConfigureAwait(false);
-                }
-                var vertexBytes = 0;
-                var uvBytes = 0;
-                var faceBytes = 0;
-                for (var localIndex = 0; localIndex < count; localIndex++)
-                {
-                    var sourceOffset = localIndex * BytesPerPreviewVertex;
-                    if (welder.TryAssign(
-                            inputBuffer.AsSpan(sourceOffset, BytesPerPreviewVertex),
-                            out var vertexIndex))
-                    {
-                        WriteRestoredPositionAsF64(
-                            inputBuffer,
-                            sourceOffset,
-                            verticesBuffer,
-                            vertexBytes,
-                            normalization);
-                        // Normals survive the preview transform: it only recentres and
-                        // scales uniformly, so every direction it produced still points
-                        // the way the source authored it.
-                        WriteFiniteVec3AsF64(
-                            inputBuffer,
-                            sourceOffset + (3 * sizeof(float)),
-                            normalsBuffer,
-                            vertexBytes,
-                            "normal");
-                        WriteFiniteVec2AsF64(
-                            inputBuffer,
-                            sourceOffset + (9 * sizeof(float)),
-                            uvsBuffer,
-                            uvBytes,
-                            "UV");
-                        vertexBytes += 3 * sizeof(double);
-                        uvBytes += 2 * sizeof(double);
-                        // The second field of the identity pair is the source vertex this corner
-                        // came from; the first names its submesh, which the batch already fixes.
-                        sourceVertexMap?.Add(
-                            BinaryPrimitives.ReadInt32LittleEndian(identityBuffer.AsSpan((localIndex * 8) + 4, 4)));
-                    }
-                    BinaryPrimitives.WriteInt32LittleEndian(facesBuffer.AsSpan(faceBytes, 4), vertexIndex);
-                    faceBytes += sizeof(int);
-                }
+                    completed += corners;
+                    await ReportAsync(progress, completed, totalWork, "mesh_export_prepare", currentItem)
+                        .ConfigureAwait(false);
+                },
+                cancellationToken).ConfigureAwait(false);
 
-                await vertices.WriteAsync(verticesBuffer.AsMemory(0, vertexBytes), cancellationToken).ConfigureAwait(false);
-                await normals.WriteAsync(normalsBuffer.AsMemory(0, vertexBytes), cancellationToken).ConfigureAwait(false);
-                await uvs.WriteAsync(uvsBuffer.AsMemory(0, uvBytes), cancellationToken).ConfigureAwait(false);
-                await faces.WriteAsync(facesBuffer.AsMemory(0, faceBytes), cancellationToken).ConfigureAwait(false);
-                batchCompleted += count;
-                completed += count;
-                await ReportAsync(progress, completed, totalWork, "mesh_export_prepare", currentItem).ConfigureAwait(false);
-            }
+            await WriteVerticesAsync(
+                verticesPath,
+                rebuilt.Positions,
+                3,
+                normalization,
+                cancellationToken).ConfigureAwait(false);
+            // Normals survive the preview transform: it only recentres and scales uniformly, so
+            // every direction it produced still points the way the source authored it.
+            await WriteVerticesAsync(normalsPath, rebuilt.Normals, 3, null, cancellationToken).ConfigureAwait(false);
+            await WriteVerticesAsync(uvsPath, rebuilt.TextureCoordinates, 2, null, cancellationToken).ConfigureAwait(false);
+            await WriteFacesAsync(facesPath, rebuilt.CornerIndices, cancellationToken).ConfigureAwait(false);
 
-            var name = CleanName(batch.MaterialName, $"part_{batch.Index:000}");
             result.Add(new PreparedNativeBatch(new Dictionary<string, object?>
             {
                 ["index"] = batch.Index,
-                ["name"] = name,
-                ["material"] = name,
-                ["vertices_binary"] = BinaryDescriptor(verticesPath, welder.UniqueCount, 3, "f64"),
+                // Full names the object after the submesh and the material after the material, so
+                // parts sharing one material stay distinguishable. Its own fallback chain, and
+                // ours, is submesh name then material name then the ordinal.
+                ["name"] = CleanName(batch.SubmeshName, CleanName(batch.MaterialName, $"part_{batch.Index:000}")),
+                ["material"] = CleanName(batch.MaterialName, CleanName(batch.SubmeshName, $"part_{batch.Index:000}")),
+                ["vertices_binary"] = BinaryDescriptor(verticesPath, rebuilt.VertexCount, 3, "f64"),
                 ["faces_binary"] = BinaryDescriptor(facesPath, batch.VertexCount / 3, 3, "i32"),
-                ["normals_binary"] = BinaryDescriptor(normalsPath, welder.UniqueCount, 3, "f64"),
-                ["uvs_binary"] = BinaryDescriptor(uvsPath, welder.UniqueCount, 2, "f64"),
-                ["source_vertex_map"] = sourceVertexMap?.ToArray(),
+                ["normals_binary"] = BinaryDescriptor(normalsPath, rebuilt.VertexCount, 3, "f64"),
+                ["uvs_binary"] = BinaryDescriptor(uvsPath, rebuilt.VertexCount, 2, "f64"),
+                ["source_vertex_map"] = rebuilt.SourceVertexMap,
             },
-            welder.UniqueCount));
+            rebuilt.VertexCount));
         }
         return result;
+    }
+
+    /// <param name="restore">
+    /// The framing transform to undo, for positions; null for an attribute the preview left alone.
+    /// </param>
+    private static async Task WriteVerticesAsync(
+        string path,
+        float[] source,
+        int components,
+        NativePreviewNormalization? restore,
+        CancellationToken cancellationToken)
+    {
+        await using var output = OpenNew(path);
+        var buffer = new byte[RecordsPerChunk * components * sizeof(double)];
+        var written = 0;
+        while (written < source.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = Math.Min(buffer.Length / sizeof(double), source.Length - written);
+            for (var index = 0; index < count; index++)
+            {
+                var value = (double)source[written + index];
+                BinaryPrimitives.WriteDoubleLittleEndian(
+                    buffer.AsSpan(index * sizeof(double), sizeof(double)),
+                    restore is null ? value : restore.Restore(value, (written + index) % components));
+            }
+            await output.WriteAsync(buffer.AsMemory(0, count * sizeof(double)), cancellationToken).ConfigureAwait(false);
+            written += count;
+        }
+    }
+
+    private static async Task WriteFacesAsync(
+        string path,
+        int[] cornerIndices,
+        CancellationToken cancellationToken)
+    {
+        await using var output = OpenNew(path);
+        var buffer = new byte[RecordsPerChunk * sizeof(int)];
+        var written = 0;
+        while (written < cornerIndices.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = Math.Min(buffer.Length / sizeof(int), cornerIndices.Length - written);
+            for (var index = 0; index < count; index++)
+            {
+                BinaryPrimitives.WriteInt32LittleEndian(
+                    buffer.AsSpan(index * sizeof(int), sizeof(int)),
+                    cornerIndices[written + index]);
+            }
+            await output.WriteAsync(buffer.AsMemory(0, count * sizeof(int)), cancellationToken).ConfigureAwait(false);
+            written += count;
+        }
     }
 
     private static Dictionary<string, object?> BinaryDescriptor(

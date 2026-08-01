@@ -3,21 +3,20 @@ using System.Buffers.Binary;
 namespace Cdmw.ArchiveLite.Core;
 
 /// <summary>
-/// Rebuilds an indexed mesh from the preview package's corner-by-corner geometry.
+/// Rejoins a package's corner-by-corner geometry by matching attribute bits, for packages written
+/// before the identity buffer recorded where each corner came from.
 /// </summary>
 /// <remarks>
 /// The package holds what the renderer submits to the GPU: three vertices for every triangle, with
 /// nothing shared, because the index buffer is spent when the blob is written. Exported as it
 /// stands, that produces a mesh whose every triangle is an island -- it renders correctly, since
 /// each corner keeps its own normal, but it has no edge loops, nothing to select as linked, and no
-/// clean way to subdivide. It is also several times larger than it needs to be: a head that indexes
-/// 13,740 vertices ships 75,474 of them.
+/// clean way to subdivide.
 ///
-/// Corners that came from one vertex were copied from a single source record, so their position,
-/// normal and texture coordinate are bit-identical -- never merely close. Matching on those exact
-/// bits is therefore lossless: it rejoins what the blob split and can never weld two vertices the
-/// source meant to keep apart, because anything the source distinguished differs in one of them.
-/// A UV seam or a hard edge survives, having different coordinates or normals on each side.
+/// Matching on position, normal and texture coordinate recovers most of what the blob split, but it
+/// cannot recover the source's vertex order, and it merges two source vertices that agree on all
+/// three. <see cref="NativePreviewVertexRebuild"/> uses the identity buffer instead wherever the
+/// package has one, and only falls back here when it does not.
 /// </remarks>
 internal sealed class NativePreviewVertexWelder
 {

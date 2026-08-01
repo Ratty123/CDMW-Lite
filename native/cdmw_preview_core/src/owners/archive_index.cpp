@@ -660,6 +660,33 @@ static std::pair<std::string, std::string> find_descriptor_names(
     size_t region_start,
     size_t desc_start
 ) {
+    // Current equipment PACs store one shared name/material record as
+    // `length + ASCII + NUL + descriptor`. The older layout below stores two adjacent
+    // length-prefixed records with no terminator. Decode the unambiguous NUL form first, so its
+    // terminator is not mistaken for a gap: the scan below rejects any span containing the NUL,
+    // fails twice, and names an unknown_ placeholder where the record was there to be read.
+    if (desc_start > region_start + 1 && static_cast<unsigned char>(data[desc_start - 1]) == 0) {
+        const size_t cursor = desc_start - 1;
+        const size_t reach = std::min<size_t>(256, cursor - region_start + 1);
+        for (size_t back = 1; back < reach; ++back) {
+            const size_t pos = cursor - back;
+            const unsigned char candidate_len = static_cast<unsigned char>(data[pos]);
+            if (candidate_len == 0 || candidate_len != back - 1) continue;
+            if (cursor <= pos + 1) continue;
+            bool ascii = true;
+            for (size_t p = pos + 1; p < cursor; ++p) {
+                const unsigned char ch = static_cast<unsigned char>(data[p]);
+                if (ch < 32 || ch >= 127) {
+                    ascii = false;
+                    break;
+                }
+            }
+            if (!ascii) continue;
+            const std::string name(data.data() + pos + 1, data.data() + cursor);
+            return {name, name};
+        }
+    }
+
     std::vector<std::string> names;
     size_t cursor = desc_start;
     for (int n = 0; n < 2; ++n) {
