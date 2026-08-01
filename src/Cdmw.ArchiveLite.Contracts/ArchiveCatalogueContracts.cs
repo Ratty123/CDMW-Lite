@@ -96,7 +96,10 @@ public sealed record ItemCatalogRow(
     IReadOnlyList<string> MaterialTags,
     int VariantCount,
     string Evidence,
-    string Description = "");
+    string Description = "",
+    int StackSize = -1,
+    int Grade = -1,
+    string EquipType = "");
 
 public sealed record ItemCatalogCategoryFacet(
     string Category,

@@ -883,6 +883,33 @@ public sealed class ItemFinderRowViewModel(ItemCatalogRow source) : ObservableOb
     public string DisplayName => source.DisplayName;
     public string Description => source.Description;
     public bool HasDescription => !string.IsNullOrWhiteSpace(source.Description);
+
+    /// <summary>
+    /// The stats the item record states about itself. A row that does not carry one shows nothing
+    /// for it rather than a zero, which would read as a real value.
+    /// </summary>
+    public bool HasStats => source.StackSize >= 0 || source.Grade >= 0 || source.EquipType.Length > 0;
+
+    public string StatsText
+    {
+        get
+        {
+            var parts = new List<string>(3);
+            if (source.EquipType.Length > 0)
+            {
+                parts.Add(LocalizationManager.Format("ItemFinderStatEquipType", source.EquipType));
+            }
+            if (source.Grade >= 0)
+            {
+                parts.Add(LocalizationManager.Format("ItemFinderStatGrade", source.Grade));
+            }
+            if (source.StackSize >= 0)
+            {
+                parts.Add(LocalizationManager.Format("ItemFinderStatStackSize", source.StackSize));
+            }
+            return parts.Count > 0 ? string.Join(Environment.NewLine, parts) : LocalizationManager.Get("None");
+        }
+    }
     public string Category => source.Category;
     public string Group => source.Group;
     public string CategoryPath => ItemCatalogLabels.CategoryPath(Category, Group);
@@ -919,6 +946,7 @@ public sealed class ItemFinderRowViewModel(ItemCatalogRow source) : ObservableOb
         OnPropertyChanged(nameof(Evidence));
         OnPropertyChanged(nameof(CategoryEvidence));
         OnPropertyChanged(nameof(LinkedSummary));
+        OnPropertyChanged(nameof(StatsText));
         OnPropertyChanged(nameof(LocalizedNamesText));
         OnPropertyChanged(nameof(MaterialTagsText));
         OnPropertyChanged(nameof(ModelFilesText));

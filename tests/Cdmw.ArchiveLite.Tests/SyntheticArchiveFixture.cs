@@ -237,6 +237,15 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
     /// <summary>The item-string category, which is what the shipped table files item names under.</summary>
     private const uint ItemStringCategory = 7;
 
+    /// <summary>Equip types, named as the shipped EquipTypeInfo names them.</summary>
+    public const string HelmEquipType = "Helm";
+
+    public const string UpperbodyEquipType = "Upperbody";
+
+    private const uint HelmEquipTypeHash = 0xC4FFA63D;
+
+    private const uint UpperbodyEquipTypeHash = 0x8415C4A0;
+
     /// <param name="includeRowDirectory">
     /// When false the package ships the table blob without its .pabgh companion, which is the shape
     /// that forces the indexer onto its pattern-scanning fallback.
@@ -266,7 +275,9 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
                 descriptionId: "12345679",
                 exactModelHash,
                 relatedModelHash,
-                scanMarkerField: 1)),
+                stackSize: 1,
+                equipTypeHash: HelmEquipTypeHash,
+                grade: 4)),
             // Shipped item keys are all numeric, and this one deliberately is not: the reader this
             // replaced accepted only six-to-twenty ASCII digits, so a key of any other shape was
             // unreachable no matter how the record was found.
@@ -277,7 +288,14 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
                 descriptionId: "22345679",
                 hiddenExactModelHash,
                 hiddenRelatedModelHash,
-                scanMarkerField: 100)),
+                stackSize: 100,
+                equipTypeHash: UpperbodyEquipTypeHash,
+                grade: 6)),
+        ]);
+        var (equipTypeInfo, equipTypeInfoDirectory) = BuildEquipTypeInfoTable(
+        [
+            (HelmEquipTypeHash, HelmEquipType),
+            (UpperbodyEquipTypeHash, UpperbodyEquipType),
         ]);
         var (stringInfo, stringInfoDirectory) = BuildStringInfoTable(
         [
@@ -297,11 +315,13 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         {
             ("gamecommon/item/iteminfo.pabgb", itemInfo),
             ("gamecommon/item/stringinfo.pabgb", stringInfo),
+            ("gamecommon/item/equiptypeinfo.pabgb", equipTypeInfo),
         };
         if (includeRowDirectory)
         {
             tables.Add(("gamecommon/item/iteminfo.pabgh", itemInfoDirectory));
             tables.Add(("gamecommon/item/stringinfo.pabgh", stringInfoDirectory));
+            tables.Add(("gamecommon/item/equiptypeinfo.pabgh", equipTypeInfoDirectory));
         }
 
         await BuildPackageAsync(root, "0008", tables).ConfigureAwait(false);
@@ -506,10 +526,12 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
     /// NUL-terminated internal name, then a scalar field, then the 07 70 and 07 71 sub-records
     /// carrying the display-name and description localization keys.
     /// </summary>
-    /// <param name="scanMarkerField">
-    /// The scalar that sits between the name and the first sub-record. The shipped scavenger looks
-    /// for the byte run that this field produces when it holds 1, so any other value hides the whole
-    /// record from a scan while leaving it perfectly readable through the row directory.
+    /// <param name="stackSize">
+    /// How many of the item fit in one inventory slot, the first scalar after the name. It is also
+    /// what decides whether the shipped scavenger can see the record at all: the byte run it
+    /// searches for is this field holding 1, followed by the zero after it and the first sub-record
+    /// tag. Anything else hides the whole record from a scan while leaving it perfectly readable
+    /// through the row directory.
     /// </param>
     private static byte[] BuildItemInfoRow(
         uint itemId,
@@ -518,7 +540,9 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         string descriptionId,
         uint exactModelHash,
         uint relatedModelHash,
-        uint scanMarkerField)
+        uint stackSize,
+        uint equipTypeHash = 0,
+        byte grade = 0xFF)
     {
         using var output = new MemoryStream();
         var name = Encoding.ASCII.GetBytes(internalName);
@@ -526,9 +550,12 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         WriteUInt32(output, checked((uint)name.Length));
         output.Write(name);
         output.WriteByte(0);
-        WriteUInt32(output, scanMarkerField);
+        WriteUInt32(output, stackSize);
         WriteUInt32(output, 0);
         WriteSubRecord(output, 0x70, itemId, localizationId);
+        // The equip-type key sits five bytes past the display-name sub-record.
+        output.Write(new byte[5]);
+        WriteUInt32(output, equipTypeHash);
         output.WriteByte(0x0E);
         output.WriteByte(0);
         output.WriteByte(0);
@@ -548,7 +575,10 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         WriteUInt32(output, exactModelHash);
         WriteUInt32(output, relatedModelHash);
         WriteSubRecord(output, 0x71, itemId, descriptionId);
-        output.Write(new byte[32]);
+        // The grade is one byte 37 past the description sub-record, and the row runs past it.
+        output.Write(new byte[37]);
+        output.WriteByte(grade);
+        output.Write(new byte[16]);
         return output.ToArray();
 
         static void WriteSubRecord(MemoryStream target, byte tag, uint repeatKey, string value)
@@ -586,6 +616,29 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
     /// StringInfo rows are {key uint32, five reserved bytes, length-prefixed name}, and the key is
     /// the hash other tables quote the name by. Returned with the .pabgh directory describing them.
     /// </summary>
+    /// <summary>
+    /// EquipTypeInfo rows are {key uint32, length-prefixed NUL-terminated name, scalars}. Item rows
+    /// name their equip type by that key.
+    /// </summary>
+    private static (byte[] Blob, byte[] Directory) BuildEquipTypeInfoTable(IReadOnlyList<(uint Hash, string Name)> rows)
+    {
+        using var blob = new MemoryStream();
+        using var directory = new MemoryStream();
+        WriteUInt16(directory, checked((ushort)rows.Count));
+        foreach (var (hash, name) in rows)
+        {
+            WriteUInt32(directory, hash);
+            WriteUInt32(directory, checked((uint)blob.Position));
+            WriteUInt32(blob, hash);
+            var bytes = Encoding.ASCII.GetBytes(name);
+            WriteUInt32(blob, checked((uint)bytes.Length));
+            blob.Write(bytes);
+            blob.WriteByte(0);
+            blob.Write(new byte[8]);
+        }
+        return (blob.ToArray(), directory.ToArray());
+    }
+
     private static (byte[] Blob, byte[] Directory) BuildStringInfoTable(IReadOnlyList<(uint Hash, string Value)> rows)
     {
         using var blob = new MemoryStream();

@@ -346,6 +346,10 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Подготовка постоянного кэша значков инвентаря...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Постоянный кэш значков инвентаря готов: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>Ссылок на модели: {0:N0}, путей значков: {1:N0}, вариантов: {2:N0}</value></data>
+  <data name="ItemFinderStats" xml:space="preserve"><value>Характеристики предмета</value></data>
+  <data name="ItemFinderStatEquipType" xml:space="preserve"><value>Тип экипировки: {0}</value></data>
+  <data name="ItemFinderStatGrade" xml:space="preserve"><value>Класс: {0}</value></data>
+  <data name="ItemFinderStatStackSize" xml:space="preserve"><value>Стопка до {0:N0}</value></data>
   <data name="ItemFinderDescription" xml:space="preserve"><value>Описание</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Признаки</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Локализованные имена</value></data>

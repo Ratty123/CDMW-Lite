@@ -246,6 +246,17 @@
 
                         <TextBlock Margin="0,16,0,4"
                                    FontWeight="SemiBold"
+                                   Text="{infra:Loc Key=ItemFinderStats}"
+                                   Visibility="{Binding HasStats, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBox IsReadOnly="True"
+                                 Text="{Binding StatsText, Mode=OneWay}"
+                                 TextWrapping="Wrap"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Visibility="{Binding HasStats, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                        <TextBlock Margin="0,16,0,4"
+                                   FontWeight="SemiBold"
                                    Text="{infra:Loc Key=ItemFinderDescription}"
                                    Visibility="{Binding HasDescription, Converter={StaticResource BooleanToVisibilityConverter}}" />
                         <TextBox IsReadOnly="True"

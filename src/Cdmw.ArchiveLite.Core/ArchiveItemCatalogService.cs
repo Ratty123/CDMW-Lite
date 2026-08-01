@@ -63,5 +63,8 @@ public sealed class ArchiveItemCatalogService(
         item.MaterialTags,
         item.VariantCount,
         item.Evidence,
-        item.Description);
+        item.Description,
+        item.StackSize,
+        item.Grade,
+        item.EquipType);
 }

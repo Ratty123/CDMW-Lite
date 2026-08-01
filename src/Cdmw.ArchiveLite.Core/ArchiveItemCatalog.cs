@@ -135,6 +135,7 @@ public sealed class ArchiveItemCatalog
             modelStems,
             iconPaths);
         var evidence = BuildEvidence(prefabHashes.Length > 0, modelStems.Length > 0, displayName, iconPaths, materialTags);
+        var equipType = (source.EquipType ?? string.Empty).Trim();
         var searchText = BuildSearchText(
             source.ItemId,
             internalName,
@@ -145,12 +146,14 @@ public sealed class ArchiveItemCatalog
             pacFiles,
             modelStems,
             iconPaths,
-            materialTags);
+            materialTags,
+            equipType);
         return source with
         {
             InternalName = internalName,
             DisplayName = displayName,
             Description = (source.Description ?? string.Empty).Trim(),
+            EquipType = equipType,
             Category = category,
             Group = group,
             CategoryEvidence = categoryEvidence,
@@ -228,7 +231,8 @@ public sealed class ArchiveItemCatalog
                 pacFiles,
                 modelStems,
                 iconPaths,
-                materialTags)
+                materialTags,
+                first.EquipType)
                 + string.Join(' ', rows.Select(static row => $" {row.ItemId} {NormalizeSearchText(row.InternalName)} ")),
         };
     }
@@ -259,7 +263,8 @@ public sealed class ArchiveItemCatalog
         IReadOnlyList<string> pacFiles,
         IReadOnlyList<string> modelStems,
         IReadOnlyList<string> iconPaths,
-        IReadOnlyList<string> materialTags) => string.Join(
+        IReadOnlyList<string> materialTags,
+        string equipType) => string.Join(
             ' ',
             new[]
             {
@@ -272,6 +277,7 @@ public sealed class ArchiveItemCatalog
                 string.Join(' ', modelStems),
                 string.Join(' ', iconPaths),
                 string.Join(' ', materialTags),
+                equipType,
                 itemId.ToString(System.Globalization.CultureInfo.InvariantCulture),
             }.Select(NormalizeSearchText));
 
@@ -555,6 +561,10 @@ public sealed record ArchiveItemCatalogRecord(
     int VariantCount = 1,
     string Evidence = "",
     string Description = "",
+    // Recovered from the item record's own scalar fields. -1 means the row did not state the value.
+    int StackSize = -1,
+    int Grade = -1,
+    string EquipType = "",
     [property: JsonIgnore] string SearchText = "");
 
 public sealed record ArchiveItemCatalogPage(

@@ -346,6 +346,10 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Preparando o cache persistente de ícones de inventário...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Cache persistente de ícones de inventário pronto: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>{0:N0} vínculo(s) de modelo, {1:N0} caminho(s) de ícone, {2:N0} variante(s)</value></data>
+  <data name="ItemFinderStats" xml:space="preserve"><value>Estatísticas do item</value></data>
+  <data name="ItemFinderStatEquipType" xml:space="preserve"><value>Tipo de equipamento: {0}</value></data>
+  <data name="ItemFinderStatGrade" xml:space="preserve"><value>Grau: {0}</value></data>
+  <data name="ItemFinderStatStackSize" xml:space="preserve"><value>Empilha até {0:N0}</value></data>
   <data name="ItemFinderDescription" xml:space="preserve"><value>Descrição</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Indícios</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Nomes localizados</value></data>
