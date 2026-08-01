@@ -409,15 +409,17 @@ internal sealed record NativePreviewSkeleton(
         {
             var offset = index * BytesPerBone;
             var parent = BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(offset, sizeof(int)));
-            // The bind matrix is stored ahead of its inverse and is not read back: glTF wants the
-            // inverse for the skin and the local transform for the node, and the bind matrix is
-            // what those two reproduce between them.
+            // Both matrices are read back. glTF wants the inverse for its skin and the local
+            // transform for its node; FBX wants the bone's global bind, because a cluster's
+            // TransformLink is exactly that and its Transform is that inverted.
+            var bind = ReadFloats(payload, offset + sizeof(int), 16);
             var inverseBind = ReadFloats(payload, offset + sizeof(int) + (16 * sizeof(float)), 16);
             var scale = ReadFloats(payload, offset + sizeof(int) + (32 * sizeof(float)), 3);
             var rotation = ReadFloats(payload, offset + sizeof(int) + (35 * sizeof(float)), 4);
             var translation = ReadFloats(payload, offset + sizeof(int) + (39 * sizeof(float)), 3);
             if (parent < -1
                 || parent >= names.Count
+                || bind is null
                 || inverseBind is null
                 || scale is null
                 || rotation is null
@@ -425,7 +427,7 @@ internal sealed record NativePreviewSkeleton(
             {
                 return unrigged;
             }
-            bones.Add(new NativePreviewBone(names[index], parent, inverseBind, scale, rotation, translation));
+            bones.Add(new NativePreviewBone(names[index], parent, bind, inverseBind, scale, rotation, translation));
         }
         return new NativePreviewSkeleton(status, sourcePath, bones);
     }
@@ -473,13 +475,14 @@ internal sealed record NativePreviewSkeleton(
 /// </summary>
 /// <remarks>
 /// The transform is the bone's own, relative to <see cref="ParentIndex"/>; chaining it up the
-/// hierarchy reproduces the bind matrix the file also stores, to within 3.4e-6 across a 448-bone
-/// rig. <see cref="InverseBindMatrix"/> is sixteen floats in the order the source holds them,
-/// which is already the order glTF wants: the translation sits at elements 12, 13 and 14.
+/// hierarchy reproduces <see cref="BindMatrix"/>, to within 3.4e-6 across a 448-bone rig. Both
+/// matrices are sixteen floats in the order the source holds them, which is already the order both
+/// glTF and FBX want: row-major with the translation at elements 12, 13 and 14.
 /// </remarks>
 internal sealed record NativePreviewBone(
     string Name,
     int ParentIndex,
+    float[] BindMatrix,
     float[] InverseBindMatrix,
     float[] Scale,
     float[] Rotation,
