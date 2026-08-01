@@ -3576,6 +3576,7 @@ internal static class ArchiveLiteTestRunner
                 CancellationToken.None).ConfigureAwait(false);
             var fbx = await File.ReadAllBytesAsync(fbxPath).ConfigureAwait(false);
             Require(Encoding.ASCII.GetString(fbx, 0, 20) == "Kaydara FBX Binary  ", "FBX export is not a binary FBX file");
+            RequireFbxUnitScale(fbx);
             Require(
                 fbx.AsSpan().IndexOf(BitConverter.GetBytes(9.875)) >= 0
                 && fbx.AsSpan().IndexOf(BitConverter.GetBytes(20.25)) >= 0,
@@ -3884,6 +3885,7 @@ internal static class ArchiveLiteTestRunner
             Require(
                 Encoding.ASCII.GetString(fbx, 0, 20) == "Kaydara FBX Binary  ",
                 "the rigged FBX export is not a binary FBX file");
+            RequireFbxUnitScale(fbx);
             var fbxText = Encoding.ASCII.GetString(fbx);
             Require(fbxText.Contains("LimbNode", StringComparison.Ordinal), "the rigged FBX carries no bone nodes");
             Require(fbxText.Contains("Skin", StringComparison.Ordinal), "the rigged FBX carries no skin deformer");
@@ -3901,7 +3903,9 @@ internal static class ArchiveLiteTestRunner
             await exporter.ExportPackageAsync(
                 root, "character/model/body.pac", ExportKind.Fbx, rigidFbxPath,
                 overwrite: false, null, null, CancellationToken.None).ConfigureAwait(false);
-            var rigidFbxText = Encoding.ASCII.GetString(await File.ReadAllBytesAsync(rigidFbxPath).ConfigureAwait(false));
+            var rigidFbx = await File.ReadAllBytesAsync(rigidFbxPath).ConfigureAwait(false);
+            RequireFbxUnitScale(rigidFbx);
+            var rigidFbxText = Encoding.ASCII.GetString(rigidFbx);
             Require(
                 !rigidFbxText.Contains("LimbNode", StringComparison.Ordinal)
                 && !rigidFbxText.Contains("Cluster", StringComparison.Ordinal),
@@ -3910,6 +3914,37 @@ internal static class ArchiveLiteTestRunner
         finally
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// An FBX has to say its geometry is in metres, because it is.
+    /// </summary>
+    /// <remarks>
+    /// UnitScaleFactor states how many centimetres one unit is, and an importer divides by it:
+    /// Blender takes it as UnitScaleFactor/100. Declaring 1 claims centimetres and lands every
+    /// export at a hundredth of its size, which is a silent wrong answer -- the file loads, the
+    /// rig works, and the character is 18 mm tall. Pinned here because nothing else would notice.
+    /// </remarks>
+    private static void RequireFbxUnitScale(byte[] fbx)
+    {
+        foreach (var name in new[] { "UnitScaleFactor", "OriginalUnitScaleFactor" })
+        {
+            var marker = Encoding.ASCII.GetBytes(name);
+            var at = fbx.AsSpan().IndexOf(marker);
+            Require(at >= 0, $"the FBX export declares no {name}");
+            // The property is a name, its type strings, then the double value; find the first
+            // 'D' tag after the name and read the eight bytes behind it.
+            var scan = at + marker.Length;
+            while (scan < fbx.Length && fbx[scan] != (byte)'D')
+            {
+                scan++;
+            }
+            Require(scan + 9 <= fbx.Length, $"the FBX export's {name} has no value");
+            var value = BitConverter.ToDouble(fbx, scan + 1);
+            Require(
+                Math.Abs(value - 100.0) < 1.0e-9,
+                $"the FBX export declares {name} {value}, so an importer reads its metres as centimetres");
         }
     }
 

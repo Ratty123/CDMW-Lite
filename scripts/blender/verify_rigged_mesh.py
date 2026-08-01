@@ -22,9 +22,9 @@ from mathutils import Quaternion
 WEIGHT_TOLERANCE = 1.0e-4
 
 # What counts as a vertex having moved, as a fraction of the model's own size. Relative because
-# the two formats do not arrive at the same scale: Blender reads an FBX as centimetres and lands
-# the same character a hundredth the size of its GLB, and a fixed threshold is then a hundred
-# times stricter on one than the other -- quietly discounting real deformation on the smaller.
+# the assets are not one size: a character stands 1.8 units tall and a piece of level geometry
+# spans 145, and any fixed distance is either too coarse to see a finger bend on the one or so
+# fine that float noise reads as movement on the other.
 MOVEMENT_FRACTION = 5.0e-5
 
 # Bones to pose. The first is a limb far enough down the arm to move a recognisable share of a
