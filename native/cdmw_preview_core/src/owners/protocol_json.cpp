@@ -544,6 +544,18 @@ struct NativeSubmesh {
     // as map_Kd. Held separately from the name and the material because the three coincide in
     // some formats and not in others.
     std::string texture;
+    // The material exactly as the source record spells it, before any fallback to the texture
+    // name. A combined LOD group names itself after this, and cannot tell an absent material from
+    // one that happened to match the texture unless it is kept apart.
+    std::string raw_material;
+    // What an interchange file calls this submesh, where that differs from what the renderer calls
+    // it. A PAM part is known to the preview by its texture, which is what resolves its material,
+    // and to CDMW Full by its ordinal and material. Both names are true; the export needs Full's.
+    std::string export_name;
+    // Whether the source records carry texture coordinates at all. A PAM vertex narrower than
+    // twelve bytes has none, and an interchange file has to say so rather than write a UV of zero
+    // for every vertex and claim the source stated it.
+    bool has_texture_coordinates = true;
     std::string source_model_path;
     std::string source_component_label;
     std::vector<Vec3> positions;

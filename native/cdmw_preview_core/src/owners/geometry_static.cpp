@@ -81,6 +81,12 @@ static bool indices_fit_vertex_count(
     return true;
 }
 
+static std::string pam_export_name(const RawPamEntry& raw) {
+    const std::string ordinal = std::to_string(raw.index);
+    return "mesh_" + (raw.index < 10 ? std::string("0") : std::string()) + ordinal
+        + "_" + (raw.material_name.empty() ? ordinal : raw.material_name);
+}
+
 static NativeSubmesh parse_quantized_pam_mesh(
     const std::vector<char>& data,
     const RawPamEntry& raw,
@@ -94,6 +100,9 @@ static NativeSubmesh parse_quantized_pam_mesh(
     mesh.name = raw.texture_name.empty() ? raw.material_name : raw.texture_name;
     mesh.material = raw.material_name.empty() ? raw.texture_name : raw.material_name;
     mesh.texture = raw.texture_name;
+    mesh.raw_material = raw.material_name;
+    mesh.export_name = pam_export_name(raw);
+    mesh.has_texture_coordinates = stride >= 12;
     mesh.source_submesh_index = raw.index;
     mesh.source_local_submesh_index = raw.index;
     if (vertex_base >= data.size() || index_offset + static_cast<size_t>(raw.index_count) * 2u > data.size()) return mesh;
@@ -162,6 +171,10 @@ static NativeSubmesh parse_global_pam_mesh_at(
     mesh.name = raw.texture_name.empty() ? raw.material_name : raw.texture_name;
     mesh.material = raw.material_name.empty() ? raw.texture_name : raw.material_name;
     mesh.texture = raw.texture_name;
+    mesh.raw_material = raw.material_name;
+    mesh.export_name = pam_export_name(raw);
+    // The global-buffer layout stores position only.
+    mesh.has_texture_coordinates = false;
     mesh.source_submesh_index = raw.index;
     mesh.source_local_submesh_index = raw.index;
     if (index_offset + static_cast<size_t>(raw.index_count) * 2u > data.size()) return mesh;
@@ -318,6 +331,7 @@ static NativeSubmesh parse_scan_pam_mesh(
     mesh.name = "mesh_" + (raw.index < 10 ? std::string("0") : std::string()) + std::to_string(raw.index) + "_" + (raw.material_name.empty() ? std::to_string(raw.index) : raw.material_name);
     mesh.material = raw.material_name;
     mesh.texture = raw.texture_name;
+    mesh.export_name = mesh.name;
     return mesh;
 }
 
@@ -662,11 +676,33 @@ static std::optional<std::tuple<size_t, int, size_t>> find_pamlod_group_layout(
     return std::nullopt;
 }
 
+// A LOD group's entries share one vertex buffer but each takes its own slice of it, so the group is
+// presented as a single submesh whose vertices are the slices laid end to end. Two things follow,
+// and both matter to an export.
+//
+// The slices are not disjoint in the source's numbering -- entry 0 and entry 3 can both use source
+// vertex 12 -- so the combined array holds a vertex per entry that reaches it, not one per distinct
+// source vertex. Numbering the combined array by source vertex would fold those together and
+// scramble what survived; the group's own position in the array is the identity that means
+// something here, so that is what is recorded.
+//
+// The group is named after the first entry's material, not its texture, and zero-padded, because
+// that is how CDMW Full names it.
 static NativeSubmesh combine_pamlod_group_meshes(const std::vector<NativeSubmesh>& parts, int lod_index) {
     NativeSubmesh combined;
     if (parts.empty()) return combined;
-    combined.name = "lod" + std::to_string(lod_index);
-    combined.material = parts.front().material.empty() ? combined.name : parts.front().material;
+    const std::string lod_label = lod_index < 10
+        ? "lod0" + std::to_string(lod_index)
+        : "lod" + std::to_string(lod_index);
+    const std::string material = parts.front().raw_material.empty()
+        ? "lod" + std::to_string(lod_index)
+        : parts.front().raw_material;
+    combined.name = lod_label + "_" + material;
+    combined.export_name = combined.name;
+    combined.material = material;
+    combined.texture = parts.front().texture;
+    combined.raw_material = parts.front().raw_material;
+    combined.has_texture_coordinates = parts.front().has_texture_coordinates;
     combined.source_submesh_index = lod_index;
     combined.source_local_submesh_index = lod_index;
     combined.vertex_layout_name = parts.front().vertex_layout_name;
@@ -675,15 +711,15 @@ static NativeSubmesh combine_pamlod_group_meshes(const std::vector<NativeSubmesh
     combined.normal_offset = parts.front().normal_offset;
     std::uint32_t vertex_base = 0;
     for (const NativeSubmesh& part : parts) {
-        if (combined.name == "lod" + std::to_string(lod_index) && !part.name.empty()) {
-            combined.name = "lod" + std::to_string(lod_index) + "_" + part.name;
-        }
         combined.positions.insert(combined.positions.end(), part.positions.begin(), part.positions.end());
         combined.uvs.insert(combined.uvs.end(), part.uvs.begin(), part.uvs.end());
         combined.normals.insert(combined.normals.end(), part.normals.begin(), part.normals.end());
         combined.export_positions.insert(combined.export_positions.end(), part.export_positions.begin(), part.export_positions.end());
         combined.export_uvs.insert(combined.export_uvs.end(), part.export_uvs.begin(), part.export_uvs.end());
-        combined.source_vertex_indices.insert(combined.source_vertex_indices.end(), part.source_vertex_indices.begin(), part.source_vertex_indices.end());
+        for (size_t local = 0; local < part.positions.size(); ++local) {
+            combined.source_vertex_indices.push_back(
+                static_cast<std::int32_t>(vertex_base + static_cast<std::uint32_t>(local)));
+        }
         for (std::uint32_t index : part.indices) {
             combined.indices.push_back(vertex_base + index);
         }

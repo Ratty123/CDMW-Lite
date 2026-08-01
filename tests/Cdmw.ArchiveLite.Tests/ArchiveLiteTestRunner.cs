@@ -3967,7 +3967,7 @@ internal static class ArchiveLiteTestRunner
         {
             var root = cacheManifest.RootElement;
             Require(
-                root.GetProperty("version").GetString() == "archive_lite_native_model_v8_lazy_prefab",
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v14_lazy_prefab",
                 "the default texture-free preview changed its established cache version");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
@@ -4180,8 +4180,8 @@ internal static class ArchiveLiteTestRunner
         Require(
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v8_lazy_prefab\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v9_textured_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v14_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v15_textured_lazy_prefab\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");

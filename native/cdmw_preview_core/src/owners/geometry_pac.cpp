@@ -619,6 +619,11 @@ static void compute_missing_normals(NativeSubmesh& mesh) {
     }
 }
 
+// Contraction is off through the smoothing below: fusing a multiply into the addition that follows
+// keeps an intermediate wider than a double, which would put the last bit of a normal somewhere
+// CDMW Full's plain double arithmetic does not.
+#pragma fp_contract(off)
+
 // CDMW Full's smoothing, component for component, for the formats whose records carry no normal.
 // Each face normal is normalized before it is accumulated, so every face adjoining a vertex counts
 // once regardless of its area, and a degenerate face contributes nothing. Averaging the
@@ -657,6 +662,12 @@ static void compute_export_smooth_normals(NativeSubmesh& mesh) {
             mesh.export_normals[index].z += nz;
         }
     }
+    // Squared by multiplication, which is the correctly rounded square. CDMW Full spells this one
+    // length as `n ** 2`, and CPython routes that through a pow() that lands a single unit in the
+    // last place above the correct answer for some inputs -- 88 of one model's 567,818 vertex
+    // normals. Reproducing that would mean reproducing another runtime's rounding error, and the
+    // C++ pow() here misses on a different set of inputs, so it cannot even be borrowed. The
+    // arithmetic is left correct; the two files differ in the sixteenth digit of those normals.
     for (ExportVec3& normal : mesh.export_normals) {
         const double length = std::sqrt(
             normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
@@ -669,6 +680,8 @@ static void compute_export_smooth_normals(NativeSubmesh& mesh) {
         }
     }
 }
+
+#pragma fp_contract(on)
 
 static bool native_mesh_renderable(const NativeSubmesh& mesh) {
     if (mesh.positions.size() < 3 || mesh.indices.size() < 3) return false;
