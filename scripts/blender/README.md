@@ -34,14 +34,13 @@ Pass `--bone "<name>"` to choose which bones to pose; it defaults to `Bip01 R Up
 their ancestors, so a legwear GLB has `Bip01 R Thigh` but no `Bip01 R Hand`. An FBX carries the
 whole skeleton and has both.
 
-The two formats differ in ways the checker has to allow for, and both are deliberate:
+A GLB puts every submesh in one mesh under one node; an FBX gives each submesh its own object.
+All of them are measured together, because most submeshes are legitimately unmoved by any one
+bone -- a head does not follow an upper arm.
 
-- A GLB puts every submesh in one mesh under one node; an FBX gives each submesh its own object.
-  All of them are measured together, because most submeshes are legitimately unmoved by any one
-  bone -- a head does not follow an upper arm.
-- Blender reads an FBX as centimetres and lands the same character a hundredth the size of its
-  GLB, so "has this vertex moved" is judged against a fraction of the model's own size rather than
-  a fixed distance. With a fixed one the same rig looks like it deforms fewer vertices in FBX.
+An import also brings in geometry that is not the model: Blender's glTF importer creates an
+`Icosphere` as the bones' display shape and files it under a `glTF_not_exported` collection. That
+is why the mesh is selected by its armature modifier and never by taking the first `MESH` object.
 
 Reference runs on exports from the shipped archives:
 
@@ -49,14 +48,15 @@ Reference runs on exports from the shipped archives:
 | --- | --- | --- | --- | --- | --- | --- |
 | `cd_phw_00_nude_00_0001_damian.pac` | GLB | 249 | 13,740 | `Bip01 R UpperArm` | 3,153 | 0.490 vs 0.730 |
 | `cd_phw_00_nude_00_0001_damian.pac` | GLB | 249 | 13,740 | `Bip01 R Hand` | 1,983 | 0.099 vs 0.681 |
-| `cd_phw_00_nude_00_0001_damian.pac` | FBX | 448 | 13,740 | `Bip01 R UpperArm` | 3,153 | 0.005 vs 0.007 |
-| `cd_phw_00_nude_00_0001_damian.pac` | FBX | 448 | 13,740 | `Bip01 R Hand` | 1,983 | 0.001 vs 0.007 |
+| `cd_phw_00_nude_00_0001_damian.pac` | FBX | 448 | 13,740 | `Bip01 R UpperArm` | 3,153 | 0.490 vs 0.730 |
+| `cd_phw_00_nude_00_0001_damian.pac` | FBX | 448 | 13,740 | `Bip01 R Hand` | 1,983 | 0.099 vs 0.681 |
 | `cd_phw_00_lb_0057.pac` | GLB | 53 | 8,379 | `Bip01 R Thigh` | 5,547 | 0.287 vs 0.320 |
-| `cd_phw_00_lb_0057.pac` | FBX | 448 | 8,379 | `Bip01 R Thigh` | 5,547 | 0.003 vs 0.003 |
+| `cd_phw_00_lb_0057.pac` | FBX | 448 | 8,379 | `Bip01 R Thigh` | 5,547 | 0.287 vs 0.320 |
 | `cd_phm_00_ub_0003.pac` | GLB | 101 | 2,768 | `Bip01 Spine1` | 2,128 | 0.293 vs 0.373 |
 
-All report 0 unweighted vertices and 0 whose weights miss 1.0. The moved counts agree exactly
-between the two formats, which is the check that they bind the same vertices to the same bones.
+All report 0 unweighted vertices and 0 whose weights miss 1.0. The two formats agree to the digit
+on both the counts and the distances, which is the check that they bind the same vertices to the
+same bones and arrive at the same size: Damian's body measures 1.839 tall out of either.
 
 ## What is not rigged, and why
 
