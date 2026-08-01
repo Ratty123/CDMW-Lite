@@ -312,7 +312,7 @@ internal static class NativeGlbExportWriter
             {
                 break;
             }
-            builder.Append(char.IsControl(character) || character is '/' or '\\' ? '_' : character);
+            builder.Append(char.IsControl(character) ? '_' : character);
         }
         return builder.Length == 0 ? fallback : builder.ToString();
     }

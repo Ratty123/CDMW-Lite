@@ -67,6 +67,7 @@ internal sealed record NativePreviewMeshPackage(
                 ResolveIdentityFile(root, element, vertexCount),
                 ResolveExportGeometryFile(root, element, exportVertexCount),
                 exportVertexCount,
+                ReadBool(element, "export_has_texture_coordinates", true),
                 ReadString(element, "material_name"),
                 FirstNonEmpty(ReadString(element, "submesh_name"), submeshNames.GetValueOrDefault(index, string.Empty)),
                 ReadString(element, "submesh_texture"),
@@ -86,6 +87,13 @@ internal sealed record NativePreviewMeshPackage(
 
     private static string FirstNonEmpty(string first, string second) =>
         first.Length > 0 ? first : second;
+
+    private static bool ReadBool(JsonElement element, string name, bool fallback)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
+            : fallback;
+    }
 
     /// <summary>
     /// The vertices an interchange file carries: position, normal and texture coordinate as eight
@@ -305,6 +313,7 @@ internal sealed record NativePreviewMeshBatch(
     string? IdentityPath,
     string? ExportGeometryPath,
     int ExportVertexCount,
+    bool HasTextureCoordinates,
     string MaterialName,
     string SubmeshName,
     string TextureName,

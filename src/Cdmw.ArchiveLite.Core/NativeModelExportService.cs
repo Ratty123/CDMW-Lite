@@ -299,7 +299,15 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             // Normals survive the preview transform: it only recentres and scales uniformly, so
             // every direction it produced still points the way the source authored it.
             await WriteVerticesAsync(normalsPath, rebuilt.Normals, 3, null, cancellationToken).ConfigureAwait(false);
-            await WriteVerticesAsync(uvsPath, rebuilt.TextureCoordinates, 2, null, cancellationToken).ConfigureAwait(false);
+            // A source whose vertex records are too narrow to hold one has no texture coordinate,
+            // and writing a UV of zero per vertex would claim it stated one.
+            var uvCount = batch.HasTextureCoordinates ? rebuilt.VertexCount : 0;
+            await WriteVerticesAsync(
+                uvsPath,
+                batch.HasTextureCoordinates ? rebuilt.TextureCoordinates : [],
+                2,
+                null,
+                cancellationToken).ConfigureAwait(false);
             await WriteFacesAsync(facesPath, rebuilt.CornerIndices, cancellationToken).ConfigureAwait(false);
 
             result.Add(new PreparedNativeBatch(new Dictionary<string, object?>
@@ -314,7 +322,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 ["vertices_binary"] = BinaryDescriptor(verticesPath, rebuilt.VertexCount, 3, "f64"),
                 ["faces_binary"] = BinaryDescriptor(facesPath, batch.VertexCount / 3, 3, "i32"),
                 ["normals_binary"] = BinaryDescriptor(normalsPath, rebuilt.VertexCount, 3, "f64"),
-                ["uvs_binary"] = BinaryDescriptor(uvsPath, rebuilt.VertexCount, 2, "f64"),
+                ["uvs_binary"] = BinaryDescriptor(uvsPath, uvCount, 2, "f64"),
                 ["source_vertex_map"] = rebuilt.SourceVertexMap,
             },
             rebuilt.VertexCount));
@@ -583,17 +591,22 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
     /// </summary>
     internal static string RoundtripManifestPath(string objDestination) => objDestination + ".meta.json";
 
+    /// <summary>
+    /// A submesh or material name as an OBJ can carry it.
+    /// </summary>
+    /// <remarks>
+    /// Only control characters are replaced, because only they would break the line they sit on.
+    /// A separator does not: some materials are named for the path their texture came from, and
+    /// CDMW Full writes those through unaltered, so an <c>o</c> or <c>usemtl</c> line rewritten
+    /// here would name something Full's file does not.
+    /// </remarks>
     internal static string CleanName(string? value, string fallback)
     {
         var source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-        var builder = new StringBuilder(Math.Min(source.Length, 96));
+        var builder = new StringBuilder(source.Length);
         foreach (var character in source)
         {
-            if (builder.Length >= 96)
-            {
-                break;
-            }
-            builder.Append(char.IsControl(character) || character is '/' or '\\' ? '_' : character);
+            builder.Append(char.IsControl(character) ? '_' : character);
         }
         return builder.Length == 0 ? fallback : builder.ToString();
     }
