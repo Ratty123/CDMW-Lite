@@ -289,11 +289,12 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 },
                 cancellationToken).ConfigureAwait(false);
 
+            // Source-space vertices need no framing undone; render-blob ones do.
             await WriteVerticesAsync(
                 verticesPath,
                 rebuilt.Positions,
                 3,
-                normalization,
+                rebuilt.IsSourceSpace ? null : normalization,
                 cancellationToken).ConfigureAwait(false);
             // Normals survive the preview transform: it only recentres and scales uniformly, so
             // every direction it produced still points the way the source authored it.
@@ -309,6 +310,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 // ours, is submesh name then material name then the ordinal.
                 ["name"] = CleanName(batch.SubmeshName, CleanName(batch.MaterialName, $"part_{batch.Index:000}")),
                 ["material"] = CleanName(batch.MaterialName, CleanName(batch.SubmeshName, $"part_{batch.Index:000}")),
+                ["texture"] = batch.TextureName,
                 ["vertices_binary"] = BinaryDescriptor(verticesPath, rebuilt.VertexCount, 3, "f64"),
                 ["faces_binary"] = BinaryDescriptor(facesPath, batch.VertexCount / 3, 3, "i32"),
                 ["normals_binary"] = BinaryDescriptor(normalsPath, rebuilt.VertexCount, 3, "f64"),
@@ -325,7 +327,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
     /// </param>
     private static async Task WriteVerticesAsync(
         string path,
-        float[] source,
+        double[] source,
         int components,
         NativePreviewNormalization? restore,
         CancellationToken cancellationToken)
@@ -339,7 +341,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             var count = Math.Min(buffer.Length / sizeof(double), source.Length - written);
             for (var index = 0; index < count; index++)
             {
-                var value = (double)source[written + index];
+                var value = source[written + index];
                 BinaryPrimitives.WriteDoubleLittleEndian(
                     buffer.AsSpan(index * sizeof(double), sizeof(double)),
                     restore is null ? value : restore.Restore(value, (written + index) % components));

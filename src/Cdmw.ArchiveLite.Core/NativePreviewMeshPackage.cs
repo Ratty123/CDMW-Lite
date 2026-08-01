@@ -9,6 +9,9 @@ internal sealed record NativePreviewMeshPackage(
 {
     private const int MaximumVertices = 8_000_000;
 
+    /// <summary>Position, normal and texture coordinate, as doubles.</summary>
+    internal const int ExportBytesPerVertex = 8 * sizeof(double);
+
     public static async Task<NativePreviewMeshPackage> ReadAsync(
         string packageRoot,
         CancellationToken cancellationToken)
@@ -56,13 +59,17 @@ internal sealed record NativePreviewMeshPackage(
             {
                 throw new InvalidDataException($"Native preview batch {index} has an invalid geometry length.");
             }
+            var exportVertexCount = ReadInt(element, "export_vertex_count", 0);
             batches.Add(new NativePreviewMeshBatch(
                 index,
                 vertexCount,
                 geometry,
                 ResolveIdentityFile(root, element, vertexCount),
+                ResolveExportGeometryFile(root, element, exportVertexCount),
+                exportVertexCount,
                 ReadString(element, "material_name"),
-                submeshNames.GetValueOrDefault(index, string.Empty),
+                FirstNonEmpty(ReadString(element, "submesh_name"), submeshNames.GetValueOrDefault(index, string.Empty)),
+                ReadString(element, "submesh_texture"),
                 ReadColor(element),
                 ReadUnitFloat(element, "metalness", 0.0f),
                 ReadUnitFloat(element, "roughness", 0.62f)));
@@ -75,6 +82,40 @@ internal sealed record NativePreviewMeshPackage(
             batches,
             totalVertices,
             NativePreviewNormalization.Read(manifest.RootElement));
+    }
+
+    private static string FirstNonEmpty(string first, string second) =>
+        first.Length > 0 ? first : second;
+
+    /// <summary>
+    /// The vertices an interchange file carries: position, normal and texture coordinate as eight
+    /// doubles each, in the source's own vertex order and its own space.
+    /// </summary>
+    /// <remarks>
+    /// The render blob beside it holds the same mesh as the GPU wants it -- per corner, framed into
+    /// the preview's display cube, narrowed to floats -- and exporting from it means undoing the
+    /// framing and living with what the floats kept. CDMW Full decodes the source records in
+    /// double and never frames them, so anything exported from the render blob differs from Full's
+    /// in the eighth digit of every coordinate. This is the same decode, at the same width.
+    /// </remarks>
+    private static string? ResolveExportGeometryFile(string packageRoot, JsonElement element, int vertexCount)
+    {
+        var relative = ReadString(element, "export_vertex_file");
+        if (string.IsNullOrWhiteSpace(relative) || vertexCount <= 0)
+        {
+            return null;
+        }
+        try
+        {
+            var path = ResolveContainedFile(packageRoot, relative);
+            return new FileInfo(path).Length == checked((long)vertexCount * ExportBytesPerVertex)
+                ? path
+                : null;
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -262,8 +303,11 @@ internal sealed record NativePreviewMeshBatch(
     int VertexCount,
     string GeometryPath,
     string? IdentityPath,
+    string? ExportGeometryPath,
+    int ExportVertexCount,
     string MaterialName,
     string SubmeshName,
+    string TextureName,
     float[] BaseColor,
     float Metalness,
     float Roughness);

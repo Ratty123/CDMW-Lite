@@ -4,27 +4,29 @@ using static Cdmw.ArchiveLite.Core.NativePreviewGeometryIO;
 namespace Cdmw.ArchiveLite.Core;
 
 /// <summary>
-/// Rebuilds one batch's indexed vertex array from the preview package's corner-by-corner geometry.
+/// Rebuilds one batch's indexed vertex array from the preview package, for export.
 /// </summary>
 /// <remarks>
-/// The package holds what the renderer submits to the GPU: three vertices for every triangle, with
-/// nothing shared, because the index buffer is spent when the blob is written. An interchange file
-/// has to carry the array the source held, and it has to carry it in the source's own order:
-/// morph targets, shape keys and any other per-vertex correspondence are matched by index, so a
-/// mesh whose vertices are the right points in the wrong order is worse than useless -- it loads,
-/// and then deforms into noise.
+/// Two things have to be recovered, and the package answers both.
 ///
-/// The order comes from the package's identity buffer, which records for every corner the source
+/// The order comes from the identity buffer, which records for every triangle corner the source
 /// vertex it was copied from. Numbering those in ascending source order reproduces the array the
-/// archive holds, because the preview parser itself emits vertices in that order. Rejoining by
-/// matching attribute bits instead would recover the same points, but in order of first appearance
-/// in the triangle stream, and would silently merge two source vertices that happen to agree on
-/// position, normal and texture coordinate. Both are the difference between a mesh that morphs and
-/// one that explodes.
+/// archive holds, because the preview parser itself emits vertices in that order. That matters
+/// because morph targets, shape keys and every other per-vertex correspondence are matched by
+/// index: a mesh whose vertices are the right points in the wrong order loads, and then deforms
+/// into noise.
 ///
-/// A package written before the identity buffer existed has no such record, and falls back to
-/// matching attribute bits. That path cannot reconstruct the source order, and is kept only so
-/// that a stale cache still exports something rather than failing.
+/// The coordinates come from the package's export geometry, which the parser decodes in double
+/// straight from the source records and never frames. The render blob beside it holds the same
+/// mesh the way the GPU wants it -- one vertex per corner, recentred and rescaled into the
+/// preview's display cube, narrowed to floats, normals normalized for shading -- and exporting
+/// from that means undoing the framing and living with whatever the floats kept. Both leave marks:
+/// coordinates that differ from CDMW Full's in the eighth digit, and normals scaled to unit length
+/// where the source record said otherwise.
+///
+/// A package written before either sidecar existed still exports, from the render blob and by
+/// matching attribute bits. Neither substitute can reconstruct what it is standing in for, and
+/// they are kept only so a stale cache exports something rather than failing.
 /// </remarks>
 internal sealed class NativePreviewVertexRebuild
 {
@@ -34,10 +36,11 @@ internal sealed class NativePreviewVertexRebuild
     private NativePreviewVertexRebuild(
         int[] cornerIndices,
         int vertexCount,
-        float[] positions,
-        float[] normals,
-        float[] textureCoordinates,
-        int[]? sourceVertexMap)
+        double[] positions,
+        double[] normals,
+        double[] textureCoordinates,
+        int[]? sourceVertexMap,
+        bool isSourceSpace)
     {
         CornerIndices = cornerIndices;
         VertexCount = vertexCount;
@@ -45,6 +48,7 @@ internal sealed class NativePreviewVertexRebuild
         Normals = normals;
         TextureCoordinates = textureCoordinates;
         SourceVertexMap = sourceVertexMap;
+        IsSourceSpace = isSourceSpace;
     }
 
     /// <summary>The exported vertex each triangle corner refers to, in the package's corner order.</summary>
@@ -52,15 +56,12 @@ internal sealed class NativePreviewVertexRebuild
 
     public int VertexCount { get; }
 
-    /// <summary>
-    /// Three components per vertex, still in the preview's normalized frame. Callers undo that
-    /// framing themselves, because the interchange formats disagree on the precision to undo it in.
-    /// </summary>
-    public float[] Positions { get; }
+    /// <summary>Three components per vertex. See <see cref="IsSourceSpace"/> for which space.</summary>
+    public double[] Positions { get; }
 
-    public float[] Normals { get; }
+    public double[] Normals { get; }
 
-    public float[] TextureCoordinates { get; }
+    public double[] TextureCoordinates { get; }
 
     /// <summary>
     /// The source vertex each exported vertex came from, or null when the package carries no
@@ -69,8 +70,14 @@ internal sealed class NativePreviewVertexRebuild
     /// </summary>
     public int[]? SourceVertexMap { get; }
 
+    /// <summary>
+    /// Whether the positions are already in the archive's own space. When false they carry the
+    /// preview's framing transform and the caller has to undo it.
+    /// </summary>
+    public bool IsSourceSpace { get; }
+
     /// <param name="cornersRead">
-    /// Reports corners consumed by the attribute pass, which visits every corner exactly once.
+    /// Reports corners consumed, so a caller can report progress over the package's corner count.
     /// </param>
     public static async Task<NativePreviewVertexRebuild> BuildAsync(
         NativePreviewMeshBatch batch,
@@ -81,9 +88,79 @@ internal sealed class NativePreviewVertexRebuild
             ? await PlanByAttributesAsync(batch, cancellationToken).ConfigureAwait(false)
             : await PlanBySourceIdentityAsync(batch, cancellationToken).ConfigureAwait(false);
 
-        var positions = new float[checked(plan.VertexCount * 3)];
-        var normals = new float[checked(plan.VertexCount * 3)];
-        var textureCoordinates = new float[checked(plan.VertexCount * 2)];
+        // The export geometry is only usable when the rebuild agrees with it about how many
+        // vertices this submesh has, which it does whenever the parser numbered them from zero
+        // without gaps. Anything else falls back rather than pairing two different arrays.
+        if (batch.ExportGeometryPath is not null && batch.ExportVertexCount == plan.VertexCount)
+        {
+            var exact = await ReadExportGeometryAsync(batch, plan, cancellationToken).ConfigureAwait(false);
+            if (cornersRead is not null)
+            {
+                await cornersRead(batch.VertexCount).ConfigureAwait(false);
+            }
+            return exact;
+        }
+
+        return await ReadRenderGeometryAsync(batch, plan, cornersRead, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<NativePreviewVertexRebuild> ReadExportGeometryAsync(
+        NativePreviewMeshBatch batch,
+        VertexPlan plan,
+        CancellationToken cancellationToken)
+    {
+        var positions = new double[checked(plan.VertexCount * 3)];
+        var normals = new double[checked(plan.VertexCount * 3)];
+        var textureCoordinates = new double[checked(plan.VertexCount * 2)];
+        await using var input = OpenRead(batch.ExportGeometryPath!);
+        const int verticesPerChunk = 8192;
+        var buffer = new byte[verticesPerChunk * NativePreviewMeshPackage.ExportBytesPerVertex];
+        var vertex = 0;
+        while (vertex < plan.VertexCount)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = Math.Min(verticesPerChunk, plan.VertexCount - vertex);
+            await input.ReadExactlyAsync(
+                buffer.AsMemory(0, count * NativePreviewMeshPackage.ExportBytesPerVertex),
+                cancellationToken).ConfigureAwait(false);
+            for (var localIndex = 0; localIndex < count; localIndex++)
+            {
+                var offset = localIndex * NativePreviewMeshPackage.ExportBytesPerVertex;
+                var index = vertex + localIndex;
+                for (var component = 0; component < 3; component++)
+                {
+                    positions[(index * 3) + component] =
+                        ReadFiniteDouble(buffer, offset + (component * sizeof(double)), "position");
+                    normals[(index * 3) + component] =
+                        ReadFiniteDouble(buffer, offset + ((3 + component) * sizeof(double)), "normal");
+                }
+                for (var component = 0; component < 2; component++)
+                {
+                    textureCoordinates[(index * 2) + component] =
+                        ReadFiniteDouble(buffer, offset + ((6 + component) * sizeof(double)), "UV");
+                }
+            }
+            vertex += count;
+        }
+        return new NativePreviewVertexRebuild(
+            plan.CornerIndices,
+            plan.VertexCount,
+            positions,
+            normals,
+            textureCoordinates,
+            plan.SourceVertexMap,
+            isSourceSpace: true);
+    }
+
+    private static async Task<NativePreviewVertexRebuild> ReadRenderGeometryAsync(
+        NativePreviewMeshBatch batch,
+        VertexPlan plan,
+        Func<int, Task>? cornersRead,
+        CancellationToken cancellationToken)
+    {
+        var positions = new double[checked(plan.VertexCount * 3)];
+        var normals = new double[checked(plan.VertexCount * 3)];
+        var textureCoordinates = new double[checked(plan.VertexCount * 2)];
         var filled = new bool[plan.VertexCount];
         await using var input = OpenRead(batch.GeometryPath);
         var buffer = new byte[RecordsPerChunk * BytesPerPreviewVertex];
@@ -116,20 +193,30 @@ internal sealed class NativePreviewVertexRebuild
                 await cornersRead(count).ConfigureAwait(false);
             }
         }
-
         return new NativePreviewVertexRebuild(
             plan.CornerIndices,
             plan.VertexCount,
             positions,
             normals,
             textureCoordinates,
-            plan.SourceVertexMap);
+            plan.SourceVertexMap,
+            isSourceSpace: false);
+    }
+
+    private static double ReadFiniteDouble(byte[] input, int offset, string label)
+    {
+        var value = BinaryPrimitives.ReadDoubleLittleEndian(input.AsSpan(offset, sizeof(double)));
+        if (!double.IsFinite(value))
+        {
+            throw new InvalidDataException($"Native preview export geometry contains a non-finite {label} value.");
+        }
+        return value;
     }
 
     private static void ReadComponents(
         byte[] input,
         int sourceOffset,
-        float[] output,
+        double[] output,
         int outputOffset,
         int components,
         string label)

@@ -93,6 +93,7 @@ static NativeSubmesh parse_quantized_pam_mesh(
     NativeSubmesh mesh;
     mesh.name = raw.texture_name.empty() ? raw.material_name : raw.texture_name;
     mesh.material = raw.material_name.empty() ? raw.texture_name : raw.material_name;
+    mesh.texture = raw.texture_name;
     mesh.source_submesh_index = raw.index;
     mesh.source_local_submesh_index = raw.index;
     if (vertex_base >= data.size() || index_offset + static_cast<size_t>(raw.index_count) * 2u > data.size()) return mesh;
@@ -116,14 +117,24 @@ static NativeSubmesh parse_quantized_pam_mesh(
             dequantize_u16(read_u16(data, voff + 2), bbox_min.y, bbox_max.y),
             dequantize_u16(read_u16(data, voff + 4), bbox_min.z, bbox_max.z),
         });
+        mesh.export_positions.push_back(ExportVec3{
+            dequantize_u16_exact(read_u16(data, voff), bbox_min.x, bbox_max.x),
+            dequantize_u16_exact(read_u16(data, voff + 2), bbox_min.y, bbox_max.y),
+            dequantize_u16_exact(read_u16(data, voff + 4), bbox_min.z, bbox_max.z),
+        });
         mesh.source_vertex_indices.push_back(static_cast<std::int32_t>(source_index));
         if (stride >= 12 && voff + 12 <= data.size()) {
             mesh.uvs.push_back(Vec2{
                 half_to_float(read_u16(data, voff + 8)),
                 half_to_float(read_u16(data, voff + 10)),
             });
+            mesh.export_uvs.push_back(ExportVec2{
+                static_cast<double>(half_to_float(read_u16(data, voff + 8))),
+                static_cast<double>(half_to_float(read_u16(data, voff + 10))),
+            });
         } else {
             mesh.uvs.push_back(Vec2{});
+            mesh.export_uvs.push_back(ExportVec2{});
         }
     }
     for (size_t i = 0; i + 2 < source_indices.size(); i += 3) {
@@ -150,6 +161,7 @@ static NativeSubmesh parse_global_pam_mesh_at(
     NativeSubmesh mesh;
     mesh.name = raw.texture_name.empty() ? raw.material_name : raw.texture_name;
     mesh.material = raw.material_name.empty() ? raw.texture_name : raw.material_name;
+    mesh.texture = raw.texture_name;
     mesh.source_submesh_index = raw.index;
     mesh.source_local_submesh_index = raw.index;
     if (index_offset + static_cast<size_t>(raw.index_count) * 2u > data.size()) return mesh;
@@ -175,7 +187,13 @@ static NativeSubmesh parse_global_pam_mesh_at(
             dequantize_i16(read_i16(data, voff + 2), bbox_min.y, bbox_max.y),
             dequantize_i16(read_i16(data, voff + 4), bbox_min.z, bbox_max.z),
         });
+        mesh.export_positions.push_back(ExportVec3{
+            dequantize_i16_exact(read_i16(data, voff), bbox_min.x, bbox_max.x),
+            dequantize_i16_exact(read_i16(data, voff + 2), bbox_min.y, bbox_max.y),
+            dequantize_i16_exact(read_i16(data, voff + 4), bbox_min.z, bbox_max.z),
+        });
         mesh.uvs.push_back(Vec2{});
+        mesh.export_uvs.push_back(ExportVec2{});
         mesh.source_vertex_indices.push_back(static_cast<std::int32_t>(source_index));
     }
     for (size_t i = 0; i + 2 < source_indices.size(); i += 3) {
@@ -299,6 +317,7 @@ static NativeSubmesh parse_scan_pam_mesh(
     NativeSubmesh mesh = parse_quantized_pam_mesh(data, raw, vertex_base, index_offset, stride, bbox_min, bbox_max);
     mesh.name = "mesh_" + (raw.index < 10 ? std::string("0") : std::string()) + std::to_string(raw.index) + "_" + (raw.material_name.empty() ? std::to_string(raw.index) : raw.material_name);
     mesh.material = raw.material_name;
+    mesh.texture = raw.texture_name;
     return mesh;
 }
 
@@ -662,6 +681,8 @@ static NativeSubmesh combine_pamlod_group_meshes(const std::vector<NativeSubmesh
         combined.positions.insert(combined.positions.end(), part.positions.begin(), part.positions.end());
         combined.uvs.insert(combined.uvs.end(), part.uvs.begin(), part.uvs.end());
         combined.normals.insert(combined.normals.end(), part.normals.begin(), part.normals.end());
+        combined.export_positions.insert(combined.export_positions.end(), part.export_positions.begin(), part.export_positions.end());
+        combined.export_uvs.insert(combined.export_uvs.end(), part.export_uvs.begin(), part.export_uvs.end());
         combined.source_vertex_indices.insert(combined.source_vertex_indices.end(), part.source_vertex_indices.begin(), part.source_vertex_indices.end());
         for (std::uint32_t index : part.indices) {
             combined.indices.push_back(vertex_base + index);

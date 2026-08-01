@@ -23,6 +23,37 @@ static void append_int32(std::vector<char>& out, std::int32_t value) {
     out.insert(out.end(), bytes, bytes + sizeof(std::int32_t));
 }
 
+static void append_double(std::vector<char>& out, double value) {
+    const char* bytes = reinterpret_cast<const char*>(&value);
+    out.insert(out.end(), bytes, bytes + sizeof(double));
+}
+
+// Eight doubles per vertex -- position, normal, texture coordinate -- in this submesh's own vertex
+// order, which is the order the source holds them in and the order an export has to reproduce.
+// Unlike the render blob beside it, nothing here is per-corner, framed, or narrowed to a float.
+static void write_export_geometry_blob(const fs::path& path, const NativeSubmesh& mesh) {
+    const size_t count = mesh.export_positions.size();
+    if (count == 0
+        || mesh.export_normals.size() != count
+        || mesh.export_uvs.size() != count) {
+        return;
+    }
+    std::vector<char> out;
+    out.reserve(count * 8u * sizeof(double));
+    for (size_t i = 0; i < count; ++i) {
+        append_double(out, mesh.export_positions[i].x);
+        append_double(out, mesh.export_positions[i].y);
+        append_double(out, mesh.export_positions[i].z);
+        append_double(out, mesh.export_normals[i].x);
+        append_double(out, mesh.export_normals[i].y);
+        append_double(out, mesh.export_normals[i].z);
+        append_double(out, mesh.export_uvs[i].x);
+        append_double(out, mesh.export_uvs[i].y);
+    }
+    write_binary(path, out);
+}
+
+
 static void write_geometry_blob(
     const fs::path& geometry_path,
     const fs::path& identity_path,

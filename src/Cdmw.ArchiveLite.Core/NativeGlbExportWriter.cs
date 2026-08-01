@@ -48,7 +48,7 @@ internal static class NativeGlbExportWriter
             var batch = package.Batches[index];
             var rebuilt = meshes[index];
             // Bounds describe the vertices the file will hold, in the frame it writes them in.
-            var bounds = MeasureBounds(rebuilt.Positions, package.Normalization);
+            var bounds = MeasureBounds(rebuilt.Positions, rebuilt.IsSourceSpace ? null : package.Normalization);
             var positionAccessor = AddFloatAccessor(
                 bufferViews,
                 accessors,
@@ -139,7 +139,7 @@ internal static class NativeGlbExportWriter
                         rebuilt.Positions,
                         3,
                         flipSecondComponent: false,
-                        package.Normalization,
+                        rebuilt.IsSourceSpace ? null : package.Normalization,
                         output,
                         token).ConfigureAwait(false);
                     // Only positions carry the preview's framing transform; a
@@ -208,14 +208,14 @@ internal static class NativeGlbExportWriter
         return accessors.Count - 1;
     }
 
-    private static MeshBounds MeasureBounds(float[] positions, NativePreviewNormalization normalization)
+    private static MeshBounds MeasureBounds(double[] positions, NativePreviewNormalization? normalization)
     {
         var minimum = new[] { float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity };
         var maximum = new[] { float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity };
         for (var index = 0; index < positions.Length; index++)
         {
             var component = index % 3;
-            var value = (float)normalization.Restore(positions[index], component);
+            var value = (float)(normalization is null ? positions[index] : normalization.Restore(positions[index], component));
             minimum[component] = Math.Min(minimum[component], value);
             maximum[component] = Math.Max(maximum[component], value);
         }
@@ -242,7 +242,7 @@ internal static class NativeGlbExportWriter
     }
 
     private static async Task WriteFloatAttributeAsync(
-        float[] source,
+        double[] source,
         int components,
         bool flipSecondComponent,
         NativePreviewNormalization? restore,
@@ -258,7 +258,7 @@ internal static class NativeGlbExportWriter
             for (var index = 0; index < count; index++)
             {
                 var component = (written + index) % components;
-                var value = source[written + index];
+                var value = (float)source[written + index];
                 if (restore is not null)
                 {
                     value = (float)restore.Restore(value, component);

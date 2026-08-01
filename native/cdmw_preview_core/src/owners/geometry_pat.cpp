@@ -160,9 +160,18 @@ static NativeSubmesh build_pat_draw_mesh(
             dequantize_u16(read_u16(data, record_offset + 2u), bbox_min.y, bbox_max.y),
             dequantize_u16(read_u16(data, record_offset + 4u), bbox_min.z, bbox_max.z),
         });
+        mesh.export_positions.push_back(ExportVec3{
+            dequantize_u16_exact(read_u16(data, record_offset), bbox_min.x, bbox_max.x),
+            dequantize_u16_exact(read_u16(data, record_offset + 2u), bbox_min.y, bbox_max.y),
+            dequantize_u16_exact(read_u16(data, record_offset + 4u), bbox_min.z, bbox_max.z),
+        });
         mesh.uvs.push_back(Vec2{
             half_to_float(read_u16(data, record_offset + 12u)),
             half_to_float(read_u16(data, record_offset + 14u)),
+        });
+        mesh.export_uvs.push_back(ExportVec2{
+            static_cast<double>(half_to_float(read_u16(data, record_offset + 12u))),
+            static_cast<double>(half_to_float(read_u16(data, record_offset + 14u))),
         });
         mesh.source_vertex_indices.push_back(static_cast<std::int32_t>(source_index));
     }
@@ -172,6 +181,7 @@ static NativeSubmesh build_pat_draw_mesh(
         mesh.indices.push_back(source_to_local.at(source_indices[offset + 2u]));
     }
     compute_missing_normals(mesh);
+    compute_export_smooth_normals(mesh);
     evaluate_native_submesh_quality(mesh);
     return mesh;
 }

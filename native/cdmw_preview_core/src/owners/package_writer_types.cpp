@@ -58,6 +58,10 @@ struct PackageBatchState {
     std::string stem;
     fs::path geometry_path;
     fs::path identity_path;
+    // The source-space vertices an interchange file carries, when the parser could decode them
+    // exactly. A parser that offers none leaves this unwritten and the export falls back.
+    fs::path export_path;
+    bool has_export_geometry = false;
     std::array<float, 3> color{};
     // True while `color` still holds the per-batch palette hue that distinguishes
     // submeshes in the untextured view. A textured preview must not publish that
@@ -152,6 +156,7 @@ static PackageBatchState start_package_batch(PackageWriteState& state, size_t ba
     batch.stem = batch_stem(batch_index);
     batch.geometry_path = state.geometry_dir / (batch.stem + ".bin");
     batch.identity_path = state.geometry_dir / (batch.stem + "_identity.bin");
+    batch.export_path = state.geometry_dir / (batch.stem + "_export.bin");
     batch.color = color_for_batch(static_cast<int>(batch_index));
     write_geometry_blob(
         batch.geometry_path,
@@ -160,6 +165,8 @@ static PackageBatchState start_package_batch(PackageWriteState& state, size_t ba
         state.geometry.center,
         state.geometry.scale,
         batch.color);
+    write_export_geometry_blob(batch.export_path, mesh);
+    batch.has_export_geometry = fs::exists(batch.export_path);
     batch.vertex_count = static_cast<int>(mesh.indices.size());
     state.emitted_vertex_count += batch.vertex_count;
     return batch;

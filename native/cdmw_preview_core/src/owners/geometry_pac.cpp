@@ -4,6 +4,33 @@ static float decode_pac_position(std::uint16_t value, float min_value, float ext
     return min_value + (static_cast<float>(value) / 32767.0f) * extent;
 }
 
+// The same formula in double, from the same float bounds the descriptor stores. CDMW Full decodes
+// these records in Python floats, which are doubles, so this reproduces its coordinates exactly
+// rather than to within a float's worth of them.
+static double decode_pac_position_exact(std::uint16_t value, float min_value, float extent) {
+    if (std::abs(extent) < 1.0e-8f) return static_cast<double>(min_value);
+    return static_cast<double>(min_value)
+        + (static_cast<double>(value) / 32767.0) * static_cast<double>(extent);
+}
+
+// Un-normalized on purpose. The three components are what the packed record decodes to, and
+// normalizing them is a choice the renderer makes for its own shading, not something the source
+// said. An interchange file states what the record holds, as CDMW Full's does.
+static ExportVec3 decode_pac_normal_exact(const std::vector<char>& data, size_t rec_off, int normal_offset) {
+    if (normal_offset < 0 || rec_off + static_cast<size_t>(normal_offset) + 4 > data.size()) {
+        return ExportVec3{0.0, 1.0, 0.0};
+    }
+    const std::uint32_t packed = read_u32(data, rec_off + static_cast<size_t>(normal_offset));
+    const std::uint32_t nx_raw = (packed >> 0) & 0x3FFu;
+    const std::uint32_t ny_raw = (packed >> 10) & 0x3FFu;
+    const std::uint32_t nz_raw = (packed >> 20) & 0x3FFu;
+    return ExportVec3{
+        static_cast<double>(ny_raw) / 511.5 - 1.0,
+        static_cast<double>(nz_raw) / 511.5 - 1.0,
+        static_cast<double>(nx_raw) / 511.5 - 1.0,
+    };
+}
+
 static Vec3 decode_pac_normal(const std::vector<char>& data, size_t rec_off, int normal_offset = 16) {
     if (normal_offset < 0 || rec_off + static_cast<size_t>(normal_offset) + 4 > data.size()) return Vec3{0.0f, 1.0f, 0.0f};
     const std::uint32_t packed = read_u32(data, rec_off + static_cast<size_t>(normal_offset));
@@ -255,6 +282,7 @@ static NativeSubmesh decode_pac_submesh_vertices(
     NativeSubmesh mesh;
     mesh.name = desc.name;
     mesh.material = desc.material.empty() ? desc.name : desc.material;
+    mesh.texture = desc.name.empty() ? desc.material : desc.name;
     mesh.source_submesh_index = source_submesh_index;
     mesh.source_local_submesh_index = source_submesh_index;
     mesh.vertex_layout_name = layout.name;
@@ -264,6 +292,9 @@ static NativeSubmesh decode_pac_submesh_vertices(
     mesh.positions.reserve(vertex_count);
     mesh.uvs.reserve(vertex_count);
     mesh.normals.reserve(vertex_count);
+    mesh.export_positions.reserve(vertex_count);
+    mesh.export_normals.reserve(vertex_count);
+    mesh.export_uvs.reserve(vertex_count);
     for (std::uint32_t vi = 0; vi < vertex_count; ++vi) {
         const size_t rec_off = static_cast<size_t>(geom_sec.offset) + static_cast<size_t>(vertex_start) + static_cast<size_t>(vi) * static_cast<size_t>(layout.stride);
         if (rec_off + static_cast<size_t>(layout.stride) > data.size()) break;
@@ -275,6 +306,11 @@ static NativeSubmesh decode_pac_submesh_vertices(
             decode_pac_position(yu, desc.bbox_min.y, desc.bbox_extent.y),
             decode_pac_position(zu, desc.bbox_min.z, desc.bbox_extent.z),
         });
+        mesh.export_positions.push_back(ExportVec3{
+            decode_pac_position_exact(xu, desc.bbox_min.x, desc.bbox_extent.x),
+            decode_pac_position_exact(yu, desc.bbox_min.y, desc.bbox_extent.y),
+            decode_pac_position_exact(zu, desc.bbox_min.z, desc.bbox_extent.z),
+        });
         mesh.source_vertex_indices.push_back(static_cast<std::int32_t>(vi));
         float u = 0.0f;
         float v = 0.0f;
@@ -283,7 +319,14 @@ static NativeSubmesh decode_pac_submesh_vertices(
             v = half_to_float(read_u16(data, rec_off + static_cast<size_t>(layout.uv_offset + 2)));
         }
         mesh.uvs.push_back(Vec2{std::isfinite(u) ? u : 0.0f, std::isfinite(v) ? v : 0.0f});
+        // A NaN texture coordinate reads as the origin rather than propagating, which is the
+        // reading CDMW Full takes of the same record.
+        mesh.export_uvs.push_back(ExportVec2{
+            std::isnan(u) || std::isnan(v) ? 0.0 : static_cast<double>(u),
+            std::isnan(u) || std::isnan(v) ? 0.0 : static_cast<double>(v),
+        });
         mesh.normals.push_back(decode_pac_normal(data, rec_off, layout.normal_offset));
+        mesh.export_normals.push_back(decode_pac_normal_exact(data, rec_off, layout.normal_offset));
     }
     for (size_t i = 0; i + 2 < indices.size(); i += 3) {
         const std::uint32_t a = indices[i];
@@ -360,6 +403,7 @@ static std::vector<NativeSubmesh> parse_pac_geometry_section(
         );
         mesh.name = desc.name;
         mesh.material = desc.material.empty() ? desc.name : desc.material;
+        mesh.texture = desc.name.empty() ? desc.material : desc.name;
         if (!mesh.positions.empty() && mesh.indices.size() >= 3) output.push_back(std::move(mesh));
     }
     return output;
@@ -540,6 +584,20 @@ static float dequantize_i16(std::int16_t value, float minimum, float maximum) {
     return minimum + ((static_cast<float>(value) + 32768.0f) / 65536.0f) * (maximum - minimum);
 }
 
+// The same two formulas in double, for the coordinates an interchange file carries. CDMW Full
+// evaluates them in Python floats, so a float here would disagree with it in the eighth digit.
+static double dequantize_u16_exact(std::uint16_t value, float minimum, float maximum) {
+    return static_cast<double>(minimum)
+        + (static_cast<double>(value) / 65535.0)
+            * (static_cast<double>(maximum) - static_cast<double>(minimum));
+}
+
+static double dequantize_i16_exact(std::int16_t value, float minimum, float maximum) {
+    return static_cast<double>(minimum)
+        + ((static_cast<double>(value) + 32768.0) / 65536.0)
+            * (static_cast<double>(maximum) - static_cast<double>(minimum));
+}
+
 static void compute_missing_normals(NativeSubmesh& mesh) {
     if (mesh.normals.size() == mesh.positions.size()) return;
     mesh.normals.assign(mesh.positions.size(), Vec3{});
@@ -558,6 +616,57 @@ static void compute_missing_normals(NativeSubmesh& mesh) {
     }
     for (Vec3& normal : mesh.normals) {
         normal = vec_normalize(normal);
+    }
+}
+
+// CDMW Full's smoothing, component for component, for the formats whose records carry no normal.
+// Each face normal is normalized before it is accumulated, so every face adjoining a vertex counts
+// once regardless of its area, and a degenerate face contributes nothing. Averaging the
+// un-normalized cross products instead -- which is what compute_missing_normals does above for the
+// renderer -- weights by area and lands somewhere else.
+static void compute_export_smooth_normals(NativeSubmesh& mesh) {
+    const size_t count = mesh.export_positions.size();
+    if (count == 0 || mesh.export_normals.size() == count) return;
+    mesh.export_normals.assign(count, ExportVec3{0.0, 0.0, 0.0});
+    for (size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+        const std::uint32_t ia = mesh.indices[i];
+        const std::uint32_t ib = mesh.indices[i + 1];
+        const std::uint32_t ic = mesh.indices[i + 2];
+        if (ia >= count || ib >= count || ic >= count) continue;
+        const ExportVec3& v0 = mesh.export_positions[ia];
+        const ExportVec3& v1 = mesh.export_positions[ib];
+        const ExportVec3& v2 = mesh.export_positions[ic];
+        const double ax = v1.x - v0.x, ay = v1.y - v0.y, az = v1.z - v0.z;
+        const double bx = v2.x - v0.x, by = v2.y - v0.y, bz = v2.z - v0.z;
+        double nx = ay * bz - az * by;
+        double ny = az * bx - ax * bz;
+        double nz = ax * by - ay * bx;
+        const double length = std::sqrt(nx * nx + ny * ny + nz * nz);
+        if (length > 1.0e-8) {
+            nx /= length;
+            ny /= length;
+            nz /= length;
+        } else {
+            nx = 0.0;
+            ny = 1.0;
+            nz = 0.0;
+        }
+        for (const std::uint32_t index : {ia, ib, ic}) {
+            mesh.export_normals[index].x += nx;
+            mesh.export_normals[index].y += ny;
+            mesh.export_normals[index].z += nz;
+        }
+    }
+    for (ExportVec3& normal : mesh.export_normals) {
+        const double length = std::sqrt(
+            normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+        if (length > 1.0e-8) {
+            normal.x /= length;
+            normal.y /= length;
+            normal.z /= length;
+        } else {
+            normal = ExportVec3{0.0, 1.0, 0.0};
+        }
     }
 }
 
@@ -589,6 +698,7 @@ static void finalize_native_meshes(std::vector<NativeSubmesh>& meshes) {
     for (NativeSubmesh& mesh : meshes) {
         if (!native_mesh_renderable(mesh)) continue;
         compute_missing_normals(mesh);
+        compute_export_smooth_normals(mesh);
         filtered.push_back(std::move(mesh));
     }
     meshes = std::move(filtered);
@@ -597,6 +707,7 @@ static void finalize_native_meshes(std::vector<NativeSubmesh>& meshes) {
 static void complete_native_meshes_without_filtering(std::vector<NativeSubmesh>& meshes) {
     for (NativeSubmesh& mesh : meshes) {
         compute_missing_normals(mesh);
+        compute_export_smooth_normals(mesh);
         evaluate_native_submesh_quality(mesh);
     }
 }

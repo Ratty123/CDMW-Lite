@@ -3764,17 +3764,71 @@ internal static class ArchiveLiteTestRunner
                 lines.Contains("usemtl shared_cloth", StringComparer.Ordinal),
                 "the exported object no longer selects its own material");
 
-            using var sidecar = JsonDocument.Parse(
-                await File.ReadAllTextAsync(destination + ".meta.json").ConfigureAwait(false));
-            var sourceVertexMap = sidecar.RootElement
-                .GetProperty("submeshes")[0]
-                .GetProperty("source_vertex_map")
-                .EnumerateArray()
-                .Select(static value => value.GetInt32())
-                .ToArray();
+            using (var sidecar = JsonDocument.Parse(
+                await File.ReadAllTextAsync(destination + ".meta.json").ConfigureAwait(false)))
+            {
+                var sourceVertexMap = sidecar.RootElement
+                    .GetProperty("submeshes")[0]
+                    .GetProperty("source_vertex_map")
+                    .EnumerateArray()
+                    .Select(static value => value.GetInt32())
+                    .ToArray();
+                Require(
+                    sourceVertexMap.SequenceEqual([0, 1, 2, 3, 4]),
+                    $"the round-trip sidecar does not map exported vertices back to the source: {string.Join(",", sourceVertexMap)}");
+            }
+
+            // The same package once it also carries the parser's own source-space vertices. Those
+            // are what an export has to write: decoded in double, never framed, and with normals
+            // left the length the record decoded to rather than scaled to one for shading. A
+            // coordinate recovered from the render blob instead differs from CDMW Full's in the
+            // eighth digit, and a normalized normal differs from it outright.
+            await using (var export = File.Create(Path.Combine(root, "geometry", "batch_000_export.bin")))
+            {
+                var writer = new BinaryWriter(export, Encoding.UTF8, leaveOpen: true);
+                for (var vertex = 0; vertex < sourcePositions.Length; vertex++)
+                {
+                    writer.Write(sourcePositions[vertex][0] * 3.0);
+                    writer.Write(sourcePositions[vertex][1] * 3.0);
+                    writer.Write(sourcePositions[vertex][2] * 3.0);
+                    // Deliberately not unit length.
+                    writer.Write(0.0);
+                    writer.Write(0.25);
+                    writer.Write(0.0);
+                    writer.Write((double)sourceUvs[vertex][0]);
+                    writer.Write((double)sourceUvs[vertex][1]);
+                }
+                writer.Flush();
+            }
+            var manifestPath = Path.Combine(root, "manifest.json");
+            var withExport = (await File.ReadAllTextAsync(manifestPath).ConfigureAwait(false)).Replace(
+                "\"vertex_count\":9",
+                "\"vertex_count\":9,\"export_vertex_file\":\"geometry/batch_000_export.bin\",\"export_vertex_count\":5",
+                StringComparison.Ordinal);
+            Require(withExport.Contains("export_vertex_file", StringComparison.Ordinal), "the export geometry fixture was not wired into the manifest");
+            await File.WriteAllTextAsync(manifestPath, withExport, Encoding.UTF8).ConfigureAwait(false);
+
+            var exactDestination = Path.Combine(root, "hood-exact.obj");
+            await new NativeModelExportService(new NativeModelPreviewService()).ExportPackageAsync(
+                root,
+                "character/model/hood.pac",
+                ExportKind.Obj,
+                exactDestination,
+                overwrite: false,
+                null,
+                null,
+                CancellationToken.None).ConfigureAwait(false);
+            var exactLines = await File.ReadAllLinesAsync(exactDestination).ConfigureAwait(false);
             Require(
-                sourceVertexMap.SequenceEqual([0, 1, 2, 3, 4]),
-                $"the round-trip sidecar does not map exported vertices back to the source: {string.Join(",", sourceVertexMap)}");
+                exactLines.Contains("v 0.75 0 0", StringComparer.Ordinal)
+                && exactLines.Contains("v 0.75 0.75 0", StringComparer.Ordinal),
+                "the export did not take the package's source-space vertices, or re-applied the framing transform to them");
+            Require(
+                exactLines.Count(static line => line == "vn 0 0.25 0") == 5,
+                "the export rescaled normals the source record did not state as unit length");
+            Require(
+                !exactLines.Any(static line => line.StartsWith("vn 0 1 0", StringComparison.Ordinal)),
+                "a normal was normalized on the way out");
         }
         finally
         {
@@ -3913,7 +3967,7 @@ internal static class ArchiveLiteTestRunner
         {
             var root = cacheManifest.RootElement;
             Require(
-                root.GetProperty("version").GetString() == "archive_lite_native_model_v6_lazy_prefab",
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v8_lazy_prefab",
                 "the default texture-free preview changed its established cache version");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
@@ -4126,8 +4180,8 @@ internal static class ArchiveLiteTestRunner
         Require(
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v6_lazy_prefab\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v7_textured_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v8_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v9_textured_lazy_prefab\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");

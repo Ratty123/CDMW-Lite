@@ -11,8 +11,8 @@ public sealed class NativeModelPreviewService
 {
     // A cached package keeps the submesh and material names the parser gave it, so recovering a
     // name the descriptor scan used to miss only reaches a model whose package is rebuilt.
-    private const string PackageVersion = "archive_lite_native_model_v6_lazy_prefab";
-    private const string TexturedPackageVersion = "archive_lite_native_model_v7_textured_lazy_prefab";
+    private const string PackageVersion = "archive_lite_native_model_v8_lazy_prefab";
+    private const string TexturedPackageVersion = "archive_lite_native_model_v9_textured_lazy_prefab";
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan ColdBuildCoalesceDelay = TimeSpan.FromMilliseconds(35);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _buildGates = new(StringComparer.Ordinal);

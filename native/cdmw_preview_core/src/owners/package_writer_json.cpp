@@ -145,7 +145,17 @@ static void append_package_batch_json_head(PackageWriteState& state, const Packa
     state.batches_json << "{"
         << "\"index\":" << batch.index << ","
         << "\"material_name\":\"" << json_escape(mesh.material) << "\","
+        << "\"submesh_name\":\"" << json_escape(mesh.name) << "\","
         << "\"texture_name\":\"" << json_escape(mesh.material.empty() ? mesh.name : mesh.material) << "\","
+        // The name the source gives the texture for this part, which is what an OBJ's material
+        // library binds as map_Kd. CDMW Full takes it from the same place.
+        << "\"submesh_texture\":\"" << json_escape(mesh.texture) << "\","
+        << "\"export_vertex_file\":\""
+        << (batch.has_export_geometry
+                ? json_escape(batch.export_path.lexically_relative(state.package_dir).generic_string())
+                : std::string())
+        << "\","
+        << "\"export_vertex_count\":" << mesh.export_positions.size() << ","
         << "\"vertex_file\":\"" << json_escape(batch.geometry_path.lexically_relative(state.package_dir).generic_string()) << "\","
         << "\"vertex_count\":" << batch.vertex_count << ","
         << "\"editor_identity\":{\"source_submesh_index\":" << mesh.source_submesh_index
