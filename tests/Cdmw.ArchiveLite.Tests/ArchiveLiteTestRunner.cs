@@ -59,6 +59,7 @@ internal static class ArchiveLiteTestRunner
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
             ("native item-name discovery reads every row of the table directory", TestArchiveItemNameDiscoveryAsync),
             ("an archive with no row directory degrades to a scan and says so", TestArchiveItemNameScanFallbackAsync),
+            ("a string table that disagrees with its own footer is rejected, not truncated", TestLocalizationTableIntegrityAsync),
             ("Item Finder shares the Full catalog contract and keeps icon work bounded", TestItemFinderCatalogAsync),
             ("Item Finder debounce, facet refresh, icons, close, and session changes stay latest-wins", TestItemFinderViewModelLifecycleAsync),
             ("DDS file type and terminal-suffix usage classification stay explicit", TestDdsTextureClassificationAsync),
@@ -4350,6 +4351,11 @@ internal static class ArchiveLiteTestRunner
             scannable!.Description == SyntheticArchiveFixture.ScannableItemDescription
             && directoryOnly!.Description == SyntheticArchiveFixture.DirectoryOnlyItemDescription,
             "exactly sliced rows did not carry their 07 71 description sub-record through to Item Finder");
+        // The hidden item's display name is keyed by a non-numeric string. The reader this replaced
+        // accepted only six-to-twenty ASCII digits, so no record shape could have reached it.
+        Require(
+            directoryOnly!.LocalizedNames.Contains(SyntheticArchiveFixture.DirectoryOnlyItemName),
+            "a string-table key that is not all digits was not resolved");
 
         var session = sessions.GetRequired(opened.SessionId);
         var queries = new ArchiveQueryService(sessions);
@@ -4435,6 +4441,38 @@ internal static class ArchiveLiteTestRunner
         Require(
             scannable!.Description.Length == 0,
             "the scan fallback claimed a description it has no record bounds to read");
+    }
+
+    /// <summary>
+    /// A string table states its own record count in its last four bytes. When the records in front
+    /// of that count do not agree with it, the buffer is not a string table, and the reader has to
+    /// say so rather than hand back however many records it managed to walk: a silently short table
+    /// looks exactly like a game that ships fewer strings.
+    /// </summary>
+    private static async Task TestLocalizationTableIntegrityAsync()
+    {
+        await using var fixture = await SyntheticArchiveFixture.CreateNameIndexAsync(corruptLocalization: true)
+            .ConfigureAwait(false);
+        var native = new NativeArchiveCore();
+        using var sessions = new ArchiveSessionManager(native);
+        var opened = await sessions.OpenAsync(
+            new OpenArchiveRequest(fixture.Root, ForceRefresh: true),
+            CancellationToken.None).ConfigureAwait(false);
+        var service = new ArchiveItemNameIndexService(sessions, native);
+        var result = await service.BuildAsync(
+            new BuildNameIndexRequest(opened.SessionId),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            result.Warning is not null && result.Warning.Contains("localization", StringComparison.OrdinalIgnoreCase),
+            "a string table that disagrees with its own footer was accepted without a word");
+
+        var catalog = await new ArchiveItemCatalogService(sessions, service).SearchAsync(
+            new ItemCatalogSearchRequest(opened.SessionId),
+            CancellationToken.None).ConfigureAwait(false);
+        Require(
+            catalog.Items.All(item => item.LocalizedNames.Count == 0 && item.Description.Length == 0),
+            "a rejected string table still supplied names, so it was read partially rather than rejected");
     }
 
     /// <summary>

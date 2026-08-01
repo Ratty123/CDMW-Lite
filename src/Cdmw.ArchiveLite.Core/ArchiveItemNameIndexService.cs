@@ -381,16 +381,20 @@ public sealed class ArchiveItemNameIndexService(
         }
         var nameIndex = ArchiveItemNameIndex.FromMappings(exact, related);
         var itemCatalog = ArchiveItemCatalog.FromRecords(ReadItems(root));
-        return new CatalogueBuildState(nameIndex, itemCatalog, ReadRowSourceWarning(root));
+        return new CatalogueBuildState(nameIndex, itemCatalog, ReadDegradedReadWarning(root));
     }
 
     /// <summary>
-    /// The indexer reads item records out of the .pabgh row directory. If an archive does not carry
-    /// one it falls back to scanning for a byte pattern that only a minority of records present, so
-    /// the degraded run says so instead of silently publishing a short catalog.
+    /// Two things can leave a catalog short of what the archive holds, and both have to reach the
+    /// caller rather than pass for a complete result. The indexer reads item records out of the
+    /// .pabgh row directory, and without one it falls back to scanning for a byte pattern that only
+    /// a minority of records present. Separately, a string table whose records do not agree with
+    /// the count in its footer is rejected whole, because a partial read of it would silently drop
+    /// names rather than fail.
     /// </summary>
-    private static string? ReadRowSourceWarning(JsonElement root)
+    private static string? ReadDegradedReadWarning(JsonElement root)
     {
+        var warnings = new List<string>();
         var itemSource = ReadString(root, "item_row_source");
         var stringSource = ReadString(root, "string_row_source");
         var degraded = new List<string>();
@@ -402,9 +406,18 @@ public sealed class ArchiveItemNameIndexService(
         {
             degraded.Add("StringInfo");
         }
-        return degraded.Count == 0
-            ? null
-            : $"No usable row directory was found for {string.Join(" or ", degraded)}, so known in-game names were recovered by pattern scan and many items are missing.";
+        if (degraded.Count > 0)
+        {
+            warnings.Add(
+                $"No usable row directory was found for {string.Join(" or ", degraded)}, so known in-game names were recovered by pattern scan and many items are missing.");
+        }
+        var failures = ReadStrings(root, "localization_failures");
+        if (failures.Length > 0)
+        {
+            warnings.Add(
+                $"{failures.Length} localization table(s) could not be read, so those languages have no names: {string.Join("; ", failures)}");
+        }
+        return warnings.Count == 0 ? null : string.Join(" ", warnings);
     }
 
     private static IReadOnlyList<ArchiveItemCatalogRecord> ReadItems(JsonElement root)
