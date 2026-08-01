@@ -6,6 +6,20 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Added
 
+- A character mesh exports with its skeleton and its weights, as a rigged GLB and a rigged FBX. Until now a `.pac` arrived in Blender as an unposable shell: nothing in the export path read skinning at all.
+
+  The binding was in the vertex records the whole time, and it is six influences per vertex rather than the four an earlier reading took the field for. Bytes 20 to 27 are two `u32` holding three 10-bit palette slots each, and bytes 28 to 33 are six `u8` weights that descend and sum to 255 give or take rounding. Reading the field as four `u8` slots is what used to pair a forehead bone with a forearm, because influence 1's index straddles bytes 21 and 22. Measured on a full character body, 13,740 vertices over three submeshes: the weights sum to 255 ± 2 on every record, they descend on every record, and the influence counts split 2,145 / 2,869 / 2,851 / 2,284 / 1,830 / 1,761 across one through six.
+
+  A slot is not a bone index. It indexes the `.pac`'s own palette of `.pab` bone-name hashes, which is recovered by generating every byte run that fits the shape and keeping the one whose hashes all resolve against a skeleton — of the thousands of runs that merely look like a palette in a body mesh, exactly one resolves. The file's head is searched first, where a character body keeps its palette, and the whole file after, which is where a coat or a boot keeps it.
+
+  The `.pab` skeleton is read at its documented fixed layout and nothing is guessed: a record that does not fit yields no skeleton rather than a scanned approximation of one, because a bone recovered by scanning is named and placed on evidence the file did not give. Chaining each bone's stored local transform through the hierarchy reproduces the bind matrix the file also stores, to within 3.4e-6 across a 448-bone rig, which is what lets the same data serve glTF's nodes and FBX's LimbNodes.
+
+  Verified by posing the result in Blender rather than by inspecting the file. A body imports with 249 joints over 13,740 vertices, no unweighted vertex, and no vertex whose weights miss 1.0 by more than 5.4e-08; rotating the right upper arm 45 degrees moves 3,153 vertices at a mean distance of 0.490 from that bone against 0.730 for the vertices that stay put, and the right hand moves 1,983 at 0.099 against 0.681. Posing the right and left upper arms moves 3,153 vertices each, on opposite sides of the body and no others. The two formats agree to the digit on every count and distance, which is the check that they bind the same vertices to the same bones.
+
+  The GLB carries the bones the mesh uses plus the ancestors that place them, 249 of a 448-bone rig, because the rest are joints nothing moves. The FBX carries the whole skeleton, because FBX is the format an animation clip is brought back in through and a clip addresses bones a given garment is not weighted to. `scripts/blender/` holds the verification script and the reference numbers.
+
+  A rigidly bound mesh — a prop, an accessory, a vehicle — is told apart from a smooth-skinned one by its records: every vertex is a single influence at full weight and every slot is zero. Those files carry no bone hash anywhere, so the bone they follow is recorded outside the mesh and there is nothing to resolve. They export unrigged, as they always have, and the package says which case it found rather than reporting a failure. Of a random sweep of 23 character meshes, 10 exported rigged, 1 was rigid, and 12 were smooth-skinned with a palette no rig their own name or directory nominates accounts for; those also export unrigged, because an NPC upper body's 88-entry palette resolves completely against nine different humanoid rigs and a monster's against ten, so once the rig is not nominated by name "the palette resolves" stops identifying which rig it is.
+
 - Item Finder shows an item's in-game description. Every item record carries two localization keys, one for the name shown in the inventory and one for the text under it, and until now nothing here read the second. It appears in the detail pane under the item's name; 3,730 of the 3,789 listed items have one. Descriptions are deliberately left out of the search text, so a search for `plate` still returns the plate armour rather than everything whose description mentions it.
 
 - Item Finder shows what the item record says about the item: its equip type, its grade, and how many of it fit in one inventory slot. An item row is a serialized C++ struct with no schema anywhere in the archive, so these three fields were recovered by differencing rows against each other and then checked against something outside the table before being shown.
@@ -17,6 +31,14 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
   The stack size is the first number after the item's internal name, and it reads 1 for weapons and armour, 50 for cannonballs, 100 for arrows, 100,000 for copper. It is also, as it turns out, exactly what the old pattern scan was keying off without knowing it: the byte run it searched for is this field holding 1, which is why the items it could see were almost exactly the items that do not stack.
 
   A row that does not state one of these shows nothing for it rather than a zero, and a value outside the range the field is known to take is dropped rather than displayed. No other item field is claimed: the rest of the record holds variable-length lists that move everything after them, and guessing at those would put numbers on screen that nobody has checked.
+
+### Changed
+
+- **An exported FBX now states that its geometry is in metres, which changes the size of every FBX this application writes.** If you have been scaling Archive Lite's FBX imports up by 100, or working at a hundredth scale, stop: they now arrive at their true size. GLB and OBJ are unaffected and always were.
+
+  The writer declared `UnitScaleFactor` 1. That field says how many centimetres one unit is and an importer divides by it — Blender computes its global scale as `UnitScaleFactor / 100` — so declaring 1 claimed centimetres for geometry that is in metres, and every FBX arrived at a hundredth of its size. A character body imported 18 mm tall. The file loaded, the rig worked, and the answer was quietly wrong, which is why it lasted: nothing refuses a mesh for being small.
+
+  The declaration is now 100, with `OriginalUnitScaleFactor` beside it. The geometry itself is untouched: reimporting the old and the new file and scaling the old by a hundred puts every one of 180,325 vertices within 1.4e-7 of its counterpart, which is `float32` rounding and nothing else. Blender now reads both formats at the same size — a character body measures 1.8394 tall out of the GLB and out of the FBX, and the same to four decimals for a legwear, an upperbody and an accessory. The focused gate pins the declaration in the rigged and the unrigged FBX both, because nothing else in the suite would notice it changing.
 
 ### Removed
 
