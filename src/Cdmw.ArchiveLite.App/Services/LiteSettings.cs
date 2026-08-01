@@ -84,7 +84,6 @@ public sealed record ItemFinderSettings(
     string Query = "",
     string? Category = null,
     string? Group = null,
-    string? MaterialTag = null,
     double Width = 1240,
     double Height = 800);
 

@@ -329,9 +329,9 @@
   <data name="None" xml:space="preserve"><value>なし</value></data>
   <data name="ItemFinderTitle" xml:space="preserve"><value>アイテム検索</value></data>
   <data name="ItemFinderNavigation" xml:space="preserve"><value>アイテム</value></data>
-  <data name="ItemFinderSubtitle" xml:space="preserve"><value>復元された名称、インベントリアイコン、モデルのリンク、マテリアルの根拠</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>復元された名称、インベントリアイコン、モデルのリンク</value></data>
   <data name="ItemFinderIntro" xml:space="preserve"><value>CDMW Full と同じネイティブのアイテムカタログを閲覧できます。表示中のアイコンから先に読み込まれ、残りのインベントリサムネイルはバックグラウンドで用意され、永続キャッシュから再利用されます。</value></data>
-  <data name="ItemFinderSearchHint" xml:space="preserve"><value>表示名、内部名、アイテム ID、カテゴリ、モデル、アイコンのパス、ローカライズ名、マテリアルタグで検索します</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>表示名、内部名、アイテム ID、カテゴリ、モデル、アイコンのパス、ローカライズ名で検索します</value></data>
   <data name="ItemFinderButtonHint" xml:space="preserve"><value>永続的に先読みされたインベントリアイコン付きで、復元されたゲーム内アイテムを閲覧します。</value></data>
   <data name="ItemFinderOpenArchive" xml:space="preserve"><value>アイテム検索を開く前にアーカイブを読み込んでください。</value></data>
   <data name="ItemFinderReady" xml:space="preserve"><value>アイテム検索の準備ができました。</value></data>
@@ -340,7 +340,6 @@
   <data name="ItemFinderPageSummary" xml:space="preserve"><value>一致した {2:N0} 件のアイテムのうち {0:N0}-{1:N0} 件を表示</value></data>
   <data name="ItemFinderFailed" xml:space="preserve"><value>アイテム検索に失敗しました: {0}</value></data>
   <data name="ItemFinderAllCategories" xml:space="preserve"><value>すべてのカテゴリ</value></data>
-  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>すべてのマテリアルタグ</value></data>
   <data name="ItemFinderIconFailed" xml:space="preserve"><value>一部のインベントリアイコンを用意できませんでした: {0}</value></data>
   <data name="ItemFinderIconWarmup" xml:space="preserve"><value>インベントリアイコンを先読み中: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>インベントリアイコンの永続キャッシュを準備しています...</value></data>
@@ -353,7 +352,6 @@
   <data name="ItemFinderDescription" xml:space="preserve"><value>説明</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>根拠</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>ローカライズ名</value></data>
-  <data name="ItemFinderMaterials" xml:space="preserve"><value>マテリアルタグ</value></data>
   <data name="ItemFinderModels" xml:space="preserve"><value>リンクされたモデル</value></data>
   <data name="ItemFinderIcons" xml:space="preserve"><value>インベントリアイコンのパス</value></data>
   <data name="ItemFinderShowExact" xml:space="preserve"><value>完全一致のリンクを表示</value></data>
@@ -447,26 +445,10 @@
   <data name="ItemGroupVehicle" xml:space="preserve"><value>乗り物</value></data>
   <data name="ItemGroupWandFan" xml:space="preserve"><value>ワンド / 扇</value></data>
   <data name="ItemGroupWoodStone" xml:space="preserve"><value>木材 / 石材</value></data>
-  <data name="ItemMaterialBone" xml:space="preserve"><value>骨</value></data>
-  <data name="ItemMaterialCloth" xml:space="preserve"><value>布</value></data>
-  <data name="ItemMaterialCrystal" xml:space="preserve"><value>結晶</value></data>
-  <data name="ItemMaterialDirt" xml:space="preserve"><value>土</value></data>
-  <data name="ItemMaterialFur" xml:space="preserve"><value>毛皮</value></data>
-  <data name="ItemMaterialGlass" xml:space="preserve"><value>ガラス</value></data>
-  <data name="ItemMaterialGrass" xml:space="preserve"><value>草</value></data>
-  <data name="ItemMaterialHair" xml:space="preserve"><value>毛髪</value></data>
-  <data name="ItemMaterialLeather" xml:space="preserve"><value>革</value></data>
-  <data name="ItemMaterialMetal" xml:space="preserve"><value>金属</value></data>
-  <data name="ItemMaterialRope" xml:space="preserve"><value>縄</value></data>
-  <data name="ItemMaterialSkin" xml:space="preserve"><value>肌</value></data>
-  <data name="ItemMaterialStone" xml:space="preserve"><value>石</value></data>
-  <data name="ItemMaterialWater" xml:space="preserve"><value>水</value></data>
-  <data name="ItemMaterialWood" xml:space="preserve"><value>木材</value></data>
   <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo のプレハブハッシュ</value></data>
   <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>アイコン/モデル参照</value></data>
   <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>ローカライズ済み表示名</value></data>
   <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>インベントリアイコンのパス</value></data>
-  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>マテリアルスロットタグ</value></data>
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>アイテムデータベースの記録</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>復元されたアイテム/モデル名</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>これ以上有力なカテゴリの手がかりは見つかりませんでした</value></data>

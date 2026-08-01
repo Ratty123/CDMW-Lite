@@ -84,7 +84,6 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="245" />
-                        <ColumnDefinition Width="210" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
@@ -98,16 +97,12 @@
                               Margin="0,0,9,0"
                               ItemsSource="{Binding CategoryOptions}"
                               SelectedItem="{Binding SelectedCategory}" />
-                    <ComboBox Grid.Column="2"
-                              Margin="0,0,9,0"
-                              ItemsSource="{Binding MaterialTagOptions}"
-                              SelectedItem="{Binding SelectedMaterialTag}" />
-                    <Button Grid.Column="3"
+                    <Button Grid.Column="2"
                             Margin="0,0,9,0"
                             Style="{StaticResource PrimaryButtonStyle}"
                             Content="{infra:Loc Key=Search}"
                             Command="{Binding SearchCommand}" />
-                    <Button Grid.Column="4"
+                    <Button Grid.Column="3"
                             Content="{infra:Loc Key=Clear}"
                             Command="{Binding ClearCommand}" />
                 </Grid>
@@ -278,13 +273,6 @@
                         <TextBlock Margin="0,14,0,4" FontWeight="SemiBold" Text="{infra:Loc Key=ItemFinderLocalizedNames}" />
                         <TextBox IsReadOnly="True"
                                  Text="{Binding LocalizedNamesText, Mode=OneWay}"
-                                 TextWrapping="Wrap"
-                                 BorderThickness="0"
-                                 Background="Transparent" />
-
-                        <TextBlock Margin="0,14,0,4" FontWeight="SemiBold" Text="{infra:Loc Key=ItemFinderMaterials}" />
-                        <TextBox IsReadOnly="True"
-                                 Text="{Binding MaterialTagsText, Mode=OneWay}"
                                  TextWrapping="Wrap"
                                  BorderThickness="0"
                                  Background="Transparent" />

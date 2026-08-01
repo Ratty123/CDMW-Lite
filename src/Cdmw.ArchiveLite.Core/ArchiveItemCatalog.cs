@@ -23,7 +23,6 @@ public sealed class ArchiveItemCatalog
     private readonly IReadOnlyList<ArchiveItemCatalogRecord> _items;
     private readonly IReadOnlyDictionary<int, ArchiveItemCatalogRecord> _byItemId;
     private readonly IReadOnlyList<ItemCatalogCategoryFacet> _categoryFacets;
-    private readonly IReadOnlyList<ItemCatalogValueFacet> _materialFacets;
 
     private ArchiveItemCatalog(IReadOnlyList<ArchiveItemCatalogRecord> items)
     {
@@ -37,20 +36,11 @@ public sealed class ArchiveItemCatalog
             .OrderBy(static facet => facet.Category, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static facet => facet.Group, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        _materialFacets = items
-            .SelectMany(static item => item.MaterialTags)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .GroupBy(static value => value, StringComparer.OrdinalIgnoreCase)
-            .Select(static group => new ItemCatalogValueFacet(group.Key, group.LongCount()))
-            .OrderByDescending(static facet => facet.Count)
-            .ThenBy(static facet => facet.Value, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
     }
 
     public long Count => _items.Count;
     public IReadOnlyList<ArchiveItemCatalogRecord> Items => _items;
     public IReadOnlyList<ItemCatalogCategoryFacet> CategoryFacets => _categoryFacets;
-    public IReadOnlyList<ItemCatalogValueFacet> MaterialFacets => _materialFacets;
 
     public static ArchiveItemCatalog FromRecords(IEnumerable<ArchiveItemCatalogRecord> records)
     {
@@ -75,7 +65,6 @@ public sealed class ArchiveItemCatalog
         string? query,
         string? category,
         string? group,
-        string? materialTag,
         int pageStart,
         int pageSize)
     {
@@ -97,10 +86,6 @@ public sealed class ArchiveItemCatalog
         if (!string.IsNullOrWhiteSpace(group))
         {
             matches = matches.Where(item => item.Group.Equals(group.Trim(), StringComparison.OrdinalIgnoreCase));
-        }
-        if (!string.IsNullOrWhiteSpace(materialTag))
-        {
-            matches = matches.Where(item => item.MaterialTags.Contains(materialTag.Trim(), StringComparer.OrdinalIgnoreCase));
         }
         if (queryTokens.Length > 0)
         {
@@ -126,7 +111,6 @@ public sealed class ArchiveItemCatalog
         var pacFiles = NormalizeValues(source.PacFiles);
         var modelStems = NormalizeValues(source.ModelStems);
         var iconPaths = NormalizeValues(source.IconPaths);
-        var materialTags = NormalizeValues(source.MaterialTags);
         var (category, group, categoryEvidence) = Classify(
             internalName,
             displayName,
@@ -134,7 +118,7 @@ public sealed class ArchiveItemCatalog
             pacFiles,
             modelStems,
             iconPaths);
-        var evidence = BuildEvidence(prefabHashes.Length > 0, modelStems.Length > 0, displayName, iconPaths, materialTags);
+        var evidence = BuildEvidence(prefabHashes.Length > 0, modelStems.Length > 0, displayName, iconPaths);
         var equipType = (source.EquipType ?? string.Empty).Trim();
         var searchText = BuildSearchText(
             source.ItemId,
@@ -146,7 +130,6 @@ public sealed class ArchiveItemCatalog
             pacFiles,
             modelStems,
             iconPaths,
-            materialTags,
             equipType);
         return source with
         {
@@ -162,7 +145,6 @@ public sealed class ArchiveItemCatalog
             IconPaths = iconPaths,
             LocalizedNames = localizedNames,
             PrefabHashes = prefabHashes,
-            MaterialTags = materialTags,
             VariantCount = Math.Max(1, source.VariantCount),
             Evidence = evidence,
             SearchText = searchText,
@@ -202,7 +184,6 @@ public sealed class ArchiveItemCatalog
         var pacFiles = MergeStrings(rows.Select(static row => row.PacFiles));
         var modelStems = MergeStrings(rows.Select(static row => row.ModelStems));
         var iconPaths = MergeStrings(rows.Select(static row => row.IconPaths));
-        var materialTags = MergeStrings(rows.Select(static row => row.MaterialTags));
         var evidence = string.Join(
             "; ",
             rows.Select(static row => row.Evidence)
@@ -218,7 +199,6 @@ public sealed class ArchiveItemCatalog
             PacFiles = pacFiles,
             ModelStems = modelStems,
             IconPaths = iconPaths,
-            MaterialTags = materialTags,
             VariantCount = rows.Sum(static row => Math.Max(1, row.VariantCount)),
             Evidence = evidence,
             SearchText = BuildSearchText(
@@ -231,7 +211,6 @@ public sealed class ArchiveItemCatalog
                 pacFiles,
                 modelStems,
                 iconPaths,
-                materialTags,
                 first.EquipType)
                 + string.Join(' ', rows.Select(static row => $" {row.ItemId} {NormalizeSearchText(row.InternalName)} ")),
         };
@@ -263,7 +242,6 @@ public sealed class ArchiveItemCatalog
         IReadOnlyList<string> pacFiles,
         IReadOnlyList<string> modelStems,
         IReadOnlyList<string> iconPaths,
-        IReadOnlyList<string> materialTags,
         string equipType) => string.Join(
             ' ',
             new[]
@@ -276,7 +254,6 @@ public sealed class ArchiveItemCatalog
                 string.Join(' ', pacFiles),
                 string.Join(' ', modelStems),
                 string.Join(' ', iconPaths),
-                string.Join(' ', materialTags),
                 equipType,
                 itemId.ToString(System.Globalization.CultureInfo.InvariantCulture),
             }.Select(NormalizeSearchText));
@@ -292,15 +269,13 @@ public sealed class ArchiveItemCatalog
         bool hasPrefabHashes,
         bool hasModelStems,
         string displayName,
-        IReadOnlyList<string> iconPaths,
-        IReadOnlyList<string> materialTags)
+        IReadOnlyList<string> iconPaths)
     {
         var parts = new List<string>();
         if (hasPrefabHashes) parts.Add("ItemInfo prefab hash");
         if (hasModelStems) parts.Add("icon/model reference");
         if (!string.IsNullOrWhiteSpace(displayName)) parts.Add("localized display name");
         if (iconPaths.Count > 0) parts.Add("inventory icon path");
-        if (materialTags.Count > 0) parts.Add("material slot tags");
         return parts.Count > 0 ? string.Join("; ", parts) : "item database record";
     }
 
@@ -554,7 +529,6 @@ public sealed record ArchiveItemCatalogRecord(
     IReadOnlyList<string> ModelStems,
     IReadOnlyList<string> PacFiles,
     IReadOnlyList<string> IconPaths,
-    IReadOnlyList<string> MaterialTags,
     string Category = "",
     string Group = "",
     string CategoryEvidence = "",

@@ -220,11 +220,11 @@ internal static class ArchiveLiteTestRunner
             Guid.Parse("45454545-4545-4545-4545-454545454545"),
             11,
             WorkerProtocol.SearchItemCatalog,
-            new ItemCatalogSearchRequest("session", "sword steel", "Weapon", "Sword", "steel", 0, 72));
+            new ItemCatalogSearchRequest("session", "sword steel", "Weapon", "Sword", 0, 72));
         var itemSearchJson = JsonSerializer.Serialize(itemSearchMessage, WorkerProtocol.JsonOptions);
         Require(
             itemSearchJson.Contains("\"kind\":\"search_item_catalog\"", StringComparison.Ordinal)
-            && itemSearchJson.Contains("\"material_tag\":\"steel\"", StringComparison.Ordinal)
+            && itemSearchJson.Contains("\"group\":\"Sword\"", StringComparison.Ordinal)
             && itemSearchJson.Contains("\"page_size\":72", StringComparison.Ordinal),
             "Item Finder request is not bounded or snake case");
         return Task.CompletedTask;
@@ -293,14 +293,13 @@ internal static class ArchiveLiteTestRunner
             }
         }
 
-        // The Item Finder's categories, groups, material tags, and evidence phrases are catalog
-        // vocabulary rather than UI chrome: they are produced in English, travel back to the worker
-        // unchanged as filters, and are only translated for display. A term with no resource falls
-        // back to its canonical English, which is a safety net for a term the classifier gains
-        // later - not a way to ship a picker half in English.
+        // The Item Finder's categories, groups, and evidence phrases are catalog vocabulary rather
+        // than UI chrome: they are produced in English, travel back to the worker unchanged as
+        // filters, and are only translated for display. A term with no resource falls back to its
+        // canonical English, which is a safety net for a term the classifier gains later - not a
+        // way to ship a picker half in English.
         var catalogKeys = ItemCatalogLabels.Categories.Select(ItemCatalogLabels.CategoryKey)
             .Concat(ItemCatalogLabels.Groups.Select(ItemCatalogLabels.GroupKey))
-            .Concat(ItemCatalogLabels.MaterialTags.Select(ItemCatalogLabels.MaterialTagKey))
             .Concat(ItemCatalogLabels.EvidencePhrases.Select(ItemCatalogLabels.EvidenceKey))
             .ToArray();
         Require(
@@ -618,7 +617,7 @@ internal static class ArchiveLiteTestRunner
                 ".xml;.material",
                 true,
                 true),
-            ItemFinder: new ItemFinderSettings("sword", "Weapon", "Sword", "steel", 1180, 760),
+            ItemFinder: new ItemFinderSettings("sword", "Weapon", "Sword", 1180, 760),
             WindowPlacement: new WindowPlacementSettings(120, 80, 1320, 790, true),
             // Placement is stored in physical pixels; a file written by a build that stored
             // device-independent units carries no pixel figures and must not be reinterpreted.
@@ -4668,8 +4667,7 @@ internal static class ArchiveLiteTestRunner
                 [],
                 [$"warm_subject_{index}"],
                 [],
-                [iconPath],
-                []))
+                [iconPath]))
             .ToArray();
         session.SetCatalogue(
             ArchiveItemNameIndex.FromMappings(
@@ -4721,8 +4719,7 @@ internal static class ArchiveLiteTestRunner
                 [0x11223344],
                 ["cd_phm_01_sword_0016"],
                 ["cd_phm_01_sword_0016.pac"],
-                ["ui/icon/item/cd_phm_01_sword_0016.dds"],
-                ["steel", "gold"]),
+                ["ui/icon/item/cd_phm_01_sword_0016.dds"]),
             new ArchiveItemCatalogRecord(
                 202,
                 "Helmet_Ashen",
@@ -4731,8 +4728,7 @@ internal static class ArchiveLiteTestRunner
                 [0x55667788],
                 ["cd_phm_hel_0042"],
                 ["cd_phm_hel_0042.pac"],
-                ["ui/icon/item/cd_phm_hel_0042.dds"],
-                ["cloth"]),
+                ["ui/icon/item/cd_phm_hel_0042.dds"]),
             new ArchiveItemCatalogRecord(
                 102,
                 "OneHandSword_Gilded_+1",
@@ -4741,8 +4737,7 @@ internal static class ArchiveLiteTestRunner
                 [0x11223345],
                 ["cd_phm_01_sword_0016_l"],
                 ["cd_phm_01_sword_0016_l.pac"],
-                ["ui/icon/item/cd_phm_01_sword_0016.dds"],
-                ["steel", "gold"]),
+                ["ui/icon/item/cd_phm_01_sword_0016.dds"]),
             new ArchiveItemCatalogRecord(
                 303,
                 "QuestJournal",
@@ -4751,30 +4746,28 @@ internal static class ArchiveLiteTestRunner
                 [],
                 ["quest_journal_01"],
                 ["quest_journal_01.pac"],
-                [],
                 []),
         ]);
 
         Require(catalog.Count == 3, "Item Finder discarded valid native catalog rows");
-        var sword = catalog.Search("gilded steel", "Weapon", "Sword", "steel", 0, 72);
-        Require(sword.TotalMatches == 1 && sword.Items[0].ItemId == 101, "Item Finder did not search across names and material tags");
+        var sword = catalog.Search("gilded longsword", "Weapon", "Sword", 0, 72);
+        Require(sword.TotalMatches == 1 && sword.Items[0].ItemId == 101, "Item Finder did not search across names and category facets");
         Require(sword.Items[0].VariantCount == 2, "Item Finder did not group enhancement/model variants like Full");
         Require(sword.Items[0].CategoryEvidence.Contains("Recovered", StringComparison.Ordinal), "Item Finder category evidence is missing");
-        var localized = catalog.Search("vergoldetes", null, null, null, 0, 72);
+        var localized = catalog.Search("vergoldetes", null, null, 0, 72);
         Require(localized.TotalMatches == 1 && localized.Items[0].ItemId == 101, "localized Item Finder search did not match");
-        var byId = catalog.Search("202", null, null, null, 0, 72);
+        var byId = catalog.Search("202", null, null, 0, 72);
         Require(byId.TotalMatches == 1 && byId.Items[0].Category == "Armor", "numeric item-id search or category recovery failed");
-        Require(catalog.Search("102", null, null, null, 0, 72).TotalMatches == 1, "grouped secondary item IDs are not searchable");
-        var paged = catalog.Search(string.Empty, null, null, null, 1, 1);
+        Require(catalog.Search("102", null, null, 0, 72).TotalMatches == 1, "grouped secondary item IDs are not searchable");
+        var paged = catalog.Search(string.Empty, null, null, 1, 1);
         Require(paged.TotalMatches == 3 && paged.Items.Count == 1, "Item Finder search is not predictably paged");
         Require(catalog.CategoryFacets.Any(facet => facet.Category == "Weapon" && facet.Group == "Sword"), "Item Finder category facets omit weapons");
-        Require(catalog.MaterialFacets.Any(facet => facet.Value == "steel" && facet.Count == 1), "Item Finder material facets omit native tags");
         var cachedRowJson = JsonSerializer.Serialize(catalog.Items.Single(item => item.ItemId == 101), WorkerProtocol.JsonOptions);
         Require(!cachedRowJson.Contains("search_text", StringComparison.Ordinal), "Item Finder persisted its rebuildable search text");
         var cachedRow = JsonSerializer.Deserialize<ArchiveItemCatalogRecord>(cachedRowJson, WorkerProtocol.JsonOptions)
             ?? throw new InvalidDataException("Item Finder cache row did not deserialize");
         Require(
-            ArchiveItemCatalog.FromRecords([cachedRow]).Search("gilded", null, null, null, 0, 72).TotalMatches == 1,
+            ArchiveItemCatalog.FromRecords([cachedRow]).Search("gilded", null, null, 0, 72).TotalMatches == 1,
             "Item Finder did not rebuild search text after a persistent-cache load");
 
         var extensionFacets = Enumerable.Range(0, 12)
@@ -4836,7 +4829,7 @@ internal static class ArchiveLiteTestRunner
             "Cdmw.ArchiveLite.Worker",
             "WorkerRuntime.cs"));
         Require(
-            acceleratorSource.Contains("\\\"catalog_schema\\\":3", StringComparison.Ordinal)
+            acceleratorSource.Contains("\\\"catalog_schema\\\":4", StringComparison.Ordinal)
             && liteCatalogSource.Contains("item-index-job", StringComparison.Ordinal),
             "Lite does not consume its versioned native item catalog");
         Require(
@@ -5000,15 +4993,12 @@ internal static class ArchiveLiteTestRunner
                 LocalizationManager.ApplyCulture("en");
                 viewModel.RefreshLocalization();
                 var englishStatus = viewModel.Status;
-                var englishAllMaterials = viewModel.MaterialTagOptions[0].Label;
                 var englishAllCategories = viewModel.CategoryOptions[0].Label;
                 var englishLinkedSummary = viewModel.Items[0].LinkedSummary;
                 // The facet rows and the detail pane carry catalog vocabulary, which is localized
                 // for display while the value the worker filters on stays canonical English.
                 var englishSwordFacet = viewModel.CategoryOptions[1].Label;
-                var englishMetalFacet = viewModel.MaterialTagOptions[1].Label;
                 var englishCategoryPath = viewModel.Items[0].CategoryPath;
-                var englishMaterials = viewModel.Items[0].MaterialTagsText;
                 Require(
                     englishSwordFacet.StartsWith("Weapon / Sword", StringComparison.Ordinal),
                     "an English category facet did not read as its canonical catalog term");
@@ -5016,26 +5006,21 @@ internal static class ArchiveLiteTestRunner
                 viewModel.RefreshLocalization();
                 Require(
                     viewModel.Status != englishStatus
-                    && viewModel.MaterialTagOptions[0].Label != englishAllMaterials
                     && viewModel.CategoryOptions[0].Label != englishAllCategories
                     && viewModel.Items[0].LinkedSummary != englishLinkedSummary,
                     "an Item Finder language change left settled text in the previous language");
                 Require(
                     viewModel.CategoryOptions[1].Label != englishSwordFacet
-                    && viewModel.MaterialTagOptions[1].Label != englishMetalFacet
-                    && viewModel.Items[0].CategoryPath != englishCategoryPath
-                    && viewModel.Items[0].MaterialTagsText != englishMaterials,
+                    && viewModel.Items[0].CategoryPath != englishCategoryPath,
                     "Item Finder catalog vocabulary stayed English after a language change");
                 Require(
                     viewModel.CategoryOptions[1].Category == "Weapon"
-                    && viewModel.CategoryOptions[1].Group == "Sword"
-                    && viewModel.MaterialTagOptions[1].Value == "metal",
+                    && viewModel.CategoryOptions[1].Group == "Sword",
                     "localizing a facet label also translated the value the worker filters on");
                 LocalizationManager.ApplyCulture("en");
                 viewModel.RefreshLocalization();
                 Require(
                     viewModel.Status == englishStatus
-                    && viewModel.MaterialTagOptions[0].Label == englishAllMaterials
                     && viewModel.CategoryOptions[0].Label == englishAllCategories
                     && viewModel.Items[0].LinkedSummary == englishLinkedSummary
                     && viewModel.CategoryOptions[1].Label == englishSwordFacet
@@ -7613,13 +7598,9 @@ internal static class ArchiveLiteTestRunner
                         ["equipment/sword"],
                         ["ui/icon/item/sword_d.dds"],
                         ["Gilded Longsword"],
-                        // The accelerator folds its aliases onto canonical tags before publishing,
-                        // so "steel" reaches the UI as "metal".
-                        ["metal"],
                         1,
                         "Synthetic regression row")],
-                    categories,
-                    [new ItemCatalogValueFacet("metal", 1)]);
+                    categories);
                 return (TResult)(object)result;
             }
             if (kind == WorkerProtocol.LoadItemIcons && payload is ItemIconBatchRequest icons)

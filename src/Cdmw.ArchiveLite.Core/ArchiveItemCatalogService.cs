@@ -27,7 +27,6 @@ public sealed class ArchiveItemCatalogService(
                     Math.Clamp(request.PageSize, 1, 200),
                     [],
                     [],
-                    [],
                     built.Warning ?? "The Item Finder catalog is unavailable for this archive.");
             }
         }
@@ -36,7 +35,6 @@ public sealed class ArchiveItemCatalogService(
             request.Query,
             request.Category,
             request.Group,
-            request.MaterialTag,
             request.PageStart,
             request.PageSize);
         return new ItemCatalogSearchResult(
@@ -45,8 +43,7 @@ public sealed class ArchiveItemCatalogService(
             request.PageStart,
             request.PageSize,
             page.Items.Select(ToContract).ToArray(),
-            catalog.CategoryFacets,
-            catalog.MaterialFacets);
+            catalog.CategoryFacets);
     }
 
     internal static ItemCatalogRow ToContract(ArchiveItemCatalogRecord item) => new(
@@ -60,7 +57,6 @@ public sealed class ArchiveItemCatalogService(
         item.ModelStems,
         item.IconPaths,
         item.LocalizedNames,
-        item.MaterialTags,
         item.VariantCount,
         item.Evidence,
         item.Description,

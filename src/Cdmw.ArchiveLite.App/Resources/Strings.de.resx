@@ -329,9 +329,9 @@
   <data name="None" xml:space="preserve"><value>Keine</value></data>
   <data name="ItemFinderTitle" xml:space="preserve"><value>Item Finder</value></data>
   <data name="ItemFinderNavigation" xml:space="preserve"><value>Item Finder</value></data>
-  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Wiederhergestellte Namen, Inventarsymbole, Modellverknüpfungen und Materialnachweise</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Wiederhergestellte Namen, Inventarsymbole und Modellverknüpfungen</value></data>
   <data name="ItemFinderIntro" xml:space="preserve"><value>Durchsucht denselben nativen Item-Katalog wie CDMW Full. Sichtbare Symbole werden zuerst geladen; die übrigen Vorschaubilder werden im Hintergrund vorbereitet und aus dem dauerhaften Cache wiederverwendet.</value></data>
-  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Anzeigename, internen Namen, Item-ID, Kategorie, Modell, Symbolpfad, lokalisierten Namen oder Material-Tag suchen</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Anzeigename, internen Namen, Item-ID, Kategorie, Modell, Symbolpfad oder lokalisierten Namen suchen</value></data>
   <data name="ItemFinderButtonHint" xml:space="preserve"><value>Wiederhergestellte Spielobjekte mit dauerhaft vorgeladenen Inventarsymbolen durchsuchen.</value></data>
   <data name="ItemFinderOpenArchive" xml:space="preserve"><value>Laden Sie ein Archiv, bevor Sie den Item Finder öffnen.</value></data>
   <data name="ItemFinderReady" xml:space="preserve"><value>Der Item Finder ist bereit.</value></data>
@@ -340,7 +340,6 @@
   <data name="ItemFinderPageSummary" xml:space="preserve"><value>{0:N0}-{1:N0} von {2:N0} passenden Items werden angezeigt</value></data>
   <data name="ItemFinderFailed" xml:space="preserve"><value>Item Finder fehlgeschlagen: {0}</value></data>
   <data name="ItemFinderAllCategories" xml:space="preserve"><value>Alle Kategorien</value></data>
-  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>Alle Material-Tags</value></data>
   <data name="ItemFinderIconFailed" xml:space="preserve"><value>Einige Inventarsymbole konnten nicht vorbereitet werden: {0}</value></data>
   <data name="ItemFinderIconWarmup" xml:space="preserve"><value>Inventarsymbole werden vorgeladen: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Der dauerhafte Cache für Inventarsymbole wird vorbereitet...</value></data>
@@ -353,7 +352,6 @@
   <data name="ItemFinderDescription" xml:space="preserve"><value>Beschreibung</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Nachweis</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Lokalisierte Namen</value></data>
-  <data name="ItemFinderMaterials" xml:space="preserve"><value>Material-Tags</value></data>
   <data name="ItemFinderModels" xml:space="preserve"><value>Verknüpfte Modelle</value></data>
   <data name="ItemFinderIcons" xml:space="preserve"><value>Pfade der Inventarsymbole</value></data>
   <data name="ItemFinderShowExact" xml:space="preserve"><value>Exakte Links anzeigen</value></data>
@@ -447,26 +445,10 @@
   <data name="ItemGroupVehicle" xml:space="preserve"><value>Fahrzeug</value></data>
   <data name="ItemGroupWandFan" xml:space="preserve"><value>Zauberstab / Fächer</value></data>
   <data name="ItemGroupWoodStone" xml:space="preserve"><value>Holz / Stein</value></data>
-  <data name="ItemMaterialBone" xml:space="preserve"><value>Knochen</value></data>
-  <data name="ItemMaterialCloth" xml:space="preserve"><value>Stoff</value></data>
-  <data name="ItemMaterialCrystal" xml:space="preserve"><value>Kristall</value></data>
-  <data name="ItemMaterialDirt" xml:space="preserve"><value>Erde</value></data>
-  <data name="ItemMaterialFur" xml:space="preserve"><value>Fell</value></data>
-  <data name="ItemMaterialGlass" xml:space="preserve"><value>Glas</value></data>
-  <data name="ItemMaterialGrass" xml:space="preserve"><value>Gras</value></data>
-  <data name="ItemMaterialHair" xml:space="preserve"><value>Haar</value></data>
-  <data name="ItemMaterialLeather" xml:space="preserve"><value>Leder</value></data>
-  <data name="ItemMaterialMetal" xml:space="preserve"><value>Metall</value></data>
-  <data name="ItemMaterialRope" xml:space="preserve"><value>Seil</value></data>
-  <data name="ItemMaterialSkin" xml:space="preserve"><value>Haut</value></data>
-  <data name="ItemMaterialStone" xml:space="preserve"><value>Stein</value></data>
-  <data name="ItemMaterialWater" xml:space="preserve"><value>Wasser</value></data>
-  <data name="ItemMaterialWood" xml:space="preserve"><value>Holz</value></data>
   <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo-Prefab-Hash</value></data>
   <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>Symbol-/Modellverweis</value></data>
   <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>lokalisierter Anzeigename</value></data>
   <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>Pfad des Inventarsymbols</value></data>
-  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>Materialslot-Tags</value></data>
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>Eintrag in der Gegenstandsdatenbank</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Wiederhergestellte Gegenstands-/Modellbenennung</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Es wurden keine belastbareren Kategoriehinweise gefunden</value></data>

@@ -900,7 +900,6 @@ struct NativeItemRecord {
     std::vector<std::string> model_stems;
     std::vector<std::string> pac_files;
     std::vector<std::string> icon_paths;
-    std::vector<std::string> material_tags;
 };
 
 void add_unique(std::vector<std::string>& values, const std::string& value) {
@@ -1563,69 +1562,6 @@ std::map<std::string, std::vector<std::string>> build_icon_path_index(const std:
     return index;
 }
 
-std::string canonical_material_tag(std::string value) {
-    value = lower_copy(value);
-    std::string compact;
-    for (unsigned char ch : value) if (std::isalnum(ch)) compact.push_back(static_cast<char>(ch));
-    static const std::vector<std::pair<std::string, std::string>> aliases = {
-        {"cloth", "cloth"}, {"cloths", "cloth"}, {"fabric", "cloth"}, {"leather", "leather"}, {"hide", "leather"},
-        {"metal", "metal"}, {"iron", "metal"}, {"steel", "metal"}, {"wood", "wood"}, {"stone", "stone"},
-        {"fur", "fur"}, {"hair", "hair"}, {"skin", "skin"}, {"bone", "bone"}, {"glass", "glass"},
-        {"rope", "rope"}, {"crystal", "crystal"}, {"water", "water"}, {"dirt", "dirt"}, {"grass", "grass"}
-    };
-    for (const auto& alias : aliases) if (compact.find(alias.first) != std::string::npos) return alias.second;
-    return {};
-}
-
-std::map<std::string, std::vector<std::string>> parse_material_index(const std::vector<char>& data) {
-    std::map<std::string, std::vector<std::string>> index;
-    std::vector<std::string> record_values;
-    auto model_asset_path = [](std::string value) {
-        value = slash_copy(value);
-        const std::string lower = lower_copy(value);
-        for (const std::string& suffix : {".pamlod", ".prefab", ".pac", ".pam"}) {
-            const size_t pos = lower.find(suffix);
-            if (pos != std::string::npos && lower.substr(0, pos + suffix.size()).find('/') != std::string::npos) {
-                return value.substr(0, pos + suffix.size());
-            }
-        }
-        return std::string();
-    };
-    auto flush = [&](const std::string& path) {
-        const std::string normalized_path = model_asset_path(path);
-        if (normalized_path.empty()) return;
-        std::vector<std::string> tags;
-        for (const std::string& value : record_values) add_unique(tags, canonical_material_tag(value));
-        add_unique(tags, canonical_material_tag(normalized_path));
-        if (tags.empty()) return;
-        const std::string basename = lower_copy(basename_for(normalized_path));
-        const std::string stem = stem_for_path(normalized_path);
-        for (const std::string& key : {lower_copy(normalized_path), basename, stem}) {
-            for (const std::string& tag : tags) add_unique(index[key], tag);
-        }
-    };
-    size_t pos = 0;
-    while (pos + 8 <= data.size()) {
-        const std::uint32_t slen = read_u32(data, pos);
-        if (slen >= 3 && slen <= 260 && pos + 4 + slen <= data.size()) {
-            std::string text(data.begin() + static_cast<std::ptrdiff_t>(pos + 4), data.begin() + static_cast<std::ptrdiff_t>(pos + 4 + slen));
-            while (!text.empty() && text.back() == '\0') text.pop_back();
-            const std::string path = model_asset_path(text);
-            if (!path.empty()) {
-                flush(path);
-                record_values.clear();
-            } else if (!text.empty()) {
-                record_values.push_back(text);
-                if (record_values.size() > 48) record_values.erase(record_values.begin(), record_values.begin() + 16);
-            }
-            pos += 4 + slen;
-            continue;
-        }
-        ++pos;
-    }
-    return index;
-}
-
 std::map<std::uint32_t, std::string> build_model_hash_table(const std::vector<Entry>& entries) {
     std::map<std::uint32_t, std::string> table;
     static const std::vector<std::string> suffixes = {
@@ -1750,7 +1686,6 @@ int run_item_index_job(
             : parse_iteminfo_bin(iteminfo, loc_tables, icon_hashes);
         const size_t iteminfo_row_count = iteminfo_from_directory ? iteminfo_table.rows.size() : items.size();
         const auto icon_index = build_icon_path_index(entries);
-        const auto material_index = parse_material_index(read_binary_if_exists(work_dir / "partprefabdyeslotinfo.bin"));
         const auto hash_table = build_model_hash_table(entries);
         std::map<std::string, std::string> aliases;
         std::map<std::string, std::string> display_names;
@@ -1806,23 +1741,12 @@ int run_item_index_job(
                     }
                 }
             }
-            for (const std::string& model : item.pac_files) {
-                for (const std::string& key : model_candidate_bases(stem_for_path(model))) {
-                    auto found = material_index.find(key);
-                    if (found != material_index.end()) for (const std::string& tag : found->second) add_unique(item.material_tags, tag);
-                }
-            }
-            if (!item.material_tags.empty()) {
-                std::string material_terms;
-                for (const std::string& tag : item.material_tags) material_terms += " " + tag;
-                for (const std::string& model : item.pac_files) add_alias(aliases, strip_model_variant_suffix(stem_for_path(model)), material_terms);
-            }
             if (!item.pac_files.empty() || !item.model_stems.empty()) linked_items.push_back(std::move(item));
         }
 
         std::ostringstream out;
         out << "{\"status\":\"ok\",\"backend\":\"" << kBackend << "\",\"protocol\":" << kProtocol
-            << ",\"catalog_schema\":3,\"items\":[";
+            << ",\"catalog_schema\":4,\"items\":[";
         for (size_t i = 0; include_items && i < linked_items.size(); ++i) {
             const auto& item = linked_items[i];
             if (i) out << ",";
@@ -1840,7 +1764,6 @@ int run_item_index_job(
                 << ",\"model_stems\":" << json_string_array(item.model_stems)
                 << ",\"pac_files\":" << json_string_array(item.pac_files)
                 << ",\"icon_paths\":" << json_string_array(item.icon_paths)
-                << ",\"material_tags\":" << json_string_array(item.material_tags)
                 << "}";
         }
         out << "],\"model_base_aliases\":";
@@ -1854,7 +1777,6 @@ int run_item_index_job(
         out << ",\"item_count\":" << linked_items.size()
             << ",\"model_hash_count\":" << hash_table.size()
             << ",\"icon_path_key_count\":" << icon_index.size()
-            << ",\"material_key_count\":" << material_index.size()
             << ",\"item_row_source\":\"" << (iteminfo_from_directory ? "row_directory" : "marker_scan")
             << "\",\"string_row_source\":\"" << (stringinfo_from_directory ? "row_directory" : "marker_scan")
             << "\",\"item_row_count\":" << iteminfo_row_count

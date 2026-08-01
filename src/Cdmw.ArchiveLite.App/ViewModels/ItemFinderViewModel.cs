@@ -38,7 +38,6 @@ public sealed class ItemFinderViewModel : ObservableObject
     private Func<string>? _warmupSummary;
     private string _query = string.Empty;
     private ItemFinderCategoryOption? _selectedCategory;
-    private ItemFinderValueOption? _selectedMaterialTag;
     private ItemFinderRowViewModel? _selectedItem;
     private string _status = LocalizationManager.Get("ItemFinderOpenArchive");
     /// <summary>
@@ -52,9 +51,7 @@ public sealed class ItemFinderViewModel : ObservableObject
     private long _totalMatches;
     private string? _preferredCategory;
     private string? _preferredGroup;
-    private string? _preferredMaterialTag;
     private IReadOnlyList<ItemCatalogCategoryFacet> _categoryFacets = [];
-    private IReadOnlyList<ItemCatalogValueFacet> _materialFacets = [];
     private int _suppressFilterSearch;
 
     public ItemFinderViewModel(
@@ -72,7 +69,6 @@ public sealed class ItemFinderViewModel : ObservableObject
         _query = settings.Query ?? string.Empty;
         _preferredCategory = settings.Category;
         _preferredGroup = settings.Group;
-        _preferredMaterialTag = settings.MaterialTag;
         WindowWidth = NormalizeWindowDimension(settings.Width, 1240, 940, 2400);
         WindowHeight = NormalizeWindowDimension(settings.Height, 800, 640, 1600);
         SearchCommand = new AsyncCommand(SearchNowAsync, () => IsAvailable);
@@ -82,14 +78,11 @@ public sealed class ItemFinderViewModel : ObservableObject
         ShowExactLinksCommand = new AsyncCommand(token => ShowScopeAsync(includeRelated: false, token), () => SelectedItem is not null && !IsBusy);
         ShowRelatedSetCommand = new AsyncCommand(token => ShowScopeAsync(includeRelated: true, token), () => SelectedItem is not null && !IsBusy);
         CategoryOptions.Add(ItemFinderCategoryOption.All());
-        MaterialTagOptions.Add(ItemFinderValueOption.All());
         _selectedCategory = CategoryOptions[0];
-        _selectedMaterialTag = MaterialTagOptions[0];
     }
 
     public ObservableCollection<ItemFinderRowViewModel> Items { get; } = [];
     public ObservableCollection<ItemFinderCategoryOption> CategoryOptions { get; } = [];
-    public ObservableCollection<ItemFinderValueOption> MaterialTagOptions { get; } = [];
     public AsyncCommand SearchCommand { get; }
     public AsyncCommand PreviousPageCommand { get; }
     public AsyncCommand NextPageCommand { get; }
@@ -116,18 +109,6 @@ public sealed class ItemFinderViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _selectedCategory, value))
-            {
-                ScheduleFilterSearch();
-            }
-        }
-    }
-
-    public ItemFinderValueOption? SelectedMaterialTag
-    {
-        get => _selectedMaterialTag;
-        set
-        {
-            if (SetProperty(ref _selectedMaterialTag, value))
             {
                 ScheduleFilterSearch();
             }
@@ -269,17 +250,14 @@ public sealed class ItemFinderViewModel : ObservableObject
     public void RefreshLocalization()
     {
         var selectedCategoryKey = SelectedCategory?.Key;
-        var selectedMaterial = SelectedMaterialTag?.Value;
         _suppressFilterSearch++;
         try
         {
-            // Every row carries a localized category, group, or material name, not just the leading
-            // "all" entry, so the whole picker is rebuilt and the selection restored by its
-            // canonical value - which is what the worker filters on and never changes with language.
+            // Every row carries a localized category or group name, not just the leading "all"
+            // entry, so the whole picker is rebuilt and the selection restored by its canonical
+            // value - which is what the worker filters on and never changes with language.
             RebuildCategoryOptions();
             SelectedCategory = CategoryOptions.FirstOrDefault(option => option.Key == selectedCategoryKey) ?? CategoryOptions[0];
-            RebuildMaterialTagOptions();
-            SelectedMaterialTag = MaterialTagOptions.FirstOrDefault(option => option.Value == selectedMaterial) ?? MaterialTagOptions[0];
         }
         finally
         {
@@ -311,7 +289,6 @@ public sealed class ItemFinderViewModel : ObservableObject
         Query,
         SelectedCategory?.Category ?? _preferredCategory,
         SelectedCategory?.Group ?? _preferredGroup,
-        SelectedMaterialTag?.Value ?? _preferredMaterialTag,
         WindowWidth,
         WindowHeight);
 
@@ -393,7 +370,6 @@ public sealed class ItemFinderViewModel : ObservableObject
         {
             var categoryName = _preferredCategory ?? SelectedCategory?.Category;
             var groupName = _preferredGroup ?? SelectedCategory?.Group;
-            var materialTag = _preferredMaterialTag ?? SelectedMaterialTag?.Value;
             var result = await _worker.SendAsync<ItemCatalogSearchRequest, ItemCatalogSearchResult>(
                 WorkerProtocol.SearchItemCatalog,
                 generation,
@@ -402,7 +378,6 @@ public sealed class ItemFinderViewModel : ObservableObject
                     Query,
                     categoryName,
                     groupName,
-                    materialTag,
                     _pageStart,
                     PageSize),
                 cancellationToken).ConfigureAwait(true);
@@ -471,9 +446,7 @@ public sealed class ItemFinderViewModel : ObservableObject
         var categoryKey = !string.IsNullOrWhiteSpace(_preferredCategory)
             ? ItemFinderCategoryOption.BuildKey(_preferredCategory, _preferredGroup)
             : SelectedCategory?.Key;
-        var materialValue = _preferredMaterialTag ?? SelectedMaterialTag?.Value;
         var categoryFacets = result.Categories.ToArray();
-        var materialFacets = result.MaterialTags.Take(250).ToArray();
         _suppressFilterSearch++;
         try
         {
@@ -483,13 +456,6 @@ public sealed class ItemFinderViewModel : ObservableObject
                 RebuildCategoryOptions();
             }
             SelectedCategory = CategoryOptions.FirstOrDefault(option => option.Key == categoryKey) ?? CategoryOptions[0];
-
-            if (!_materialFacets.SequenceEqual(materialFacets))
-            {
-                _materialFacets = materialFacets;
-                RebuildMaterialTagOptions();
-            }
-            SelectedMaterialTag = MaterialTagOptions.FirstOrDefault(option => option.Value == materialValue) ?? MaterialTagOptions[0];
         }
         finally
         {
@@ -497,7 +463,6 @@ public sealed class ItemFinderViewModel : ObservableObject
         }
         _preferredCategory = null;
         _preferredGroup = null;
-        _preferredMaterialTag = null;
     }
 
     /// <summary>
@@ -515,18 +480,6 @@ public sealed class ItemFinderViewModel : ObservableObject
                 facet.Category,
                 facet.Group,
                 $"{ItemCatalogLabels.CategoryPath(facet.Category, facet.Group)} ({facet.Count:N0})"));
-        }
-    }
-
-    private void RebuildMaterialTagOptions()
-    {
-        MaterialTagOptions.Clear();
-        MaterialTagOptions.Add(ItemFinderValueOption.All());
-        foreach (var facet in _materialFacets)
-        {
-            MaterialTagOptions.Add(new ItemFinderValueOption(
-                facet.Value,
-                $"{ItemCatalogLabels.MaterialTag(facet.Value)} ({facet.Count:N0})"));
         }
     }
 
@@ -721,7 +674,6 @@ public sealed class ItemFinderViewModel : ObservableObject
         {
             Query = string.Empty;
             SelectedCategory = CategoryOptions.FirstOrDefault();
-            SelectedMaterialTag = MaterialTagOptions.FirstOrDefault();
         }
         finally
         {
@@ -918,15 +870,11 @@ public sealed class ItemFinderRowViewModel(ItemCatalogRow source) : ObservableOb
     public IReadOnlyList<string> ModelStems => source.ModelStems;
     public IReadOnlyList<string> IconPaths => source.IconPaths;
     public IReadOnlyList<string> LocalizedNames => source.LocalizedNames;
-    public IReadOnlyList<string> MaterialTags => source.MaterialTags;
     public int VariantCount => source.VariantCount;
     public string Evidence => ItemCatalogLabels.Evidence(source.Evidence);
     public string FallbackText => string.IsNullOrWhiteSpace(DisplayName) ? "?" : DisplayName[..1].ToUpperInvariant();
     public string LinkedSummary => LocalizationManager.Format("ItemFinderLinkedSummary", PacFiles.Count, IconPaths.Count, VariantCount);
     public string LocalizedNamesText => LocalizedNames.Count > 0 ? string.Join(", ", LocalizedNames) : LocalizationManager.Get("None");
-    public string MaterialTagsText => MaterialTags.Count > 0
-        ? string.Join(", ", MaterialTags.Select(ItemCatalogLabels.MaterialTag))
-        : LocalizationManager.Get("None");
     public string ModelFilesText => PacFiles.Count > 0 ? string.Join(Environment.NewLine, PacFiles) : LocalizationManager.Get("None");
     public string IconPathsText => IconPaths.Count > 0 ? string.Join(Environment.NewLine, IconPaths) : LocalizationManager.Get("None");
 
@@ -948,7 +896,6 @@ public sealed class ItemFinderRowViewModel(ItemCatalogRow source) : ObservableOb
         OnPropertyChanged(nameof(LinkedSummary));
         OnPropertyChanged(nameof(StatsText));
         OnPropertyChanged(nameof(LocalizedNamesText));
-        OnPropertyChanged(nameof(MaterialTagsText));
         OnPropertyChanged(nameof(ModelFilesText));
         OnPropertyChanged(nameof(IconPathsText));
     }
@@ -959,11 +906,5 @@ public sealed record ItemFinderCategoryOption(string? Category, string? Group, s
     public string Key => BuildKey(Category, Group);
     public static string BuildKey(string? category, string? group) => $"{category}\u001f{group}";
     public static ItemFinderCategoryOption All() => new(null, null, LocalizationManager.Get("ItemFinderAllCategories"));
-    public override string ToString() => Label;
-}
-
-public sealed record ItemFinderValueOption(string? Value, string Label)
-{
-    public static ItemFinderValueOption All() => new(null, LocalizationManager.Get("ItemFinderAllMaterials"));
     public override string ToString() => Label;
 }

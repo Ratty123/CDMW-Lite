@@ -10,8 +10,8 @@ public sealed class ArchiveItemNameIndexService(
     NativeArchiveCore native,
     ArchiveWorkPriority? workPriority = null)
 {
-    private const int CacheSchemaVersion = 5;
-    private const int NativeCatalogSchemaVersion = 3;
+    private const int CacheSchemaVersion = 6;
+    private const int NativeCatalogSchemaVersion = 4;
     private const int MaximumDiagnosticCharacters = 64 * 1024;
     private static readonly TimeSpan IndexerTimeout = TimeSpan.FromMinutes(3);
     private static readonly JsonSerializerOptions CacheJsonOptions = new()
@@ -220,10 +220,6 @@ public sealed class ArchiveItemNameIndexService(
             {
                 sources.StringInfo = entry;
             }
-            else if (sources.PartPrefabDyeSlotInfo is null && basename == "partprefabdyeslotinfo.pabgb")
-            {
-                sources.PartPrefabDyeSlotInfo = entry;
-            }
             else if (sources.EquipTypeInfo is null && basename == "equiptypeinfo.pabgb")
             {
                 sources.EquipTypeInfo = entry;
@@ -267,10 +263,6 @@ public sealed class ArchiveItemNameIndexService(
         {
             payloads.Add(("stringinfo.bin", sources.StringInfo));
             AddRowDirectory("stringinfo.header.bin", sources.StringInfo);
-        }
-        if (sources.PartPrefabDyeSlotInfo is not null)
-        {
-            payloads.Add(("partprefabdyeslotinfo.bin", sources.PartPrefabDyeSlotInfo));
         }
         if (sources.EquipTypeInfo is not null)
         {
@@ -459,7 +451,6 @@ public sealed class ArchiveItemNameIndexService(
                 ReadStrings(row, "model_stems"),
                 ReadStrings(row, "pac_files"),
                 ReadStrings(row, "icon_paths"),
-                ReadStrings(row, "material_tags"),
                 Description: ReadString(row, "description"),
                 StackSize: ReadInt(row, "stack_size"),
                 Grade: ReadInt(row, "grade"),
@@ -699,7 +690,6 @@ public sealed class ArchiveItemNameIndexService(
     {
         public ArchiveEntryDto? ItemInfo { get; set; }
         public ArchiveEntryDto? StringInfo { get; set; }
-        public ArchiveEntryDto? PartPrefabDyeSlotInfo { get; set; }
         public ArchiveEntryDto? EquipTypeInfo { get; set; }
         public Dictionary<string, ArchiveEntryDto> Localizations { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, ArchiveEntryDto> RowDirectories { get; } = new(StringComparer.OrdinalIgnoreCase);
