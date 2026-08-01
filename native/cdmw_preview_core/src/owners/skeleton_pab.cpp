@@ -20,6 +20,20 @@ constexpr size_t kPabMaximumNameLength = 255;
 // "no influence". No rig in the archive comes anywhere near this.
 constexpr size_t kMaximumSkeletonBones = 0xFFFE;
 
+// A bone name as the manifest can carry it. The names are ASCII in every one of the 257 skeletons
+// the archive ships, but they reach the manifest as the file's own bytes, and a single byte above
+// 0x7E would make it invalid UTF-8. The reader parses the whole manifest before it reaches the
+// geometry, so that would not cost the export its rig -- it would cost the export.
+static std::string sanitize_bone_name(const char* bytes, size_t length) {
+    std::string name;
+    name.reserve(length);
+    for (size_t index = 0; index < length; ++index) {
+        const unsigned char value = static_cast<unsigned char>(bytes[index]);
+        name.push_back(value >= 0x20 && value <= 0x7E ? static_cast<char>(value) : '?');
+    }
+    return name;
+}
+
 static std::array<float, 16> read_pab_matrix(const std::vector<char>& data, size_t offset) {
     std::array<float, 16> matrix{};
     for (size_t element = 0; element < matrix.size(); ++element) {
@@ -52,7 +66,7 @@ static std::vector<NativeBone> parse_pab_skeleton(const std::vector<char>& data)
         if (name_length > kPabMaximumNameLength || offset + name_length + 4 > data.size()) {
             throw std::runtime_error("PAB bone name is truncated");
         }
-        bone.name.assign(data.data() + offset, name_length);
+        bone.name = sanitize_bone_name(data.data() + offset, name_length);
         offset += name_length;
         bone.parent_index = static_cast<std::int32_t>(read_u32(data, offset));
         offset += 4;
@@ -131,16 +145,12 @@ static std::vector<std::vector<std::uint32_t>> pac_bone_palette_candidates(
 
 // Map the PAC's influence slots onto bone indices in `bones`, or return nothing.
 //
-// A candidate has to resolve completely: every hash a bone this rig actually has. That is a strong
-// enough filter to be unambiguous -- of the thousands of tables that merely look like a palette in
-// a body mesh, exactly one resolves -- so a mismatched or missing skeleton yields nothing rather
-// than a wrong palette.
-//
-// The cheap scan of the file's head runs first, because that is where a character body keeps its
-// palette. Armour keeps it further in: a coat, a boot and a helmet all come back empty from the
-// head alone and every one of them resolves once the whole file is searched.
-static std::vector<std::int32_t> resolve_pac_bone_palette(
-    const std::vector<char>& data,
+// A table has to resolve completely: every hash a bone this rig actually has. That is a strong
+// enough filter to be unambiguous within one file -- of the thousands of byte runs that merely look
+// like a palette in a body mesh, exactly one resolves -- so a mismatched skeleton yields nothing
+// rather than a wrong palette.
+static std::vector<std::int32_t> resolve_palette_against_bones(
+    const std::vector<std::vector<std::uint32_t>>& tables,
     const std::vector<NativeBone>& bones
 ) {
     if (bones.empty()) return {};
@@ -149,27 +159,23 @@ static std::vector<std::int32_t> resolve_pac_bone_palette(
     for (size_t index = 0; index < bones.size(); ++index) {
         by_hash.emplace(bones[index].name_hash, static_cast<std::int32_t>(index));
     }
-    for (const size_t search_limit : {static_cast<size_t>(4096), data.size()}) {
-        std::vector<std::int32_t> best;
-        for (const std::vector<std::uint32_t>& candidate : pac_bone_palette_candidates(data, search_limit)) {
-            if (candidate.size() <= best.size()) continue;
-            std::vector<std::int32_t> resolved;
-            resolved.reserve(candidate.size());
-            bool complete = true;
-            for (const std::uint32_t value : candidate) {
-                auto found = by_hash.find(value);
-                if (found == by_hash.end()) {
-                    complete = false;
-                    break;
-                }
-                resolved.push_back(found->second);
+    std::vector<std::int32_t> best;
+    for (const std::vector<std::uint32_t>& table : tables) {
+        if (table.size() <= best.size()) continue;
+        std::vector<std::int32_t> resolved;
+        resolved.reserve(table.size());
+        bool complete = true;
+        for (const std::uint32_t value : table) {
+            auto found = by_hash.find(value);
+            if (found == by_hash.end()) {
+                complete = false;
+                break;
             }
-            if (complete) best = std::move(resolved);
+            resolved.push_back(found->second);
         }
-        if (!best.empty()) return best;
-        if (search_limit >= data.size()) break;
+        if (complete) best = std::move(resolved);
     }
-    return {};
+    return best;
 }
 
 // The .pab basenames a PAC may be rigged to, most specific first.
@@ -284,38 +290,62 @@ static NativePackageSkeleton resolve_native_package_skeleton(
             break;
     }
 
-    std::vector<std::string> attempted;
-    // Each candidate costs a decode and a palette scan, so the search is bounded. The rig that
-    // serves a mesh is among the first few names by construction.
+    // The rigs this mesh's name and its directory nominate, most specific first. Reading them all
+    // up front is what lets the palette tables below be scanned for once rather than once per
+    // skeleton: the scan is over the mesh, not the rig, and a whole-file scan of a multi-megabyte
+    // mesh repeated per candidate is the expensive way to reach the same answer.
+    struct SkeletonCandidate {
+        std::string path;
+        std::vector<NativeBone> bones;
+    };
     constexpr size_t kMaximumSkeletonsTried = 8;
+    std::vector<SkeletonCandidate> candidates;
+    std::vector<std::string> attempted;
     std::set<std::string> tried_paths;
     for (const std::string& basename : iter_pab_candidate_basenames(job.path)) {
+        if (tried_paths.size() >= kMaximumSkeletonsTried) break;
         for (const ArchiveEntryRef& ref : lookup_basename_candidates_across_package(job, index, basename, 4)) {
             if (tried_paths.size() >= kMaximumSkeletonsTried) break;
             if (!tried_paths.insert(lower_copy(ref.path)).second) continue;
             try {
-                const std::vector<char> pab = read_archive_ref_decoded_bytes(ref);
-                std::vector<NativeBone> bones = parse_pab_skeleton(pab);
+                std::vector<NativeBone> bones = parse_pab_skeleton(read_archive_ref_decoded_bytes(ref));
                 if (bones.empty()) continue;
-                std::vector<std::int32_t> palette = resolve_pac_bone_palette(data, bones);
-                if (palette.empty()) {
-                    attempted.push_back(ref.path + " (" + std::to_string(bones.size()) + " bones, no palette resolved)");
-                    continue;
-                }
-                skeleton.status = "rigged";
-                skeleton.source_path = ref.path;
-                skeleton.bones = std::move(bones);
-                skeleton.palette = std::move(palette);
-                skeleton.note = "palette of " + std::to_string(skeleton.palette.size())
-                    + " entries resolved against " + std::to_string(skeleton.bones.size()) + " bones";
-                return skeleton;
+                attempted.push_back(ref.path + " (" + std::to_string(bones.size()) + " bones)");
+                candidates.push_back(SkeletonCandidate{ref.path, std::move(bones)});
             } catch (const std::exception& exc) {
                 attempted.push_back(ref.path + " (" + exc.what() + ")");
             }
         }
-        if (tried_paths.size() >= kMaximumSkeletonsTried) break;
     }
 
+    // The head of the file is searched first, because that is where a character body keeps its
+    // palette, and every named rig is offered it before the search widens. Armour keeps its palette
+    // further in: a coat, a boot and a helmet all come back empty from the head alone and resolve
+    // once the whole file is searched.
+    if (!candidates.empty()) {
+        for (const size_t search_limit : {static_cast<size_t>(4096), data.size()}) {
+            const std::vector<std::vector<std::uint32_t>> tables =
+                pac_bone_palette_candidates(data, search_limit);
+            for (SkeletonCandidate& candidate : candidates) {
+                std::vector<std::int32_t> palette = resolve_palette_against_bones(tables, candidate.bones);
+                if (palette.empty()) continue;
+                skeleton.status = "rigged";
+                skeleton.source_path = candidate.path;
+                skeleton.bones = std::move(candidate.bones);
+                skeleton.palette = std::move(palette);
+                skeleton.note = "palette of " + std::to_string(skeleton.palette.size())
+                    + " entries resolved against " + std::to_string(skeleton.bones.size()) + " bones";
+                return skeleton;
+            }
+            if (search_limit >= data.size()) break;
+        }
+    }
+
+    // Not an error, and not the rigid case either: the mesh is smooth-skinned, but no rig this
+    // file's name or directory nominates accounts for its palette. Widening the search to every
+    // skeleton in the archive is not the answer -- an NPC upper body's 88-entry palette resolves
+    // against nine different humanoid rigs, and a monster's against ten, so "resolves" stops
+    // identifying anything once the rig is not nominated by name. It exports unrigged and says so.
     skeleton.status = "palette_unresolved";
     if (attempted.empty()) {
         skeleton.note = "the mesh is smooth-skinned but no candidate .pab was found in the package";

@@ -41,3 +41,23 @@ Reference runs on exports from the shipped archives:
 | `cd_phm_00_ub_0003.pac` | 101 | 2,768 | `Bip01 Spine1` | 2,128 | 0.293 vs 0.373 |
 
 All four report 0 unweighted vertices and 0 whose weights miss 1.0.
+
+## What is not rigged, and why
+
+A mesh only gets an armature when the `.pab` its own name or directory nominates accounts for its
+palette. Across a random sweep of 23 character `.pac` files, 10 came back rigged, 1 rigid, and 12
+`palette_unresolved` — NPCs, monsters, and a few player accessories. That last group is a real
+coverage gap rather than a defect, and widening the search is not the fix:
+
+- Two of them (a helmet accessory and a pike) resolve against **no** skeleton in the archive at
+  all. Their rig is not among the 257 `.pab` files that ship.
+- The rest resolve against **several**. An NPC upper body's 88-entry palette resolves completely
+  against nine different humanoid rigs, a monster's against ten, and one head mesh's against
+  twenty-four, because a palette of common biped bone names is satisfied by any biped rig. Once
+  the rig is not nominated by name, "the palette resolves" stops identifying which rig it is, and
+  binding to the wrong one gives an armature of the right bone *names* in the wrong *places*.
+
+There is no NPC skeleton in the archive — no `nhm`/`nhw` `.pab` exists — so those meshes must
+borrow a rig that is named nowhere in their own path. Closing that gap needs evidence beyond the
+palette, and until there is some, those meshes export unrigged with the reason recorded in the
+package manifest's `skeleton.note`.
