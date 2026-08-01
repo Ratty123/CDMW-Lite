@@ -160,7 +160,7 @@ Portable builds keep settings, caches, logs, and crash reports beside the execut
 
 These paths and all build outputs are excluded from version control.
 
-Neither package is code-signed. The standalone launcher unpacks its runtime and then starts it, which Microsoft Defender's machine-learning heuristic has flagged on a fresh release as `Trojan:Win32/Wacatac.B!ml` — a false positive. Each release lists the SHA-256 of both packages, and the portable zip carries the same application as ordinary files rather than as a self-extracting executable.
+Neither package is code-signed. The standalone launcher unpacks its runtime — 990 files, 978 of them DLLs and EXEs — and then starts it, and that sequence is what scanners react to: Microsoft Defender's machine-learning heuristic has flagged a fresh release as `Trojan:Win32/Wacatac.B!ml`, VirusTotal carries generic packed-executable names such as `Trojan.Win64.Crypt`, and its sandbox reports the PEs written as executable creation and the asynchronous write handles bound to I/O completion ports as `Data Encrypted for Impact` (T1486). All are false positives, and nothing already on the disk is read, changed or deleted. Each release lists the SHA-256 of both packages, and the portable zip carries the same application as ordinary files rather than as a self-extracting executable.
 
 ## Project documents
 
