@@ -55,6 +55,7 @@ internal static class ArchiveLiteTestRunner
             ("native preview core parses PAT LOD0 geometry", TestNativePatGeometryAsync),
             ("native model packages adapt safely and export Blender interchange formats", TestNativeModelPreviewPackageAsync),
             ("an exported mesh keeps the source's own vertices, order, and part names", TestMeshExportSourceVertexParityAsync),
+            ("a skinned mesh exports as a rigged GLB, and a rigid one exports as it always did", TestRiggedGlbExportAsync),
             ("renderer warmup package is complete and loadable", TestRendererWarmupPackageAsync),
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
@@ -3643,6 +3644,263 @@ internal static class ArchiveLiteTestRunner
     /// texture coordinate. The batch below is built to catch both: its triangles introduce source
     /// vertices out of order, and two of its vertices are attribute-for-attribute identical.
     /// </remarks>
+    /// <summary>
+    /// A skinned package exports a GLB with an armature the mesh is actually bound to.
+    /// </summary>
+    /// <remarks>
+    /// The corner order deliberately disagrees with the source's vertex order, because the export
+    /// renumbers vertices into source order and the skin rows have to follow them there. A rig
+    /// bound the other way round produces a file that imports and weighs correctly and deforms
+    /// into noise, which no check on the counts alone would catch.
+    /// </remarks>
+    private static async Task TestRiggedGlbExportAsync()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-rigged-glb-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "geometry"));
+
+            // No triangle starts at vertex 0, so first-appearance order and source order differ.
+            int[] corners = [3, 2, 4, 2, 1, 0, 0, 3, 4];
+            const int sourceVertexCount = 5;
+            await using (var geometry = File.Create(Path.Combine(root, "geometry", "batch_000.bin")))
+            await using (var identity = File.Create(Path.Combine(root, "geometry", "batch_000_identity.bin")))
+            {
+                var vertexWriter = new BinaryWriter(geometry, Encoding.UTF8, leaveOpen: true);
+                var identityWriter = new BinaryWriter(identity, Encoding.UTF8, leaveOpen: true);
+                foreach (var source in corners)
+                {
+                    var record = new float[23];
+                    record[0] = source * 0.25f;
+                    record[5] = 1.0f;
+                    foreach (var value in record) vertexWriter.Write(value);
+                    identityWriter.Write(0);
+                    identityWriter.Write(source);
+                }
+                vertexWriter.Flush();
+                identityWriter.Flush();
+            }
+
+            // root -> spine -> {arm_l, arm_r}, and a leg hanging off the root that nothing binds to.
+            string[] boneNames = ["root", "spine", "arm_l", "arm_r", "leg"];
+            int[] boneParents = [-1, 0, 1, 1, 0];
+            await using (var skeleton = File.Create(Path.Combine(root, "geometry", "skeleton.bin")))
+            {
+                var writer = new BinaryWriter(skeleton, Encoding.UTF8, leaveOpen: true);
+                for (var bone = 0; bone < boneNames.Length; bone++)
+                {
+                    writer.Write(boneParents[bone]);
+                    for (var element = 0; element < 16; element++) writer.Write(element % 5 == 0 ? 1.0f : 0.0f);
+                    for (var element = 0; element < 16; element++) writer.Write(element % 5 == 0 ? 1.0f : 0.0f);
+                    writer.Write(1.0f); writer.Write(1.0f); writer.Write(1.0f);
+                    writer.Write(0.0f); writer.Write(0.0f); writer.Write(0.0f); writer.Write(1.0f);
+                    writer.Write(bone * 0.5f); writer.Write(0.0f); writer.Write(0.0f);
+                }
+                writer.Flush();
+            }
+
+            // Six influences per source vertex. Vertex 1 names arm_l twice and vertex 4 names both
+            // arms three times each: the source does split one bone's share across entries, and a
+            // consumer that assigns rather than accumulates loses all but the last unless they are
+            // summed here.
+            var influences = new (int Bone, int Weight)[][]
+            {
+                [(2, 255)],
+                [(2, 200), (2, 55)],
+                [(3, 128), (2, 127)],
+                [(3, 255)],
+                [(2, 100), (3, 80), (2, 40), (3, 20), (2, 10), (3, 5)],
+            };
+            await using (var skin = File.Create(Path.Combine(root, "geometry", "batch_000_skin.bin")))
+            {
+                var writer = new BinaryWriter(skin, Encoding.UTF8, leaveOpen: true);
+                foreach (var vertex in influences)
+                {
+                    for (var slot = 0; slot < 6; slot++)
+                    {
+                        writer.Write(slot < vertex.Length ? (ushort)vertex[slot].Bone : ushort.MaxValue);
+                    }
+                    for (var slot = 0; slot < 6; slot++)
+                    {
+                        writer.Write(slot < vertex.Length ? (byte)vertex[slot].Weight : (byte)0);
+                    }
+                }
+                writer.Flush();
+            }
+
+            object BuildManifest(string status) => new
+            {
+                schema_version = 8,
+                batches = new[]
+                {
+                    new
+                    {
+                        index = 0,
+                        material_name = "cloth",
+                        vertex_file = "geometry/batch_000.bin",
+                        vertex_count = corners.Length,
+                        skin_file = "geometry/batch_000_skin.bin",
+                        skin_vertex_count = sourceVertexCount,
+                        editor_identity = new { identity_file = "geometry/batch_000_identity.bin" },
+                    },
+                },
+                skeleton = new
+                {
+                    status,
+                    source_path = "character/model/1_pc/2_phw/phw_01.pab",
+                    bone_file = "geometry/skeleton.bin",
+                    bone_names = boneNames,
+                },
+            };
+
+            var manifestPath = Path.Combine(root, "manifest.json");
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(BuildManifest("rigged")), Encoding.UTF8)
+                .ConfigureAwait(false);
+
+            var exporter = new NativeModelExportService(new NativeModelPreviewService());
+            var riggedPath = Path.Combine(root, "rigged.glb");
+            await exporter.ExportPackageAsync(
+                root, "character/model/body.pac", ExportKind.Glb, riggedPath,
+                overwrite: false, null, null, CancellationToken.None).ConfigureAwait(false);
+
+            var rigged = await File.ReadAllBytesAsync(riggedPath).ConfigureAwait(false);
+            var jsonLength = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(rigged.AsSpan(12, 4)));
+            using (var document = JsonDocument.Parse(rigged.AsMemory(20, jsonLength)))
+            {
+                var glb = document.RootElement;
+                var binaryStart = 20 + jsonLength + 8;
+                Require(glb.TryGetProperty("skins", out var skins) && skins.GetArrayLength() == 1, "the rigged GLB carries no skin");
+                var joints = skins[0].GetProperty("joints").EnumerateArray().Select(static value => value.GetInt32()).ToArray();
+                var nodes = glb.GetProperty("nodes");
+                var jointNames = joints.Select(node => nodes[node].GetProperty("name").GetString()).ToArray();
+                // arm_l and arm_r are bound; spine and root come with them; nothing binds leg.
+                Require(
+                    jointNames.SequenceEqual(["root", "spine", "arm_l", "arm_r"], StringComparer.Ordinal),
+                    $"the armature is not the bound bones plus their ancestors: {string.Join(",", jointNames)}");
+
+                Require(
+                    nodes[joints[1]].GetProperty("children").EnumerateArray()
+                        .Select(static value => value.GetInt32()).OrderBy(static value => value)
+                        .SequenceEqual([joints[2], joints[3]]),
+                    "the exported bone hierarchy does not reproduce the skeleton's own parents");
+                Require(
+                    nodes[joints[2]].GetProperty("translation")[0].GetSingle() == 1.0f
+                    && nodes[joints[2]].GetProperty("rotation")[3].GetSingle() == 1.0f,
+                    "a bone node does not carry the transform the skeleton stated");
+                Require(
+                    glb.GetProperty("scenes")[0].GetProperty("nodes").EnumerateArray()
+                        .Select(static value => value.GetInt32()).Contains(joints[0]),
+                    "the armature root does not hang from the scene");
+
+                var inverseBind = glb.GetProperty("accessors")[skins[0].GetProperty("inverseBindMatrices").GetInt32()];
+                Require(
+                    inverseBind.GetProperty("type").GetString() == "MAT4"
+                    && inverseBind.GetProperty("count").GetInt32() == joints.Length,
+                    "the skin's inverse bind matrices do not cover its joints");
+
+                var attributes = glb.GetProperty("meshes")[0].GetProperty("primitives")[0].GetProperty("attributes");
+                Require(
+                    attributes.TryGetProperty("JOINTS_1", out _) && attributes.TryGetProperty("WEIGHTS_1", out _),
+                    "the export dropped the fifth and sixth influences a glTF attribute set cannot hold");
+                foreach (var name in new[] { "JOINTS_0", "JOINTS_1", "WEIGHTS_0", "WEIGHTS_1" })
+                {
+                    Require(
+                        glb.GetProperty("accessors")[attributes.GetProperty(name).GetInt32()]
+                            .GetProperty("type").GetString() == "VEC4",
+                        $"{name} is not the four-component attribute glTF requires");
+                }
+
+                var boneJoints = ReadGlbUInt16Accessor(glb, rigged, binaryStart, attributes.GetProperty("JOINTS_0").GetInt32())
+                    .Concat(ReadGlbUInt16Accessor(glb, rigged, binaryStart, attributes.GetProperty("JOINTS_1").GetInt32()))
+                    .ToArray();
+                var boneWeights = ReadGlbSingleAccessor(glb, rigged, binaryStart, attributes.GetProperty("WEIGHTS_0").GetInt32())
+                    .Concat(ReadGlbSingleAccessor(glb, rigged, binaryStart, attributes.GetProperty("WEIGHTS_1").GetInt32()))
+                    .ToArray();
+                for (var vertex = 0; vertex < sourceVertexCount; vertex++)
+                {
+                    var lanes = Enumerable.Range(0, 8)
+                        .Select(lane => (
+                            Joint: boneJoints[(lane < 4 ? 0 : sourceVertexCount * 4) + (vertex * 4) + (lane % 4)],
+                            Weight: boneWeights[(lane < 4 ? 0 : sourceVertexCount * 4) + (vertex * 4) + (lane % 4)]))
+                        .Where(static lane => lane.Weight > 0.0f)
+                        .ToArray();
+                    Require(
+                        Math.Abs(lanes.Sum(static lane => lane.Weight) - 1.0f) < 1.0e-5f,
+                        $"vertex {vertex} has weights that do not sum to 1.0");
+                    Require(
+                        lanes.Select(static lane => lane.Joint).Distinct().Count() == lanes.Length,
+                        $"vertex {vertex} names the same joint twice instead of summing its share");
+                    // Written in source order: vertex 0 is the source's vertex 0, bound to arm_l,
+                    // even though the triangles reach vertex 3 first.
+                    var expected = influences[vertex]
+                        .GroupBy(static influence => influence.Bone)
+                        .ToDictionary(
+                            static group => Array.IndexOf(new[] { 0, 1, 2, 3 }, group.Key),
+                            static group => group.Sum(static influence => influence.Weight) / 255.0f);
+                    Require(
+                        lanes.Length == expected.Count
+                        && lanes.All(lane => expected.TryGetValue(lane.Joint, out var weight)
+                            && Math.Abs(lane.Weight - weight) < 1.0e-5f),
+                        $"vertex {vertex} is bound to the wrong joints or shares: "
+                        + string.Join(",", lanes.Select(static lane => $"{lane.Joint}={lane.Weight:F3}")));
+                }
+            }
+
+            // The same package read as a rigidly bound mesh. Those carry no bone hash at all, so
+            // there is nothing to resolve and nothing has gone wrong; the export is the unrigged
+            // one it has always been.
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(BuildManifest("rigid")), Encoding.UTF8)
+                .ConfigureAwait(false);
+            var rigidPath = Path.Combine(root, "rigid.glb");
+            await exporter.ExportPackageAsync(
+                root, "character/model/body.pac", ExportKind.Glb, rigidPath,
+                overwrite: false, null, null, CancellationToken.None).ConfigureAwait(false);
+            var rigid = await File.ReadAllBytesAsync(rigidPath).ConfigureAwait(false);
+            var rigidJsonLength = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(rigid.AsSpan(12, 4)));
+            using (var document = JsonDocument.Parse(rigid.AsMemory(20, rigidJsonLength)))
+            {
+                var glb = document.RootElement;
+                Require(!glb.TryGetProperty("skins", out _), "a rigidly bound mesh was exported with a skin");
+                Require(glb.GetProperty("nodes").GetArrayLength() == 1, "a rigidly bound mesh was exported with bone nodes");
+                Require(
+                    !glb.GetProperty("asset").GetProperty("extras").TryGetProperty("skeleton_status", out _),
+                    "an unrigged export no longer writes the file it wrote before");
+                Require(
+                    !glb.GetProperty("meshes")[0].GetProperty("primitives")[0]
+                        .GetProperty("attributes").TryGetProperty("JOINTS_0", out _),
+                    "a rigidly bound mesh was exported with joint attributes");
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static ushort[] ReadGlbUInt16Accessor(JsonElement glb, byte[] payload, int binaryStart, int accessorIndex)
+    {
+        var accessor = glb.GetProperty("accessors")[accessorIndex];
+        var view = glb.GetProperty("bufferViews")[accessor.GetProperty("bufferView").GetInt32()];
+        var offset = binaryStart + view.GetProperty("byteOffset").GetInt32();
+        var count = accessor.GetProperty("count").GetInt32() * 4;
+        return Enumerable.Range(0, count)
+            .Select(index => BinaryPrimitives.ReadUInt16LittleEndian(
+                payload.AsSpan(offset + (index * sizeof(ushort)), sizeof(ushort))))
+            .ToArray();
+    }
+
+    private static float[] ReadGlbSingleAccessor(JsonElement glb, byte[] payload, int binaryStart, int accessorIndex)
+    {
+        var accessor = glb.GetProperty("accessors")[accessorIndex];
+        var view = glb.GetProperty("bufferViews")[accessor.GetProperty("bufferView").GetInt32()];
+        var offset = binaryStart + view.GetProperty("byteOffset").GetInt32();
+        var count = accessor.GetProperty("count").GetInt32() * 4;
+        return Enumerable.Range(0, count)
+            .Select(index => BinaryPrimitives.ReadSingleLittleEndian(
+                payload.AsSpan(offset + (index * sizeof(float)), sizeof(float))))
+            .ToArray();
+    }
+
     private static async Task TestMeshExportSourceVertexParityAsync()
     {
         var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-mesh-parity-{Guid.NewGuid():N}");
@@ -3967,7 +4225,7 @@ internal static class ArchiveLiteTestRunner
         {
             var root = cacheManifest.RootElement;
             Require(
-                root.GetProperty("version").GetString() == "archive_lite_native_model_v16_lazy_prefab",
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v18_skinned",
                 "the default texture-free preview changed its established cache version");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
@@ -4180,8 +4438,8 @@ internal static class ArchiveLiteTestRunner
         Require(
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v16_lazy_prefab\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v17_textured_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v18_skinned\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v19_textured_skinned\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");

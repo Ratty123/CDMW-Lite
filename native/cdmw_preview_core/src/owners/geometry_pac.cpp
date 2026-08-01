@@ -51,6 +51,35 @@ struct PacVertexLayout {
     int normal_offset = 16;
 };
 
+// Whether this layout leaves the skin field where the format puts it. Bytes 20 to 33 hold the
+// influences, so a layout that reads its texture coordinate or its normal out of those bytes is
+// describing a different record and has no skin to offer -- decoding one anyway would invent a
+// binding out of UV halves.
+static bool pac_layout_carries_skin(const PacVertexLayout& layout) {
+    if (layout.stride < kPacSkinRecordEnd) return false;
+    const auto overlaps = [](int offset, int size) {
+        return offset >= 0 && offset < kPacSkinRecordEnd && offset + size > kPacSkinSlotOffset;
+    };
+    return !overlaps(layout.uv_offset, 4) && !overlaps(layout.normal_offset, 4);
+}
+
+static NativeSkinInfluence decode_pac_skin(const std::vector<char>& data, size_t rec_off) {
+    NativeSkinInfluence skin;
+    const std::uint32_t groups[2] = {
+        read_u32(data, rec_off + kPacSkinSlotOffset),
+        read_u32(data, rec_off + kPacSkinSlotOffset + 4),
+    };
+    for (int influence = 0; influence < kPacSkinInfluences; ++influence) {
+        const std::uint32_t group = groups[influence / 3];
+        const int shift = (influence % 3) * 10;
+        skin.slots[static_cast<size_t>(influence)] =
+            static_cast<std::uint16_t>((group >> shift) & kPacSkinSlotMask);
+        skin.weights[static_cast<size_t>(influence)] =
+            static_cast<std::uint8_t>(data[rec_off + kPacSkinWeightOffset + influence]);
+    }
+    return skin;
+}
+
 static float triangle_area_estimate(const Vec3& a, const Vec3& b, const Vec3& c) {
     const Vec3 ab = vec_sub(b, a);
     const Vec3 ac = vec_sub(c, a);
@@ -295,6 +324,8 @@ static NativeSubmesh decode_pac_submesh_vertices(
     mesh.export_positions.reserve(vertex_count);
     mesh.export_normals.reserve(vertex_count);
     mesh.export_uvs.reserve(vertex_count);
+    const bool decode_skin = pac_layout_carries_skin(layout);
+    if (decode_skin) mesh.export_skin.reserve(vertex_count);
     for (std::uint32_t vi = 0; vi < vertex_count; ++vi) {
         const size_t rec_off = static_cast<size_t>(geom_sec.offset) + static_cast<size_t>(vertex_start) + static_cast<size_t>(vi) * static_cast<size_t>(layout.stride);
         if (rec_off + static_cast<size_t>(layout.stride) > data.size()) break;
@@ -327,7 +358,11 @@ static NativeSubmesh decode_pac_submesh_vertices(
         });
         mesh.normals.push_back(decode_pac_normal(data, rec_off, layout.normal_offset));
         mesh.export_normals.push_back(decode_pac_normal_exact(data, rec_off, layout.normal_offset));
+        if (decode_skin) mesh.export_skin.push_back(decode_pac_skin(data, rec_off));
     }
+    // A record cut short by the end of the buffer leaves the arrays uneven, and a skin row that
+    // does not pair with a vertex would bind the rig to the wrong points.
+    if (mesh.export_skin.size() != mesh.export_positions.size()) mesh.export_skin.clear();
     for (size_t i = 0; i + 2 < indices.size(); i += 3) {
         const std::uint32_t a = indices[i];
         const std::uint32_t b = indices[i + 1];

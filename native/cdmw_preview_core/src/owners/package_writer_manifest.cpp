@@ -59,6 +59,32 @@ static std::string exact_float_json(float value) {
     return out.str();
 }
 
+// The rig belongs to the package, not to any one batch: every batch of a character binds to the
+// same skeleton, and repeating 448 bones per batch would say the same thing several times over
+// and invite the copies to disagree. The per-batch skin rows point into this one table.
+//
+// `status` is published whether or not a rig was found, because "this mesh is rigidly bound and
+// names no bone" is an answer, not a failure, and a reader that cannot tell it from "the palette
+// would not resolve" cannot report either honestly.
+static std::string package_skeleton_json(const PackageWriteState& state) {
+    const NativePackageSkeleton& skeleton = state.package.skeleton;
+    std::ostringstream out;
+    out << "\"skeleton\":{"
+        << "\"status\":\"" << json_escape(skeleton.status) << "\","
+        << "\"source_path\":\"" << json_escape(skeleton.source_path) << "\","
+        << "\"note\":\"" << json_escape(skeleton.note) << "\","
+        << "\"bone_count\":" << skeleton.bones.size() << ","
+        << "\"palette_size\":" << skeleton.palette.size() << ","
+        << "\"bone_file\":\"" << json_escape(state.skeleton_file) << "\","
+        << "\"bone_names\":[";
+    for (size_t index = 0; index < skeleton.bones.size(); ++index) {
+        if (index) out << ",";
+        out << "\"" << json_escape(skeleton.bones[index].name) << "\"";
+    }
+    out << "]}";
+    return out.str();
+}
+
 static std::string package_manifest_json(const PackageWriteState& state) {
     const std::string format = state.job.extension.size() > 1 && state.job.extension.front() == '.'
         ? state.job.extension.substr(1) : state.job.extension;
@@ -118,6 +144,7 @@ static std::string package_manifest_json(const PackageWriteState& state) {
         << "\"high_quality_textures\":" << (state.job.high_quality_textures ? "true" : "false") << ","
         << "\"native_preview_core\":{\"runtime_backend\":\"native_cpp\",\"package_builder\":\"cdmw_preview_core_cpp\",\"renderer_contract\":\"d3d11_native_package\",\"python_fallback_allowed\":false,\"mesh_parse\":\"" << json_escape(state.package.mesh_parse) << "\",\"material_index\":\"" << json_escape(state.package.material_index) << "\",\"material_graph_status\":\"" << json_escape(state.package.material_graph_status) << "\",\"material_graph_version\":" << kNativeMaterialGraphVersion << ",\"material_graph_cache_hit\":" << (state.package.material_graph_cache_hit ? "true" : "false") << ",\"material_graph_cache_path\":\"" << json_escape(state.package.material_graph_cache_path) << "\",\"texture_resolution\":\"" << json_escape(state.package.texture_resolution) << "\",\"material_output_quality\":\"" << json_escape(state.package.material_output_quality) << "\",\"material_semantics_version\":" << kNativeMaterialSemanticsVersion << ",\"material_quality_safe\":" << (state.package.material_quality_safe ? "true" : "false") << ",\"base_missing_count\":" << state.package.base_missing_count << ",\"base_low_res_count\":" << state.package.base_low_res_count << ",\"base_low_confidence_count\":" << state.package.base_low_confidence_count << ",\"base_technical_count\":" << state.package.base_technical_count << ",\"asset_family_reference_count\":" << state.package.asset_family_reference_count << ",\"visible_texture_mode\":\"" << json_escape(state.job.visible_texture_mode) << "\",\"lod_count\":" << state.package.lod_count << "},"
         << native_asset_family_json(state.package, state.job) << ","
+        << package_skeleton_json(state) << ","
         << "\"material_slots\":[" << state.material_slots_json.str() << "],"
         << "\"selection_decisions\":[" << state.selection_decisions_json.str() << "],"
         << "\"rejected_candidates\":[";

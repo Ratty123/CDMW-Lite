@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text.Json;
 
 namespace Cdmw.ArchiveLite.Core;
@@ -5,12 +6,21 @@ namespace Cdmw.ArchiveLite.Core;
 internal sealed record NativePreviewMeshPackage(
     IReadOnlyList<NativePreviewMeshBatch> Batches,
     int TotalVertices,
-    NativePreviewNormalization Normalization)
+    NativePreviewNormalization Normalization,
+    NativePreviewSkeleton Skeleton)
 {
     private const int MaximumVertices = 8_000_000;
 
     /// <summary>Position, normal and texture coordinate, as doubles.</summary>
     internal const int ExportBytesPerVertex = 8 * sizeof(double);
+
+    /// <summary>Six skin influences per vertex: a u16 bone index each, then a u8 weight each.</summary>
+    internal const int SkinInfluencesPerVertex = 6;
+
+    internal const int SkinBytesPerVertex = SkinInfluencesPerVertex * (sizeof(ushort) + sizeof(byte));
+
+    /// <summary>The bone index a skin row uses for an influence the source record does not fill.</summary>
+    internal const ushort UnusedSkinBone = ushort.MaxValue;
 
     public static async Task<NativePreviewMeshPackage> ReadAsync(
         string packageRoot,
@@ -60,6 +70,7 @@ internal sealed record NativePreviewMeshPackage(
                 throw new InvalidDataException($"Native preview batch {index} has an invalid geometry length.");
             }
             var exportVertexCount = ReadInt(element, "export_vertex_count", 0);
+            var skinVertexCount = ReadInt(element, "skin_vertex_count", 0);
             batches.Add(new NativePreviewMeshBatch(
                 index,
                 vertexCount,
@@ -67,6 +78,8 @@ internal sealed record NativePreviewMeshPackage(
                 ResolveIdentityFile(root, element, vertexCount),
                 ResolveExportGeometryFile(root, element, exportVertexCount),
                 exportVertexCount,
+                ResolveFixedStrideFile(root, ReadString(element, "skin_file"), skinVertexCount, SkinBytesPerVertex),
+                skinVertexCount,
                 ReadBool(element, "export_has_texture_coordinates", true),
                 ReadString(element, "material_name"),
                 FirstNonEmpty(ReadString(element, "submesh_name"), submeshNames.GetValueOrDefault(index, string.Empty)),
@@ -82,7 +95,30 @@ internal sealed record NativePreviewMeshPackage(
         return new NativePreviewMeshPackage(
             batches,
             totalVertices,
-            NativePreviewNormalization.Read(manifest.RootElement));
+            NativePreviewNormalization.Read(manifest.RootElement),
+            await NativePreviewSkeleton.ReadAsync(root, manifest.RootElement, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>The package file named by <paramref name="relative"/>, if it is the length it claims.</summary>
+    internal static string? ResolveFixedStrideFile(
+        string packageRoot,
+        string relative,
+        int recordCount,
+        int bytesPerRecord)
+    {
+        if (string.IsNullOrWhiteSpace(relative) || recordCount <= 0)
+        {
+            return null;
+        }
+        try
+        {
+            var path = ResolveContainedFile(packageRoot, relative);
+            return new FileInfo(path).Length == checked((long)recordCount * bytesPerRecord) ? path : null;
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
     }
 
     private static string FirstNonEmpty(string first, string second) =>
@@ -106,25 +142,12 @@ internal sealed record NativePreviewMeshPackage(
     /// double and never frames them, so anything exported from the render blob differs from Full's
     /// in the eighth digit of every coordinate. This is the same decode, at the same width.
     /// </remarks>
-    private static string? ResolveExportGeometryFile(string packageRoot, JsonElement element, int vertexCount)
-    {
-        var relative = ReadString(element, "export_vertex_file");
-        if (string.IsNullOrWhiteSpace(relative) || vertexCount <= 0)
-        {
-            return null;
-        }
-        try
-        {
-            var path = ResolveContainedFile(packageRoot, relative);
-            return new FileInfo(path).Length == checked((long)vertexCount * ExportBytesPerVertex)
-                ? path
-                : null;
-        }
-        catch (InvalidDataException)
-        {
-            return null;
-        }
-    }
+    private static string? ResolveExportGeometryFile(string packageRoot, JsonElement element, int vertexCount) =>
+        ResolveFixedStrideFile(
+            packageRoot,
+            ReadString(element, "export_vertex_file"),
+            vertexCount,
+            ExportBytesPerVertex);
 
     /// <summary>
     /// The name the source gave each submesh, keyed by batch index.
@@ -193,7 +216,7 @@ internal sealed record NativePreviewMeshPackage(
         }
     }
 
-    private static string ResolveContainedFile(string packageRoot, string relativePath)
+    internal static string ResolveContainedFile(string packageRoot, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
         {
@@ -313,6 +336,8 @@ internal sealed record NativePreviewMeshBatch(
     string? IdentityPath,
     string? ExportGeometryPath,
     int ExportVertexCount,
+    string? SkinPath,
+    int SkinVertexCount,
     bool HasTextureCoordinates,
     string MaterialName,
     string SubmeshName,
@@ -320,3 +345,142 @@ internal sealed record NativePreviewMeshBatch(
     float[] BaseColor,
     float Metalness,
     float Roughness);
+
+/// <summary>
+/// The rig a package's meshes are bound to, and the reading of the source that produced it.
+/// </summary>
+/// <remarks>
+/// <para><see cref="Status"/> is the answer, not a success flag. A character body is
+/// <c>rigged</c>: one to six influences per vertex, and a palette in the file that resolves against
+/// a <c>.pab</c> skeleton. A prop, accessory or vehicle is <c>rigid</c>: every vertex is a single
+/// influence at full weight, every slot is zero, and the file carries no bone hash anywhere,
+/// because the bone a rigidly bound mesh follows is recorded outside the mesh. That is not a
+/// failure to be retried or reported as one; it exports unrigged, as it always has.</para>
+/// <para>Bones are in the skeleton's own order, so a parent index refers to this list.</para>
+/// </remarks>
+internal sealed record NativePreviewSkeleton(
+    string Status,
+    string SourcePath,
+    IReadOnlyList<NativePreviewBone> Bones)
+{
+    /// <summary>Parent, bind matrix, inverse bind matrix, scale, rotation, position.</summary>
+    private const int BytesPerBone = sizeof(int) + (16 * sizeof(float) * 2) + (10 * sizeof(float));
+
+    private const int MaximumBones = 4096;
+
+    public static NativePreviewSkeleton None { get; } = new("not_skinned", string.Empty, []);
+
+    /// <summary>Whether the package resolved a rig that meshes can actually be bound to.</summary>
+    public bool IsRigged => Status == "rigged" && Bones.Count > 0;
+
+    /// <remarks>
+    /// A rig that cannot be read costs the export its armature and nothing else. The mesh, its
+    /// materials and its vertex order do not depend on the skeleton, and an OBJ or FBX never asks
+    /// for it at all, so a bone table that is missing, the wrong length, or unreadable degrades to
+    /// no rig rather than failing an export that would otherwise have succeeded.
+    /// </remarks>
+    public static async Task<NativePreviewSkeleton> ReadAsync(
+        string packageRoot,
+        JsonElement manifest,
+        CancellationToken cancellationToken)
+    {
+        if (!manifest.TryGetProperty("skeleton", out var element) || element.ValueKind != JsonValueKind.Object)
+        {
+            // A package built before the manifest carried a rig simply has none to offer.
+            return None;
+        }
+        var status = ReadText(element, "status", "not_skinned");
+        var sourcePath = ReadText(element, "source_path", string.Empty);
+        var unrigged = new NativePreviewSkeleton(status, sourcePath, []);
+        var names = ReadNames(element);
+        var boneFile = ReadText(element, "bone_file", string.Empty);
+        if (status != "rigged" || names.Count == 0 || names.Count > MaximumBones || boneFile.Length == 0)
+        {
+            return unrigged;
+        }
+        var path = NativePreviewMeshPackage.ResolveFixedStrideFile(packageRoot, boneFile, names.Count, BytesPerBone);
+        if (path is null)
+        {
+            return unrigged;
+        }
+        var payload = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+        var bones = new List<NativePreviewBone>(names.Count);
+        for (var index = 0; index < names.Count; index++)
+        {
+            var offset = index * BytesPerBone;
+            var parent = BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(offset, sizeof(int)));
+            // The bind matrix is stored ahead of its inverse and is not read back: glTF wants the
+            // inverse for the skin and the local transform for the node, and the bind matrix is
+            // what those two reproduce between them.
+            var inverseBind = ReadFloats(payload, offset + sizeof(int) + (16 * sizeof(float)), 16);
+            var scale = ReadFloats(payload, offset + sizeof(int) + (32 * sizeof(float)), 3);
+            var rotation = ReadFloats(payload, offset + sizeof(int) + (35 * sizeof(float)), 4);
+            var translation = ReadFloats(payload, offset + sizeof(int) + (39 * sizeof(float)), 3);
+            if (parent < -1
+                || parent >= names.Count
+                || inverseBind is null
+                || scale is null
+                || rotation is null
+                || translation is null)
+            {
+                return unrigged;
+            }
+            bones.Add(new NativePreviewBone(names[index], parent, inverseBind, scale, rotation, translation));
+        }
+        return new NativePreviewSkeleton(status, sourcePath, bones);
+    }
+
+    /// <summary>Reads <paramref name="count"/> finite floats, or null if any is not.</summary>
+    private static float[]? ReadFloats(byte[] payload, int offset, int count)
+    {
+        var values = new float[count];
+        for (var index = 0; index < count; index++)
+        {
+            values[index] = BinaryPrimitives.ReadSingleLittleEndian(
+                payload.AsSpan(offset + (index * sizeof(float)), sizeof(float)));
+            if (!float.IsFinite(values[index]))
+            {
+                return null;
+            }
+        }
+        return values;
+    }
+
+    private static List<string> ReadNames(JsonElement element)
+    {
+        var names = new List<string>();
+        if (!element.TryGetProperty("bone_names", out var array) || array.ValueKind != JsonValueKind.Array)
+        {
+            return names;
+        }
+        foreach (var name in array.EnumerateArray())
+        {
+            names.Add(name.ValueKind == JsonValueKind.String ? name.GetString() ?? string.Empty : string.Empty);
+        }
+        return names;
+    }
+
+    private static string ReadText(JsonElement element, string name, string fallback)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? fallback
+            : fallback;
+    }
+}
+
+/// <summary>
+/// One bone: where it sits relative to its parent, and what undoes the bind pose.
+/// </summary>
+/// <remarks>
+/// The transform is the bone's own, relative to <see cref="ParentIndex"/>; chaining it up the
+/// hierarchy reproduces the bind matrix the file also stores, to within 3.4e-6 across a 448-bone
+/// rig. <see cref="InverseBindMatrix"/> is sixteen floats in the order the source holds them,
+/// which is already the order glTF wants: the translation sits at elements 12, 13 and 14.
+/// </remarks>
+internal sealed record NativePreviewBone(
+    string Name,
+    int ParentIndex,
+    float[] InverseBindMatrix,
+    float[] Scale,
+    float[] Rotation,
+    float[] Translation);

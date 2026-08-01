@@ -41,6 +41,8 @@ struct PackageWriteState {
     fs::path geometry_dir;
     const PamtIndex* package_index = nullptr;
     NativePackageGeometryStats geometry;
+    // Relative path of the skeleton blob, empty when no rig was resolved.
+    std::string skeleton_file;
     std::ostringstream batches_json;
     std::ostringstream material_slots_json;
     std::ostringstream selection_decisions_json;
@@ -62,6 +64,10 @@ struct PackageBatchState {
     // exactly. A parser that offers none leaves this unwritten and the export falls back.
     fs::path export_path;
     bool has_export_geometry = false;
+    // The rig binding of those same vertices, in that same order. Written only for a mesh whose
+    // records carry one and whose palette resolved against a skeleton.
+    fs::path skin_path;
+    bool has_skin_rows = false;
     std::array<float, 3> color{};
     // True while `color` still holds the per-batch palette hue that distinguishes
     // submeshes in the untextured view. A textured preview must not publish that
@@ -136,7 +142,7 @@ static PackageWriteState start_package_write(
     const fs::path package_dir = job.output_root;
     const fs::path geometry_dir = package_dir / "geometry";
     fs::create_directories(geometry_dir);
-    return PackageWriteState{
+    PackageWriteState state{
         job,
         submeshes,
         bindings,
@@ -146,6 +152,14 @@ static PackageWriteState start_package_write(
         &cached_pamt_index(job.entry.pamt_path),
         inspect_package_geometry(submeshes),
     };
+    if (state.package.skeleton.status == "rigged") {
+        const fs::path skeleton_path = geometry_dir / "skeleton.bin";
+        write_skeleton_blob(skeleton_path, state.package.skeleton.bones);
+        if (fs::exists(skeleton_path)) {
+            state.skeleton_file = skeleton_path.lexically_relative(package_dir).generic_string();
+        }
+    }
+    return state;
 }
 
 static PackageBatchState start_package_batch(PackageWriteState& state, size_t batch_index) {
@@ -157,6 +171,7 @@ static PackageBatchState start_package_batch(PackageWriteState& state, size_t ba
     batch.geometry_path = state.geometry_dir / (batch.stem + ".bin");
     batch.identity_path = state.geometry_dir / (batch.stem + "_identity.bin");
     batch.export_path = state.geometry_dir / (batch.stem + "_export.bin");
+    batch.skin_path = state.geometry_dir / (batch.stem + "_skin.bin");
     batch.color = color_for_batch(static_cast<int>(batch_index));
     write_geometry_blob(
         batch.geometry_path,
@@ -167,6 +182,12 @@ static PackageBatchState start_package_batch(PackageWriteState& state, size_t ba
         batch.color);
     write_export_geometry_blob(batch.export_path, mesh);
     batch.has_export_geometry = fs::exists(batch.export_path);
+    // A prefab component is a different file with a palette of its own, which this one's does not
+    // decode; it exports unrigged rather than bound to the wrong bones.
+    if (state.package.skeleton.status == "rigged" && !mesh.source_prefab_component) {
+        write_skin_rows_blob(batch.skin_path, mesh, state.package.skeleton.palette);
+        batch.has_skin_rows = fs::exists(batch.skin_path);
+    }
     batch.vertex_count = static_cast<int>(mesh.indices.size());
     state.emitted_vertex_count += batch.vertex_count;
     return batch;
