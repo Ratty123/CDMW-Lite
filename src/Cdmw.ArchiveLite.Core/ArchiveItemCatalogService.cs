@@ -62,5 +62,6 @@ public sealed class ArchiveItemCatalogService(
         item.LocalizedNames,
         item.MaterialTags,
         item.VariantCount,
-        item.Evidence);
+        item.Evidence,
+        item.Description);
 }

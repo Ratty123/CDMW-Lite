@@ -346,6 +346,7 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>正在準備持續性的背包圖示快取...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>持續性背包圖示快取已就緒：{0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>模型連結 {0:N0} 個，圖示路徑 {1:N0} 個，變體 {2:N0} 個</value></data>
+  <data name="ItemFinderDescription" xml:space="preserve"><value>描述</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>依據</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>本地化名稱</value></data>
   <data name="ItemFinderMaterials" xml:space="preserve"><value>材質標籤</value></data>

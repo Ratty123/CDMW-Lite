@@ -10,8 +10,8 @@ public sealed class ArchiveItemNameIndexService(
     NativeArchiveCore native,
     ArchiveWorkPriority? workPriority = null)
 {
-    private const int CacheSchemaVersion = 3;
-    private const int NativeCatalogSchemaVersion = 1;
+    private const int CacheSchemaVersion = 4;
+    private const int NativeCatalogSchemaVersion = 2;
     private const int MaximumDiagnosticCharacters = 64 * 1024;
     private static readonly TimeSpan IndexerTimeout = TimeSpan.FromMinutes(3);
     private static readonly JsonSerializerOptions CacheJsonOptions = new()
@@ -63,7 +63,7 @@ public sealed class ArchiveItemNameIndexService(
             if (cached is not null)
             {
                 session.SetCatalogue(cached.NameIndex, cached.ItemCatalog);
-                return Result(session, cached.NameIndex, cached.ItemCatalog, usedCache: true);
+                return Result(session, cached.NameIndex, cached.ItemCatalog, usedCache: true, cached.Warning);
             }
             await WaitForForegroundAsync(yieldToForeground, cancellationToken).ConfigureAwait(false);
 
@@ -112,7 +112,7 @@ public sealed class ArchiveItemNameIndexService(
                 {
                     await publishProgress(new ProgressUpdate(1, 1, "name_publish")).ConfigureAwait(false);
                 }
-                return Result(session, catalogue.NameIndex, catalogue.ItemCatalog, usedCache: false);
+                return Result(session, catalogue.NameIndex, catalogue.ItemCatalog, usedCache: false, catalogue.Warning);
             }
             finally
             {
@@ -134,12 +134,14 @@ public sealed class ArchiveItemNameIndexService(
         ArchiveSession session,
         ArchiveItemNameIndex index,
         ArchiveItemCatalog catalog,
-        bool usedCache) => new(
+        bool usedCache,
+        string? warning = null) => new(
             session.Id,
             Available: true,
             UsedCache: usedCache,
             ExactNameCount: index.ExactNameCount,
             RelatedNameCount: index.RelatedNameCount,
+            Warning: warning,
             ItemCount: catalog.Count);
 
     private async Task<NameIndexSources> WriteEntriesAndFindSourcesAsync(
@@ -222,6 +224,13 @@ public sealed class ArchiveItemNameIndexService(
             {
                 sources.PartPrefabDyeSlotInfo = entry;
             }
+            else if (lowerPath.EndsWith(".pabgh", StringComparison.Ordinal))
+            {
+                // Each table blob ships beside a same-named .pabgh row directory holding one entry
+                // per row. Collected by path here and paired with its blob once the pass is over,
+                // because either half can appear first and several tables share a name suffix.
+                sources.RowDirectories[lowerPath] = entry;
+            }
         }
         if (packageGroup != "0020" || !lowerPath.Contains("localizationstring_", StringComparison.Ordinal))
         {
@@ -249,15 +258,26 @@ public sealed class ArchiveItemNameIndexService(
         {
             ("iteminfo.bin", sources.ItemInfo!),
         };
+        AddRowDirectory("iteminfo.header.bin", sources.ItemInfo);
         if (sources.StringInfo is not null)
         {
             payloads.Add(("stringinfo.bin", sources.StringInfo));
+            AddRowDirectory("stringinfo.header.bin", sources.StringInfo);
         }
         if (sources.PartPrefabDyeSlotInfo is not null)
         {
             payloads.Add(("partprefabdyeslotinfo.bin", sources.PartPrefabDyeSlotInfo));
         }
+
         payloads.AddRange(sources.Localizations.Select(pair => ($"loc_{pair.Key}.bin", pair.Value)));
+
+        void AddRowDirectory(string name, ArchiveEntryDto? blob)
+        {
+            if (sources.RowDirectoryFor(blob) is { } header)
+            {
+                payloads.Add((name, header));
+            }
+        }
 
         for (var index = 0; index < payloads.Count; index++)
         {
@@ -361,7 +381,30 @@ public sealed class ArchiveItemNameIndexService(
         }
         var nameIndex = ArchiveItemNameIndex.FromMappings(exact, related);
         var itemCatalog = ArchiveItemCatalog.FromRecords(ReadItems(root));
-        return new CatalogueBuildState(nameIndex, itemCatalog);
+        return new CatalogueBuildState(nameIndex, itemCatalog, ReadRowSourceWarning(root));
+    }
+
+    /// <summary>
+    /// The indexer reads item records out of the .pabgh row directory. If an archive does not carry
+    /// one it falls back to scanning for a byte pattern that only a minority of records present, so
+    /// the degraded run says so instead of silently publishing a short catalog.
+    /// </summary>
+    private static string? ReadRowSourceWarning(JsonElement root)
+    {
+        var itemSource = ReadString(root, "item_row_source");
+        var stringSource = ReadString(root, "string_row_source");
+        var degraded = new List<string>();
+        if (itemSource.Length > 0 && itemSource != "row_directory")
+        {
+            degraded.Add("ItemInfo");
+        }
+        if (stringSource.Length > 0 && stringSource != "row_directory")
+        {
+            degraded.Add("StringInfo");
+        }
+        return degraded.Count == 0
+            ? null
+            : $"No usable row directory was found for {string.Join(" or ", degraded)}, so known in-game names were recovered by pattern scan and many items are missing.";
     }
 
     private static IReadOnlyList<ArchiveItemCatalogRecord> ReadItems(JsonElement root)
@@ -394,7 +437,8 @@ public sealed class ArchiveItemNameIndexService(
                 ReadStrings(row, "model_stems"),
                 ReadStrings(row, "pac_files"),
                 ReadStrings(row, "icon_paths"),
-                ReadStrings(row, "material_tags")));
+                ReadStrings(row, "material_tags"),
+                Description: ReadString(row, "description")));
         }
         return result;
     }
@@ -475,7 +519,8 @@ public sealed class ArchiveItemNameIndexService(
             }
             return new CatalogueBuildState(
                 ArchiveItemNameIndex.FromMappings(payload.ExactNames, payload.RelatedNames),
-                ArchiveItemCatalog.FromRecords(payload.Items));
+                ArchiveItemCatalog.FromRecords(payload.Items),
+                payload.Warning);
         }
         catch (FileNotFoundException)
         {
@@ -502,7 +547,8 @@ public sealed class ArchiveItemNameIndexService(
                     CacheSchemaVersion,
                     catalogue.NameIndex.ExactNames.ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.OrdinalIgnoreCase),
                     catalogue.NameIndex.RelatedNames.ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.OrdinalIgnoreCase),
-                    catalogue.ItemCatalog.Items.ToArray()),
+                    catalogue.ItemCatalog.Items.ToArray(),
+                    catalogue.Warning),
                 CacheJsonOptions,
                 token).ConfigureAwait(false),
             cancellationToken);
@@ -621,15 +667,29 @@ public sealed class ArchiveItemNameIndexService(
         public ArchiveEntryDto? StringInfo { get; set; }
         public ArchiveEntryDto? PartPrefabDyeSlotInfo { get; set; }
         public Dictionary<string, ArchiveEntryDto> Localizations { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, ArchiveEntryDto> RowDirectories { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The .pabgh directory stored beside <paramref name="blob"/>, if the archive has one.</summary>
+        public ArchiveEntryDto? RowDirectoryFor(ArchiveEntryDto? blob)
+        {
+            if (blob is null)
+            {
+                return null;
+            }
+            var header = Path.ChangeExtension(blob.Path.Replace('\\', '/'), ".pabgh").ToLowerInvariant();
+            return RowDirectories.GetValueOrDefault(header);
+        }
     }
 
     private sealed record NameIndexCachePayload(
         int SchemaVersion,
         Dictionary<string, string> ExactNames,
         Dictionary<string, string> RelatedNames,
-        IReadOnlyList<ArchiveItemCatalogRecord> Items);
+        IReadOnlyList<ArchiveItemCatalogRecord> Items,
+        string? Warning = null);
 
     private sealed record CatalogueBuildState(
         ArchiveItemNameIndex NameIndex,
-        ArchiveItemCatalog ItemCatalog);
+        ArchiveItemCatalog ItemCatalog,
+        string? Warning = null);
 }

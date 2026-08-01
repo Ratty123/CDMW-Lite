@@ -221,38 +221,86 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         return bytes;
     }
 
-    public static async Task<SyntheticArchiveFixture> CreateNameIndexAsync()
+    /// <summary>The display name and description carried by the marker-visible synthetic item.</summary>
+    public const string ScannableItemName = "Synthetic Blade";
+
+    public const string ScannableItemDescription = "A blade that exists only inside this fixture.";
+
+    /// <summary>
+    /// The display name and description carried by the item whose scan-marker field does not hold
+    /// the value the shipped scavenger looks for. Only a row-directory read reaches it.
+    /// </summary>
+    public const string DirectoryOnlyItemName = "Directory Only Armor";
+
+    public const string DirectoryOnlyItemDescription = "Readable only when the row directory is present.";
+
+    /// <param name="includeRowDirectory">
+    /// When false the package ships the table blob without its .pabgh companion, which is the shape
+    /// that forces the indexer onto its pattern-scanning fallback.
+    /// </param>
+    public static async Task<SyntheticArchiveFixture> CreateNameIndexAsync(bool includeRowDirectory = true)
     {
-        const uint exactModelHash = 0x1D586E71;
+        const uint exactModelHash = 0x1D586E71;        // cd_test_01_sword
         const uint relatedModelHash = 0xA1B2C3D4;
-        const string localizationId = "12345678";
+        const uint hiddenExactModelHash = 0x8415C4A0;  // cd_marni_laser_ub_0001
+        const uint hiddenRelatedModelHash = 0xB2C3D4E5;
         var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-names-{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         var fixture = new SyntheticArchiveFixture(root);
 
-        var itemInfo = BuildItemInfo(
-            itemId: 1234,
-            internalName: "Item_Marni_Laser_Helm",
-            localizationId,
-            exactModelHash,
-            relatedModelHash);
-        var stringInfo = BuildStringInfo("Icon_Prefab_cd_marni_laser_hel_0001", relatedModelHash);
-        var localization = BuildLocalization(localizationId, "Synthetic Blade");
+        var (itemInfo, itemInfoDirectory) = BuildItemInfoTable(
+        [
+            (1234, BuildItemInfoRow(
+                itemId: 1234,
+                internalName: "Item_Marni_Laser_Helm",
+                localizationId: "12345678",
+                descriptionId: "12345679",
+                exactModelHash,
+                relatedModelHash,
+                scanMarkerField: 1)),
+            (5678, BuildItemInfoRow(
+                itemId: 5678,
+                internalName: "Item_Hidden_Armor",
+                localizationId: "22345678",
+                descriptionId: "22345679",
+                hiddenExactModelHash,
+                hiddenRelatedModelHash,
+                scanMarkerField: 100)),
+        ]);
+        var (stringInfo, stringInfoDirectory) = BuildStringInfoTable(
+        [
+            (relatedModelHash, "Icon_Prefab_cd_marni_laser_hel_0001"),
+            (hiddenRelatedModelHash, "Icon_Prefab_cd_marni_laser_ub_0001"),
+        ]);
+        var localization = BuildLocalization(
+        [
+            ("12345678", ScannableItemName),
+            ("12345679", ScannableItemDescription),
+            ("22345678", DirectoryOnlyItemName),
+            ("22345679", DirectoryOnlyItemDescription),
+        ]);
 
-        await BuildPackageAsync(
-            root,
-            "0008",
-            [
-                ("gamecommon/item/iteminfo.pabgb", itemInfo),
-                ("gamecommon/item/stringinfo.pabgb", stringInfo),
-            ]).ConfigureAwait(false);
+        var tables = new List<(string Path, byte[] Bytes)>
+        {
+            ("gamecommon/item/iteminfo.pabgb", itemInfo),
+            ("gamecommon/item/stringinfo.pabgb", stringInfo),
+        };
+        if (includeRowDirectory)
+        {
+            tables.Add(("gamecommon/item/iteminfo.pabgh", itemInfoDirectory));
+            tables.Add(("gamecommon/item/stringinfo.pabgh", stringInfoDirectory));
+        }
+
+        await BuildPackageAsync(root, "0008", tables).ConfigureAwait(false);
         await BuildPackageAsync(
             root,
             "0009",
             [
                 ("character/model/cd_test_01_sword.pac", new byte[] { 0x50, 0x41, 0x43, 0x00 }),
                 ("character/model/cd_marni_laser_hel_0001_index01.pac", new byte[] { 0x50, 0x41, 0x43, 0x01 }),
+                ("character/model/cd_marni_laser_ub_0001.pac", new byte[] { 0x50, 0x41, 0x43, 0x02 }),
                 ("ui/itemicon/itemicon_prefab_cd_marni_laser_hel_0001_n.dds", BuildDecodableDds()),
+                ("ui/itemicon/itemicon_prefab_cd_marni_laser_ub_0001_n.dds", BuildDecodableDds()),
             ]).ConfigureAwait(false);
         await BuildPackageAsync(
             root,
@@ -440,28 +488,34 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         await File.WriteAllBytesAsync(Path.Combine(packageRoot, "0.pamt"), BuildPamt(entries)).ConfigureAwait(false);
     }
 
-    private static byte[] BuildItemInfo(
+    /// <summary>
+    /// One ItemInfo record, shaped like the shipped table: the row key, a length-prefixed and
+    /// NUL-terminated internal name, then a scalar field, then the 07 70 and 07 71 sub-records
+    /// carrying the display-name and description localization keys.
+    /// </summary>
+    /// <param name="scanMarkerField">
+    /// The scalar that sits between the name and the first sub-record. The shipped scavenger looks
+    /// for the byte run that this field produces when it holds 1, so any other value hides the whole
+    /// record from a scan while leaving it perfectly readable through the row directory.
+    /// </param>
+    private static byte[] BuildItemInfoRow(
         uint itemId,
         string internalName,
         string localizationId,
+        string descriptionId,
         uint exactModelHash,
-        uint relatedModelHash)
+        uint relatedModelHash,
+        uint scanMarkerField)
     {
-        ReadOnlySpan<byte> marker =
-        [
-            0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x07, 0x70, 0x00, 0x00, 0x00,
-        ];
         using var output = new MemoryStream();
         var name = Encoding.ASCII.GetBytes(internalName);
         WriteUInt32(output, itemId);
         WriteUInt32(output, checked((uint)name.Length));
         output.Write(name);
-        output.Write(marker);
-        output.Write(new byte[16]);
-        var localization = Encoding.ASCII.GetBytes(localizationId);
-        WriteUInt32(output, checked((uint)localization.Length));
-        output.Write(localization);
+        output.WriteByte(0);
+        WriteUInt32(output, scanMarkerField);
+        WriteUInt32(output, 0);
+        WriteSubRecord(output, 0x70, itemId, localizationId);
         output.WriteByte(0x0E);
         output.WriteByte(0);
         output.WriteByte(0);
@@ -480,29 +534,75 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         WriteUInt32(output, 1);
         WriteUInt32(output, exactModelHash);
         WriteUInt32(output, relatedModelHash);
+        WriteSubRecord(output, 0x71, itemId, descriptionId);
         output.Write(new byte[32]);
         return output.ToArray();
+
+        static void WriteSubRecord(MemoryStream target, byte tag, uint repeatKey, string value)
+        {
+            target.WriteByte(0x07);
+            target.WriteByte(tag);
+            target.Write(new byte[3]);
+            WriteUInt32(target, repeatKey);
+            var bytes = Encoding.ASCII.GetBytes(value);
+            WriteUInt32(target, checked((uint)bytes.Length));
+            target.Write(bytes);
+            target.WriteByte(0);
+        }
     }
 
-    private static byte[] BuildStringInfo(string value, uint storedHash)
+    /// <summary>
+    /// Packs rows into a blob and the .pabgh row directory that describes it: a row count, then one
+    /// entry per row holding that row's key and its absolute offset into the blob.
+    /// </summary>
+    private static (byte[] Blob, byte[] Directory) BuildItemInfoTable(IReadOnlyList<(uint Key, byte[] Row)> rows)
     {
-        using var output = new MemoryStream();
-        var bytes = Encoding.UTF8.GetBytes(value);
-        WriteUInt32(output, checked((uint)bytes.Length));
-        output.Write(bytes);
-        WriteUInt32(output, storedHash);
-        return output.ToArray();
+        using var blob = new MemoryStream();
+        using var directory = new MemoryStream();
+        WriteUInt16(directory, checked((ushort)rows.Count));
+        foreach (var (key, row) in rows)
+        {
+            WriteUInt32(directory, key);
+            WriteUInt32(directory, checked((uint)blob.Position));
+            blob.Write(row);
+        }
+        return (blob.ToArray(), directory.ToArray());
     }
 
-    private static byte[] BuildLocalization(string id, string value)
+    /// <summary>
+    /// StringInfo rows are {key uint32, five reserved bytes, length-prefixed name}, and the key is
+    /// the hash other tables quote the name by. Returned with the .pabgh directory describing them.
+    /// </summary>
+    private static (byte[] Blob, byte[] Directory) BuildStringInfoTable(IReadOnlyList<(uint Hash, string Value)> rows)
+    {
+        using var blob = new MemoryStream();
+        using var directory = new MemoryStream();
+        WriteUInt16(directory, checked((ushort)rows.Count));
+        foreach (var (hash, value) in rows)
+        {
+            WriteUInt32(directory, hash);
+            WriteUInt32(directory, checked((uint)blob.Position));
+            WriteUInt32(blob, hash);
+            blob.Write(new byte[5]);
+            var bytes = Encoding.UTF8.GetBytes(value);
+            WriteUInt32(blob, checked((uint)bytes.Length));
+            blob.Write(bytes);
+        }
+        return (blob.ToArray(), directory.ToArray());
+    }
+
+    private static byte[] BuildLocalization(IReadOnlyList<(string Id, string Value)> rows)
     {
         using var output = new MemoryStream();
-        var idBytes = Encoding.ASCII.GetBytes(id);
-        var valueBytes = Encoding.UTF8.GetBytes(value);
-        WriteUInt32(output, checked((uint)idBytes.Length));
-        output.Write(idBytes);
-        WriteUInt32(output, checked((uint)valueBytes.Length));
-        output.Write(valueBytes);
+        foreach (var (id, value) in rows)
+        {
+            var idBytes = Encoding.ASCII.GetBytes(id);
+            var valueBytes = Encoding.UTF8.GetBytes(value);
+            WriteUInt32(output, checked((uint)idBytes.Length));
+            output.Write(idBytes);
+            WriteUInt32(output, checked((uint)valueBytes.Length));
+            output.Write(valueBytes);
+        }
         return output.ToArray();
     }
 

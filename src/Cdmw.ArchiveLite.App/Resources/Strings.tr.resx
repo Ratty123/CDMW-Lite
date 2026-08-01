@@ -346,6 +346,7 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Kalıcı envanter simgesi önbelleği hazırlanıyor...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Kalıcı envanter simgesi önbelleği hazır: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>{0:N0} model bağlantısı, {1:N0} simge yolu, {2:N0} varyant</value></data>
+  <data name="ItemFinderDescription" xml:space="preserve"><value>Açıklama</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Kanıt</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Yerelleştirilmiş adlar</value></data>
   <data name="ItemFinderMaterials" xml:space="preserve"><value>Malzeme etiketleri</value></data>

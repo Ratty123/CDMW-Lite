@@ -883,6 +883,9 @@ struct NativeItemRecord {
     int item_id = 0;
     std::string internal_name;
     std::string display_name;
+    std::string description;
+    std::string name_key;
+    std::string description_key;
     std::vector<std::string> localized_names;
     std::vector<std::uint32_t> prefab_hashes;
     std::vector<std::string> model_stems;
@@ -931,6 +934,169 @@ std::string normalize_icon_model_stem(std::string value) {
     return value;
 }
 
+// A .pabgb table ships beside a .pabgh row directory: a little-endian count, then one fixed-width
+// entry per row holding that row's primary key and the row's absolute byte offset into the blob.
+// Row N spans offsets[N]..offsets[N+1] and the last row runs to the end of the blob.
+struct PabgRow {
+    std::vector<unsigned char> key;
+    size_t begin = 0;
+    size_t end = 0;
+};
+
+struct PabgTable {
+    std::vector<PabgRow> rows;
+    size_t count_width = 0;
+    size_t key_width = 0;
+};
+
+std::uint32_t pabg_row_key(const PabgRow& row) {
+    std::uint32_t value = 0;
+    for (size_t index = 0; index < row.key.size() && index < 4; ++index) {
+        value |= static_cast<std::uint32_t>(row.key[index]) << (index * 8);
+    }
+    return value;
+}
+
+// Neither width is declared anywhere in the pair, so both are recovered by search and then checked
+// against the payload the directory claims to describe: offsets start at zero, rise strictly, stay
+// inside the blob, and every row repeats its own key inline at its first byte. A header that fails
+// any of those is not this table's directory, and the caller falls back.
+bool parse_pabg_directory(
+    const std::vector<char>& header,
+    const std::vector<char>& blob,
+    PabgTable& table
+) {
+    if (header.empty() || blob.empty()) return false;
+    for (const size_t count_width : {size_t{1}, size_t{2}, size_t{4}}) {
+        if (header.size() <= count_width) continue;
+        std::uint64_t count = 0;
+        for (size_t index = 0; index < count_width; ++index) {
+            count |= static_cast<std::uint64_t>(static_cast<unsigned char>(header[index])) << (index * 8);
+        }
+        if (count == 0) continue;
+        const size_t remaining = header.size() - count_width;
+        if (remaining % count != 0) continue;
+        const size_t stride = static_cast<size_t>(remaining / count);
+        if (stride <= 4) continue;
+        const size_t key_width = stride - 4;
+        if (key_width != 1 && key_width != 2 && key_width != 4 && key_width != 8 && key_width != 12) continue;
+
+        std::vector<PabgRow> rows;
+        rows.reserve(static_cast<size_t>(count));
+        bool valid = true;
+        std::uint32_t previous = 0;
+        for (std::uint64_t index = 0; index < count; ++index) {
+            const size_t entry = count_width + static_cast<size_t>(index) * stride;
+            const std::uint32_t offset = read_u32(header, entry + key_width);
+            if (index == 0 ? offset != 0 : offset <= previous) { valid = false; break; }
+            if (offset >= blob.size() || blob.size() - offset < key_width) { valid = false; break; }
+            PabgRow row;
+            row.key.assign(
+                reinterpret_cast<const unsigned char*>(header.data()) + entry,
+                reinterpret_cast<const unsigned char*>(header.data()) + entry + key_width);
+            if (!std::equal(
+                    row.key.begin(),
+                    row.key.end(),
+                    reinterpret_cast<const unsigned char*>(blob.data()) + offset)) { valid = false; break; }
+            row.begin = offset;
+            if (!rows.empty()) rows.back().end = offset;
+            rows.push_back(std::move(row));
+            previous = offset;
+        }
+        if (!valid) continue;
+        rows.back().end = blob.size();
+        table.rows = std::move(rows);
+        table.count_width = count_width;
+        table.key_width = key_width;
+        return true;
+    }
+    return false;
+}
+
+// Rows carry inline sub-records. 07 70 00 00 00 introduces the display-name localization key and
+// 07 71 00 00 00 the description key; each is followed by the row's own key repeated and then a
+// length-prefixed string. Requiring the repeat is what separates a real sub-record from the same
+// five bytes occurring inside a neighbouring scalar field.
+std::string pabg_row_tag_string(
+    const std::vector<char>& data,
+    const PabgRow& row,
+    unsigned char tag
+) {
+    const unsigned char needle[] = {0x07, tag, 0x00, 0x00, 0x00};
+    const std::uint32_t key = pabg_row_key(row);
+    const auto begin = data.begin() + static_cast<std::ptrdiff_t>(row.begin);
+    const auto end = data.begin() + static_cast<std::ptrdiff_t>(row.end);
+    for (auto it = begin; it != end;) {
+        auto found = std::search(it, end, std::begin(needle), std::end(needle));
+        if (found == end) break;
+        const size_t at = static_cast<size_t>(std::distance(data.begin(), found));
+        it = found + 1;
+        if (at + sizeof(needle) + 8 > row.end) continue;
+        if (read_u32(data, at + sizeof(needle)) != key) continue;
+        const size_t length_at = at + sizeof(needle) + 4;
+        const std::uint32_t length = read_u32(data, length_at);
+        if (length == 0 || length > 512 || length_at + 4 + length > row.end) continue;
+        return std::string(
+            data.begin() + static_cast<std::ptrdiff_t>(length_at + 4),
+            data.begin() + static_cast<std::ptrdiff_t>(length_at + 4 + length));
+    }
+    return {};
+}
+
+// Rows open with their key, then a length-prefixed, NUL-terminated internal name.
+std::string pabg_row_name(const std::vector<char>& data, const PabgRow& row) {
+    if (row.begin + 8 > row.end) return {};
+    const std::uint32_t length = read_u32(data, row.begin + 4);
+    if (length == 0 || length > 200 || row.begin + 8 + length > row.end) return {};
+    return std::string(
+        data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8),
+        data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8 + length));
+}
+
+void add_stringinfo_icon_hash(
+    std::map<std::uint32_t, std::string>& hashes,
+    const std::string& text,
+    std::uint32_t stored_hash
+) {
+    const std::string lower = lower_copy(text);
+    std::string prefix;
+    for (const char* candidate : {"itemicon_prefab_", "itemicon_", "icon_prefab_", "icon_"}) {
+        if (starts_with(lower, candidate)) {
+            prefix = candidate;
+            break;
+        }
+    }
+    if (prefix.empty()) return;
+    const std::string model_stem = normalize_icon_model_stem(text.substr(prefix.size()));
+    if (!starts_with(model_stem, "cd_")) return;
+    if (stored_hash) hashes[stored_hash] = model_stem;
+    hashes[hashlittle_bytes(text, 0xC5EDE)] = model_stem;
+    hashes[hashlittle_bytes(model_stem, 0xC5EDE)] = model_stem;
+}
+
+// Every row is {key uint32, five reserved bytes, length-prefixed name}, and the key is the little
+// hash of that name, so the directory hands back both halves of the icon mapping exactly.
+std::map<std::uint32_t, std::string> parse_stringinfo_rows(
+    const std::vector<char>& data,
+    const PabgTable& table
+) {
+    std::map<std::uint32_t, std::string> hashes;
+    for (const PabgRow& row : table.rows) {
+        if (row.begin + 13 > row.end) continue;
+        const std::uint32_t length = read_u32(data, row.begin + 9);
+        if (length < 3 || row.begin + 13 + length != row.end) continue;
+        std::string text(
+            data.begin() + static_cast<std::ptrdiff_t>(row.begin + 13),
+            data.begin() + static_cast<std::ptrdiff_t>(row.end));
+        while (!text.empty() && text.back() == '\0') text.pop_back();
+        add_stringinfo_icon_hash(hashes, text, pabg_row_key(row));
+    }
+    return hashes;
+}
+
+// Kept for archives whose StringInfo directory is missing or does not describe its blob. The walk
+// cannot see row boundaries, so the uint32 it reads past a name is the next row's key rather than
+// this one's; the two derived hashes are what actually carry the mapping.
 std::map<std::uint32_t, std::string> parse_stringinfo_hashes(const std::vector<char>& data) {
     std::map<std::uint32_t, std::string> hashes;
     size_t pos = 0;
@@ -939,23 +1105,7 @@ std::map<std::uint32_t, std::string> parse_stringinfo_hashes(const std::vector<c
         if (slen >= 3 && slen <= 180 && pos + 4 + slen + 4 <= data.size()) {
             std::string text(data.begin() + static_cast<std::ptrdiff_t>(pos + 4), data.begin() + static_cast<std::ptrdiff_t>(pos + 4 + slen));
             while (!text.empty() && text.back() == '\0') text.pop_back();
-            const std::string lower = lower_copy(text);
-            std::string prefix;
-            for (const char* candidate : {"itemicon_prefab_", "itemicon_", "icon_prefab_", "icon_"}) {
-                if (starts_with(lower, candidate)) {
-                    prefix = candidate;
-                    break;
-                }
-            }
-            if (!prefix.empty()) {
-                std::string model_stem = normalize_icon_model_stem(text.substr(prefix.size()));
-                if (starts_with(model_stem, "cd_")) {
-                    const std::uint32_t stored_hash = read_u32(data, pos + 4 + slen);
-                    hashes[stored_hash] = model_stem;
-                    hashes[hashlittle_bytes(text, 0xC5EDE)] = model_stem;
-                    hashes[hashlittle_bytes(model_stem, 0xC5EDE)] = model_stem;
-                }
-            }
+            add_stringinfo_icon_hash(hashes, text, read_u32(data, pos + 4 + slen));
             pos += 4 + slen + 8;
             continue;
         }
@@ -1065,6 +1215,128 @@ std::vector<std::string> iteminfo_localization_id_candidates(
     return candidates;
 }
 
+std::string localized_text(
+    const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
+    const std::string& language,
+    const std::string& key
+) {
+    if (key.empty()) return {};
+    auto table = loc_tables.find(language);
+    if (table == loc_tables.end()) return {};
+    auto found = table->second.find(key);
+    return found == table->second.end() ? std::string() : found->second;
+}
+
+// Fills in everything that is read out of the record body rather than its header: the localized
+// name in every shipped language, the bounded prefab-hash lists, and any icon-string hash the
+// record quotes. Both the directory path and the marker fallback share it, so the two differ only
+// in how they decide where a record starts and ends.
+void fill_item_record_body(
+    const std::vector<char>& data,
+    const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
+    const std::map<std::uint32_t, std::string>& icon_hashes,
+    const std::string& loc_id,
+    size_t scan_begin,
+    size_t record_end,
+    size_t icon_scan_begin,
+    size_t icon_scan_end,
+    NativeItemRecord& record
+) {
+    std::set<std::string> seen_names;
+    if (!loc_id.empty()) {
+        for (const auto& table : loc_tables) {
+            auto found = table.second.find(loc_id);
+            if (found != table.second.end() && !found->second.empty()) {
+                const std::string key = lower_copy(found->second);
+                if (!seen_names.count(key)) {
+                    record.localized_names.push_back(found->second);
+                    seen_names.insert(key);
+                }
+            }
+        }
+        record.display_name = localized_text(loc_tables, "eng", loc_id);
+        if (record.display_name.empty() && !record.localized_names.empty()) record.display_name = record.localized_names.front();
+    }
+
+    std::set<std::uint32_t> seen_prefab_hashes;
+    size_t scan = scan_begin;
+    while (scan + 15 < record_end && record.prefab_hashes.size() < 128) {
+        const unsigned char list_marker = static_cast<unsigned char>(data[scan]);
+        if (list_marker != 0x0E && list_marker != 0x0F && list_marker != 0x10) {
+            ++scan;
+            continue;
+        }
+        const std::uint32_t count1 = read_u32(data, scan + 3);
+        const std::uint32_t count2 = read_u32(data, scan + 7);
+        if (!(count1 > 0 && count1 <= 32 && count2 > 0 && count2 <= 32)) {
+            ++scan;
+            continue;
+        }
+        const size_t list_end = scan + 11 + static_cast<size_t>(count2) * 4;
+        if (list_end > record_end) {
+            ++scan;
+            continue;
+        }
+        for (std::uint32_t hash_index = 0; hash_index < count2; ++hash_index) {
+            const std::uint32_t value = read_u32(data, scan + 11 + hash_index * 4);
+            if (value && seen_prefab_hashes.insert(value).second) record.prefab_hashes.push_back(value);
+        }
+        scan = list_end;
+    }
+    if (!icon_hashes.empty()) {
+        for (size_t at = icon_scan_begin; at + 4 <= icon_scan_end; ++at) {
+            const std::uint32_t value = read_u32(data, at);
+            auto found = icon_hashes.find(value);
+            if (
+                found != icon_hashes.end()
+                && item_icon_model_reference_is_compatible(record.internal_name, record.display_name, found->second)
+            ) {
+                add_unique(record.model_stems, found->second);
+            }
+        }
+    }
+}
+
+// The directory gives exact row bounds, so every record is read rather than searched for: the id
+// is the row's own key, the name follows it, and the two localization keys come out of the row's
+// 07 70 and 07 71 sub-records.
+std::vector<NativeItemRecord> parse_iteminfo_rows(
+    const std::vector<char>& data,
+    const PabgTable& table,
+    const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
+    const std::map<std::uint32_t, std::string>& icon_hashes
+) {
+    std::vector<NativeItemRecord> items;
+    items.reserve(table.rows.size());
+    std::set<int> seen_ids;
+    for (const PabgRow& row : table.rows) {
+        const std::uint32_t item_id = pabg_row_key(row);
+        if (item_id == 0 || !seen_ids.insert(static_cast<int>(item_id)).second) continue;
+        NativeItemRecord record;
+        record.item_id = static_cast<int>(item_id);
+        record.internal_name = pabg_row_name(data, row);
+        record.name_key = pabg_row_tag_string(data, row, 0x70);
+        record.description_key = pabg_row_tag_string(data, row, 0x71);
+        fill_item_record_body(
+            data,
+            loc_tables,
+            icon_hashes,
+            record.name_key,
+            row.begin,
+            row.end,
+            row.begin,
+            row.end,
+            record);
+        record.description = localized_text(loc_tables, "eng", record.description_key);
+        items.push_back(std::move(record));
+    }
+    return items;
+}
+
+// Kept for archives whose ItemInfo directory is missing or does not describe its blob. Without row
+// bounds the only handle on a record is a fragment of its first sub-record, which appears only when
+// the scalar field ahead of that sub-record happens to hold one, so this path sees a minority of
+// the table and has to guess where the localization key sits.
 std::vector<NativeItemRecord> parse_iteminfo_bin(
     const std::vector<char>& data,
     const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
@@ -1111,62 +1383,17 @@ std::vector<NativeItemRecord> parse_iteminfo_bin(
         NativeItemRecord record;
         record.item_id = static_cast<int>(item_id);
         record.internal_name = name;
-        std::set<std::string> seen_names;
-        if (!loc_id.empty()) {
-            for (const auto& table : loc_tables) {
-                auto found = table.second.find(loc_id);
-                if (found != table.second.end() && !found->second.empty()) {
-                    const std::string key = lower_copy(found->second);
-                    if (!seen_names.count(key)) {
-                        record.localized_names.push_back(found->second);
-                        seen_names.insert(key);
-                    }
-                }
-            }
-            auto eng_table = loc_tables.find("eng");
-            if (eng_table != loc_tables.end()) {
-                auto found = eng_table->second.find(loc_id);
-                if (found != eng_table->second.end()) record.display_name = found->second;
-            }
-            if (record.display_name.empty() && !record.localized_names.empty()) record.display_name = record.localized_names.front();
-        }
-
-        const size_t search_end = std::min(next_pos, pos + 800);
-        std::set<std::uint32_t> seen_prefab_hashes;
-        size_t scan = pos + sizeof(marker);
-        while (scan + 15 < search_end && record.prefab_hashes.size() < 128) {
-            const unsigned char list_marker = static_cast<unsigned char>(data[scan]);
-            if (list_marker != 0x0E && list_marker != 0x0F && list_marker != 0x10) {
-                ++scan;
-                continue;
-            }
-            const std::uint32_t count1 = read_u32(data, scan + 3);
-            const std::uint32_t count2 = read_u32(data, scan + 7);
-            if (!(count1 > 0 && count1 <= 32 && count2 > 0 && count2 <= 32)) {
-                ++scan;
-                continue;
-            }
-            const size_t list_end = scan + 11 + static_cast<size_t>(count2) * 4;
-            if (list_end > search_end) {
-                ++scan;
-                continue;
-            }
-            for (std::uint32_t hash_index = 0; hash_index < count2; ++hash_index) {
-                const std::uint32_t value = read_u32(data, scan + 11 + hash_index * 4);
-                if (value && seen_prefab_hashes.insert(value).second) record.prefab_hashes.push_back(value);
-            }
-            scan = list_end;
-        }
-        if (!icon_hashes.empty()) {
-            const size_t icon_end = std::min({data.size(), next_pos, pos + 2500});
-            for (size_t scan = pos; scan + 4 <= icon_end; ++scan) {
-                const std::uint32_t value = read_u32(data, scan);
-                auto found = icon_hashes.find(value);
-                if (found != icon_hashes.end() && item_icon_model_reference_is_compatible(name, record.display_name, found->second)) {
-                    add_unique(record.model_stems, found->second);
-                }
-            }
-        }
+        record.name_key = loc_id;
+        fill_item_record_body(
+            data,
+            loc_tables,
+            icon_hashes,
+            loc_id,
+            pos + sizeof(marker),
+            std::min(next_pos, pos + 800),
+            pos,
+            std::min({data.size(), next_pos, pos + 2500}),
+            record);
         items.push_back(std::move(record));
     }
     return items;
@@ -1326,8 +1553,26 @@ int run_item_index_job(
             std::vector<char> data = read_binary_if_exists(work_dir / ("loc_" + lang + ".bin"));
             if (!data.empty()) loc_tables[lang] = parse_localization_bin(data);
         }
-        const auto icon_hashes = parse_stringinfo_hashes(read_binary_if_exists(work_dir / "stringinfo.bin"));
-        auto items = parse_iteminfo_bin(read_binary_if_exists(work_dir / "iteminfo.bin"), loc_tables, icon_hashes);
+        const std::vector<char> stringinfo = read_binary_if_exists(work_dir / "stringinfo.bin");
+        PabgTable stringinfo_table;
+        const bool stringinfo_from_directory = parse_pabg_directory(
+            read_binary_if_exists(work_dir / "stringinfo.header.bin"),
+            stringinfo,
+            stringinfo_table);
+        const auto icon_hashes = stringinfo_from_directory
+            ? parse_stringinfo_rows(stringinfo, stringinfo_table)
+            : parse_stringinfo_hashes(stringinfo);
+
+        const std::vector<char> iteminfo = read_binary_if_exists(work_dir / "iteminfo.bin");
+        PabgTable iteminfo_table;
+        const bool iteminfo_from_directory = parse_pabg_directory(
+            read_binary_if_exists(work_dir / "iteminfo.header.bin"),
+            iteminfo,
+            iteminfo_table);
+        auto items = iteminfo_from_directory
+            ? parse_iteminfo_rows(iteminfo, iteminfo_table, loc_tables, icon_hashes)
+            : parse_iteminfo_bin(iteminfo, loc_tables, icon_hashes);
+        const size_t iteminfo_row_count = iteminfo_from_directory ? iteminfo_table.rows.size() : items.size();
         const auto icon_index = build_icon_path_index(entries);
         const auto material_index = parse_material_index(read_binary_if_exists(work_dir / "partprefabdyeslotinfo.bin"));
         const auto hash_table = build_model_hash_table(entries);
@@ -1401,13 +1646,14 @@ int run_item_index_job(
 
         std::ostringstream out;
         out << "{\"status\":\"ok\",\"backend\":\"" << kBackend << "\",\"protocol\":" << kProtocol
-            << ",\"catalog_schema\":1,\"items\":[";
+            << ",\"catalog_schema\":2,\"items\":[";
         for (size_t i = 0; include_items && i < linked_items.size(); ++i) {
             const auto& item = linked_items[i];
             if (i) out << ",";
             out << "{\"item_id\":" << item.item_id
                 << ",\"internal_name\":\"" << json_escape(item.internal_name)
                 << "\",\"display_name\":\"" << json_escape(item.display_name)
+                << "\",\"description\":\"" << json_escape(item.description)
                 << "\",\"localized_names\":" << json_string_array(item.localized_names)
                 << ",\"prefab_hashes\":" << json_u32_array(item.prefab_hashes)
                 << ",\"model_stems\":" << json_string_array(item.model_stems)
@@ -1428,6 +1674,10 @@ int run_item_index_job(
             << ",\"model_hash_count\":" << hash_table.size()
             << ",\"icon_path_key_count\":" << icon_index.size()
             << ",\"material_key_count\":" << material_index.size()
+            << ",\"item_row_source\":\"" << (iteminfo_from_directory ? "row_directory" : "marker_scan")
+            << "\",\"string_row_source\":\"" << (stringinfo_from_directory ? "row_directory" : "marker_scan")
+            << "\",\"item_row_count\":" << iteminfo_row_count
+            << ",\"item_parsed_count\":" << items.size()
             << "}";
         write_text(report_path, out.str());
         return 0;

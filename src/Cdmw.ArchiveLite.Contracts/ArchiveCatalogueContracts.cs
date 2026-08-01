@@ -95,7 +95,8 @@ public sealed record ItemCatalogRow(
     IReadOnlyList<string> LocalizedNames,
     IReadOnlyList<string> MaterialTags,
     int VariantCount,
-    string Evidence);
+    string Evidence,
+    string Description = "");
 
 public sealed record ItemCatalogCategoryFacet(
     string Category,

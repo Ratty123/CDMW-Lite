@@ -244,6 +244,17 @@
                             </StackPanel>
                         </Grid>
 
+                        <TextBlock Margin="0,16,0,4"
+                                   FontWeight="SemiBold"
+                                   Text="{infra:Loc Key=ItemFinderDescription}"
+                                   Visibility="{Binding HasDescription, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        <TextBox IsReadOnly="True"
+                                 Text="{Binding Description, Mode=OneWay}"
+                                 TextWrapping="Wrap"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 Visibility="{Binding HasDescription, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
                         <TextBlock Margin="0,16,0,4" FontWeight="SemiBold" Text="{infra:Loc Key=ItemFinderEvidence}" />
                         <TextBlock Foreground="{DynamicResource TextMutedBrush}"
                                    Text="{Binding Evidence}"

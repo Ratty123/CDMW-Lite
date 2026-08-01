@@ -57,7 +57,8 @@ internal static class ArchiveLiteTestRunner
             ("renderer warmup package is complete and loadable", TestRendererWarmupPackageAsync),
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
-            ("native item-name discovery handles shifted records and semantic icon links", TestArchiveItemNameDiscoveryAsync),
+            ("native item-name discovery reads every row of the table directory", TestArchiveItemNameDiscoveryAsync),
+            ("an archive with no row directory degrades to a scan and says so", TestArchiveItemNameScanFallbackAsync),
             ("Item Finder shares the Full catalog contract and keeps icon work bounded", TestItemFinderCatalogAsync),
             ("Item Finder debounce, facet refresh, icons, close, and session changes stay latest-wins", TestItemFinderViewModelLifecycleAsync),
             ("DDS file type and terminal-suffix usage classification stay explicit", TestDdsTextureClassificationAsync),
@@ -4330,6 +4331,25 @@ internal static class ArchiveLiteTestRunner
         Require(!result.UsedCache, "the pre-discovery name cache schema was reused instead of rebuilding");
         Require(result.Available && result.ExactNameCount > 0 && result.RelatedNameCount > 0,
             $"synthetic item-name discovery did not publish both mapping kinds: {result.Warning}");
+        Require(
+            result.Warning is null,
+            $"a row-directory build reported a degraded-read warning: {result.Warning}");
+
+        var catalog = await new ArchiveItemCatalogService(sessions, service).SearchAsync(
+            new ItemCatalogSearchRequest(opened.SessionId),
+            CancellationToken.None).ConfigureAwait(false);
+        var scannable = catalog.Items.SingleOrDefault(item => item.ItemId == 1234);
+        var directoryOnly = catalog.Items.SingleOrDefault(item => item.ItemId == 5678);
+        Require(
+            scannable is not null && scannable.DisplayName == SyntheticArchiveFixture.ScannableItemName,
+            "the row directory lost the item the pattern scan can also see");
+        Require(
+            directoryOnly is not null && directoryOnly.DisplayName == SyntheticArchiveFixture.DirectoryOnlyItemName,
+            "the row directory did not recover the item whose record never presents the scan marker");
+        Require(
+            scannable!.Description == SyntheticArchiveFixture.ScannableItemDescription
+            && directoryOnly!.Description == SyntheticArchiveFixture.DirectoryOnlyItemDescription,
+            "exactly sliced rows did not carry their 07 71 description sub-record through to Item Finder");
 
         var session = sessions.GetRequired(opened.SessionId);
         var queries = new ArchiveQueryService(sessions);
@@ -4374,6 +4394,47 @@ internal static class ArchiveLiteTestRunner
             "the merged item-name sort ordered evidence-only rows as if they had no name");
 
         await RequireChunkedIconWarmupAsync(sessions, session, service, native, opened.SessionId).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// An archive with no .pabgh companion still has to produce a catalog, but a degraded one. The
+    /// same two synthetic items are present; only the row directory is withheld. The scavenger can
+    /// see the record whose scan-marker field holds the value it searches for and cannot see the
+    /// other, it has no record boundaries to read a description sub-record from, and the shortfall
+    /// has to reach the caller rather than pass for a complete catalog.
+    /// </summary>
+    private static async Task TestArchiveItemNameScanFallbackAsync()
+    {
+        await using var fixture = await SyntheticArchiveFixture.CreateNameIndexAsync(includeRowDirectory: false)
+            .ConfigureAwait(false);
+        var native = new NativeArchiveCore();
+        using var sessions = new ArchiveSessionManager(native);
+        var opened = await sessions.OpenAsync(
+            new OpenArchiveRequest(fixture.Root, ForceRefresh: true),
+            CancellationToken.None).ConfigureAwait(false);
+        var service = new ArchiveItemNameIndexService(sessions, native);
+        var result = await service.BuildAsync(
+            new BuildNameIndexRequest(opened.SessionId),
+            null,
+            CancellationToken.None).ConfigureAwait(false);
+        Require(result.Available, $"the scan fallback produced no catalog at all: {result.Warning}");
+        Require(
+            result.Warning is not null && result.Warning.Contains("ItemInfo", StringComparison.Ordinal),
+            "a catalog recovered by pattern scan did not say so, so a short catalog would pass for a complete one");
+
+        var catalog = await new ArchiveItemCatalogService(sessions, service).SearchAsync(
+            new ItemCatalogSearchRequest(opened.SessionId),
+            CancellationToken.None).ConfigureAwait(false);
+        var scannable = catalog.Items.SingleOrDefault(item => item.ItemId == 1234);
+        Require(
+            scannable is not null && scannable.DisplayName == SyntheticArchiveFixture.ScannableItemName,
+            "the scan fallback no longer recovers the record that does present its marker");
+        Require(
+            catalog.Items.All(item => item.ItemId != 5678),
+            "the marker-hidden record was recovered without a row directory, so the fixture no longer proves what the directory buys");
+        Require(
+            scannable!.Description.Length == 0,
+            "the scan fallback claimed a description it has no record bounds to read");
     }
 
     /// <summary>
@@ -4567,7 +4628,7 @@ internal static class ArchiveLiteTestRunner
             "Cdmw.ArchiveLite.Worker",
             "WorkerRuntime.cs"));
         Require(
-            acceleratorSource.Contains("\\\"catalog_schema\\\":1", StringComparison.Ordinal)
+            acceleratorSource.Contains("\\\"catalog_schema\\\":2", StringComparison.Ordinal)
             && liteCatalogSource.Contains("item-index-job", StringComparison.Ordinal),
             "Lite does not consume its versioned native item catalog");
         Require(
