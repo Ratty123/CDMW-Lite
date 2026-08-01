@@ -4357,6 +4357,22 @@ internal static class ArchiveLiteTestRunner
             directoryOnly!.LocalizedNames.Contains(SyntheticArchiveFixture.DirectoryOnlyItemName),
             "a string-table key that is not all digits was not resolved");
 
+        // The three scalars recovered from the item record itself: how many stack, which equip type
+        // the row names by EquipTypeInfo key, and the grade byte after the description sub-record.
+        Require(
+            scannable.StackSize == 1 && directoryOnly.StackSize == 100,
+            $"stack size was not read from the item record ({scannable.StackSize}, {directoryOnly.StackSize})");
+        Require(
+            scannable.EquipType == SyntheticArchiveFixture.HelmEquipType
+            && directoryOnly.EquipType == SyntheticArchiveFixture.UpperbodyEquipType,
+            $"the equip-type key was not resolved through EquipTypeInfo ('{scannable.EquipType}', '{directoryOnly.EquipType}')");
+        Require(
+            scannable.Grade == 4 && directoryOnly.Grade == 6,
+            $"grade was not read from the item record ({scannable.Grade}, {directoryOnly.Grade})");
+        Require(
+            catalog.Items.Count(item => item.EquipType == SyntheticArchiveFixture.HelmEquipType) == 1,
+            "the equip type did not reach Item Finder as a searchable, displayable field");
+
         var session = sessions.GetRequired(opened.SessionId);
         var queries = new ArchiveQueryService(sessions);
         async Task<ArchiveEntryDto> ReadAsync(string path)
@@ -4666,7 +4682,7 @@ internal static class ArchiveLiteTestRunner
             "Cdmw.ArchiveLite.Worker",
             "WorkerRuntime.cs"));
         Require(
-            acceleratorSource.Contains("\\\"catalog_schema\\\":2", StringComparison.Ordinal)
+            acceleratorSource.Contains("\\\"catalog_schema\\\":3", StringComparison.Ordinal)
             && liteCatalogSource.Contains("item-index-job", StringComparison.Ordinal),
             "Lite does not consume its versioned native item catalog");
         Require(

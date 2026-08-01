@@ -346,6 +346,10 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>正在準備持續性的背包圖示快取...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>持續性背包圖示快取已就緒：{0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>模型連結 {0:N0} 個，圖示路徑 {1:N0} 個，變體 {2:N0} 個</value></data>
+  <data name="ItemFinderStats" xml:space="preserve"><value>物品屬性</value></data>
+  <data name="ItemFinderStatEquipType" xml:space="preserve"><value>裝備類型：{0}</value></data>
+  <data name="ItemFinderStatGrade" xml:space="preserve"><value>等級：{0}</value></data>
+  <data name="ItemFinderStatStackSize" xml:space="preserve"><value>最多堆疊 {0:N0}</value></data>
   <data name="ItemFinderDescription" xml:space="preserve"><value>描述</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>依據</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>本地化名稱</value></data>

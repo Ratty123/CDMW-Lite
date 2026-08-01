@@ -346,6 +346,10 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Kalıcı envanter simgesi önbelleği hazırlanıyor...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Kalıcı envanter simgesi önbelleği hazır: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>{0:N0} model bağlantısı, {1:N0} simge yolu, {2:N0} varyant</value></data>
+  <data name="ItemFinderStats" xml:space="preserve"><value>Eşya istatistikleri</value></data>
+  <data name="ItemFinderStatEquipType" xml:space="preserve"><value>Ekipman türü: {0}</value></data>
+  <data name="ItemFinderStatGrade" xml:space="preserve"><value>Derece: {0}</value></data>
+  <data name="ItemFinderStatStackSize" xml:space="preserve"><value>{0:N0} adede kadar yığılır</value></data>
   <data name="ItemFinderDescription" xml:space="preserve"><value>Açıklama</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Kanıt</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Yerelleştirilmiş adlar</value></data>

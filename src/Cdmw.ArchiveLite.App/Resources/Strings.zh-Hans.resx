@@ -346,6 +346,10 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>正在准备持久的背包图标缓存...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>持久背包图标缓存已就绪：{0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>模型链接 {0:N0} 个，图标路径 {1:N0} 个，变体 {2:N0} 个</value></data>
+  <data name="ItemFinderStats" xml:space="preserve"><value>物品属性</value></data>
+  <data name="ItemFinderStatEquipType" xml:space="preserve"><value>装备类型：{0}</value></data>
+  <data name="ItemFinderStatGrade" xml:space="preserve"><value>等级：{0}</value></data>
+  <data name="ItemFinderStatStackSize" xml:space="preserve"><value>最多堆叠 {0:N0}</value></data>
   <data name="ItemFinderDescription" xml:space="preserve"><value>描述</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>依据</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>本地化名称</value></data>

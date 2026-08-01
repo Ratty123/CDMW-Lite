@@ -890,6 +890,11 @@ struct NativeItemRecord {
     // described and compared against CDMW Full's rather than only counted.
     int name_category = -1;
     int description_category = -1;
+    // Recovered from the row's scalar fields. -1 means the row did not carry the field, or carried
+    // the value the table uses for unset, rather than that the value happens to be zero.
+    long long stack_size = -1;
+    int grade = -1;
+    std::string equip_type;
     std::vector<std::string> localized_names;
     std::vector<std::uint32_t> prefab_hashes;
     std::vector<std::string> model_stems;
@@ -1066,7 +1071,8 @@ bool parse_pabg_directory(
 std::string pabg_row_tag_string(
     const std::vector<char>& data,
     const PabgRow& row,
-    unsigned char tag
+    unsigned char tag,
+    size_t* end_offset = nullptr
 ) {
     const unsigned char needle[] = {0x07, tag, 0x00, 0x00, 0x00};
     const std::uint32_t key = pabg_row_key(row);
@@ -1082,6 +1088,8 @@ std::string pabg_row_tag_string(
         const size_t length_at = at + sizeof(needle) + 4;
         const std::uint32_t length = read_u32(data, length_at);
         if (length == 0 || length > 512 || length_at + 4 + length > row.end) continue;
+        // The string is followed by a NUL the length does not count.
+        if (end_offset != nullptr) *end_offset = std::min(row.end, length_at + 4 + length + 1);
         return std::string(
             data.begin() + static_cast<std::ptrdiff_t>(length_at + 4),
             data.begin() + static_cast<std::ptrdiff_t>(length_at + 4 + length));
@@ -1089,14 +1097,49 @@ std::string pabg_row_tag_string(
     return {};
 }
 
+// EquipTypeInfo rows are {key uint32, length-prefixed NUL-terminated name, scalars}, and every
+// equippable ItemInfo row quotes one of those keys. The names are the game's own: OneHandSword,
+// Upperbody, HorseSaddle.
+std::map<std::uint32_t, std::string> parse_equiptypeinfo_rows(
+    const std::vector<char>& data,
+    const PabgTable& table
+) {
+    std::map<std::uint32_t, std::string> names;
+    for (const PabgRow& row : table.rows) {
+        if (row.begin + 8 > row.end) continue;
+        const std::uint32_t length = read_u32(data, row.begin + 4);
+        if (length == 0 || length > 120 || row.begin + 8 + length > row.end) continue;
+        names[pabg_row_key(row)] = std::string(
+            data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8),
+            data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8 + length));
+    }
+    return names;
+}
+
 // Rows open with their key, then a length-prefixed, NUL-terminated internal name.
-std::string pabg_row_name(const std::vector<char>& data, const PabgRow& row) {
+std::string pabg_row_name(const std::vector<char>& data, const PabgRow& row, size_t* end_offset = nullptr) {
     if (row.begin + 8 > row.end) return {};
     const std::uint32_t length = read_u32(data, row.begin + 4);
     if (length == 0 || length > 200 || row.begin + 8 + length > row.end) return {};
+    if (end_offset != nullptr) *end_offset = std::min(row.end, row.begin + 8 + length + 1);
     return std::string(
         data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8),
         data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8 + length));
+}
+
+// Reads a scalar at a fixed offset from one of the row's landmarks, or reports that the row is too
+// short to hold it. The landmarks are the only stable positions in an ItemInfo row: its name and
+// its two sub-records are variable-length, and lists further in move everything after them.
+bool row_u32_at(const std::vector<char>& data, const PabgRow& row, size_t at, std::uint32_t& value) {
+    if (at < row.begin || at + 4 > row.end) return false;
+    value = read_u32(data, at);
+    return true;
+}
+
+bool row_byte_at(const std::vector<char>& data, const PabgRow& row, size_t at, unsigned char& value) {
+    if (at < row.begin || at >= row.end) return false;
+    value = static_cast<unsigned char>(data[at]);
+    return true;
 }
 
 void add_stringinfo_icon_hash(
@@ -1347,11 +1390,54 @@ void fill_item_record_body(
 // The directory gives exact row bounds, so every record is read rather than searched for: the id
 // is the row's own key, the name follows it, and the two localization keys come out of the row's
 // 07 70 and 07 71 sub-records.
+// Three of an ItemInfo row's scalar fields sit at fixed offsets from a landmark the row always has,
+// and each was recovered by differencing rows and then checked against something outside the table:
+//
+//   stack size, uint32 straight after the internal name. Reads 1 for weapons and armour, 100 for
+//   arrows, 50 for cannonballs, 100,000 for copper; 6,493 of the 6,508 shipped rows hold a value in
+//   the set the game's stack sizes actually take.
+//
+//   equip type, uint32 five bytes past the display-name sub-record. Its value is an EquipTypeInfo
+//   key in 3,151 rows and zero in the rest, and the type it names matches the item's own name
+//   across all 88 types present: OneHandSword items are named *_OneHandSword, Upperbody items are
+//   the chest armour, HorseSaddle the saddles.
+//
+//   grade, one byte 37 past the description sub-record. 0xFF in 5,381 rows, meaning the item has no
+//   grade, and 0 to 6 in the 1,127 that do. The share of items named Legendary_* climbs with it,
+//   from 0.8% at grade 0 to 20.5% at grade 5, which is the ladder a rarity field should produce.
+//
+// Anything outside those ranges is dropped rather than shown: a row that does not hold the field is
+// better represented as having no value than as having a wrong one.
+void fill_item_record_stats(
+    const std::vector<char>& data,
+    const PabgRow& row,
+    size_t name_end,
+    size_t name_key_end,
+    size_t description_key_end,
+    const std::map<std::uint32_t, std::string>& equip_types,
+    NativeItemRecord& record
+) {
+    std::uint32_t stack = 0;
+    if (name_end != 0 && row_u32_at(data, row, name_end, stack) && stack > 0 && stack <= 1000000) {
+        record.stack_size = static_cast<long long>(stack);
+    }
+    std::uint32_t equip_type_key = 0;
+    if (name_key_end != 0 && row_u32_at(data, row, name_key_end + 5, equip_type_key) && equip_type_key != 0) {
+        auto found = equip_types.find(equip_type_key);
+        if (found != equip_types.end()) record.equip_type = found->second;
+    }
+    unsigned char grade = 0;
+    if (description_key_end != 0 && row_byte_at(data, row, description_key_end + 37, grade) && grade <= 6) {
+        record.grade = static_cast<int>(grade);
+    }
+}
+
 std::vector<NativeItemRecord> parse_iteminfo_rows(
     const std::vector<char>& data,
     const PabgTable& table,
     const LocalizationTables& loc_tables,
-    const std::map<std::uint32_t, std::string>& icon_hashes
+    const std::map<std::uint32_t, std::string>& icon_hashes,
+    const std::map<std::uint32_t, std::string>& equip_types
 ) {
     std::vector<NativeItemRecord> items;
     items.reserve(table.rows.size());
@@ -1361,9 +1447,13 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
         if (item_id == 0 || !seen_ids.insert(static_cast<int>(item_id)).second) continue;
         NativeItemRecord record;
         record.item_id = static_cast<int>(item_id);
-        record.internal_name = pabg_row_name(data, row);
-        record.name_key = pabg_row_tag_string(data, row, 0x70);
-        record.description_key = pabg_row_tag_string(data, row, 0x71);
+        size_t name_end = 0;
+        size_t name_key_end = 0;
+        size_t description_key_end = 0;
+        record.internal_name = pabg_row_name(data, row, &name_end);
+        record.name_key = pabg_row_tag_string(data, row, 0x70, &name_key_end);
+        record.description_key = pabg_row_tag_string(data, row, 0x71, &description_key_end);
+        fill_item_record_stats(data, row, name_end, name_key_end, description_key_end, equip_types, record);
         fill_item_record_body(
             data,
             loc_tables,
@@ -1639,6 +1729,16 @@ int run_item_index_job(
             ? parse_stringinfo_rows(stringinfo, stringinfo_table)
             : parse_stringinfo_hashes(stringinfo);
 
+        const std::vector<char> equiptypeinfo = read_binary_if_exists(work_dir / "equiptypeinfo.bin");
+        PabgTable equiptypeinfo_table;
+        std::map<std::uint32_t, std::string> equip_types;
+        if (parse_pabg_directory(
+                read_binary_if_exists(work_dir / "equiptypeinfo.header.bin"),
+                equiptypeinfo,
+                equiptypeinfo_table)) {
+            equip_types = parse_equiptypeinfo_rows(equiptypeinfo, equiptypeinfo_table);
+        }
+
         const std::vector<char> iteminfo = read_binary_if_exists(work_dir / "iteminfo.bin");
         PabgTable iteminfo_table;
         const bool iteminfo_from_directory = parse_pabg_directory(
@@ -1646,7 +1746,7 @@ int run_item_index_job(
             iteminfo,
             iteminfo_table);
         auto items = iteminfo_from_directory
-            ? parse_iteminfo_rows(iteminfo, iteminfo_table, loc_tables, icon_hashes)
+            ? parse_iteminfo_rows(iteminfo, iteminfo_table, loc_tables, icon_hashes, equip_types)
             : parse_iteminfo_bin(iteminfo, loc_tables, icon_hashes);
         const size_t iteminfo_row_count = iteminfo_from_directory ? iteminfo_table.rows.size() : items.size();
         const auto icon_index = build_icon_path_index(entries);
@@ -1722,7 +1822,7 @@ int run_item_index_job(
 
         std::ostringstream out;
         out << "{\"status\":\"ok\",\"backend\":\"" << kBackend << "\",\"protocol\":" << kProtocol
-            << ",\"catalog_schema\":2,\"items\":[";
+            << ",\"catalog_schema\":3,\"items\":[";
         for (size_t i = 0; include_items && i < linked_items.size(); ++i) {
             const auto& item = linked_items[i];
             if (i) out << ",";
@@ -1732,6 +1832,9 @@ int run_item_index_job(
                 << "\",\"description\":\"" << json_escape(item.description)
                 << "\",\"name_category\":" << item.name_category
                 << ",\"description_category\":" << item.description_category
+                << ",\"stack_size\":" << item.stack_size
+                << ",\"grade\":" << item.grade
+                << ",\"equip_type\":\"" << json_escape(item.equip_type) << "\""
                 << ",\"localized_names\":" << json_string_array(item.localized_names)
                 << ",\"prefab_hashes\":" << json_u32_array(item.prefab_hashes)
                 << ",\"model_stems\":" << json_string_array(item.model_stems)
@@ -1756,6 +1859,7 @@ int run_item_index_job(
             << "\",\"string_row_source\":\"" << (stringinfo_from_directory ? "row_directory" : "marker_scan")
             << "\",\"item_row_count\":" << iteminfo_row_count
             << ",\"item_parsed_count\":" << items.size()
+            << ",\"equip_type_count\":" << equip_types.size()
             << ",\"localization_row_count\":" << localization_row_count
             << ",\"localization_categories\":";
         append_category_json(out, localization_categories);

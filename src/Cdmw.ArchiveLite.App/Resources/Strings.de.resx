@@ -346,6 +346,10 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Der dauerhafte Cache für Inventarsymbole wird vorbereitet...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Dauerhafter Symbol-Cache bereit: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>{0:N0} Modelllink(s), {1:N0} Symbolpfad(e), {2:N0} Variante(n)</value></data>
+  <data name="ItemFinderStats" xml:space="preserve"><value>Gegenstandswerte</value></data>
+  <data name="ItemFinderStatEquipType" xml:space="preserve"><value>Ausrüstungstyp: {0}</value></data>
+  <data name="ItemFinderStatGrade" xml:space="preserve"><value>Stufe: {0}</value></data>
+  <data name="ItemFinderStatStackSize" xml:space="preserve"><value>Stapelt bis {0:N0}</value></data>
   <data name="ItemFinderDescription" xml:space="preserve"><value>Beschreibung</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Nachweis</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Lokalisierte Namen</value></data>
