@@ -881,6 +881,8 @@ public sealed class ItemFinderRowViewModel(ItemCatalogRow source) : ObservableOb
     public int ItemId => source.ItemId;
     public string InternalName => source.InternalName;
     public string DisplayName => source.DisplayName;
+    public string Description => source.Description;
+    public bool HasDescription => !string.IsNullOrWhiteSpace(source.Description);
     public string Category => source.Category;
     public string Group => source.Group;
     public string CategoryPath => ItemCatalogLabels.CategoryPath(Category, Group);

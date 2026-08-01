@@ -346,6 +346,7 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>インベントリアイコンの永続キャッシュを準備しています...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>インベントリアイコンの永続キャッシュの準備完了: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>モデルのリンク {0:N0} 件、アイコンのパス {1:N0} 件、バリアント {2:N0} 件</value></data>
+  <data name="ItemFinderDescription" xml:space="preserve"><value>説明</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>根拠</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>ローカライズ名</value></data>
   <data name="ItemFinderMaterials" xml:space="preserve"><value>マテリアルタグ</value></data>

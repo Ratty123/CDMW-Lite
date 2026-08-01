@@ -346,6 +346,7 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Przygotowywanie trwałej pamięci podręcznej ikon ekwipunku...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>Trwała pamięć podręczna ikon ekwipunku gotowa: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>Odnośniki do modeli: {0:N0}, ścieżki ikon: {1:N0}, warianty: {2:N0}</value></data>
+  <data name="ItemFinderDescription" xml:space="preserve"><value>Opis</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Przesłanki</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Nazwy lokalizowane</value></data>
   <data name="ItemFinderMaterials" xml:space="preserve"><value>Etykiety materiałów</value></data>

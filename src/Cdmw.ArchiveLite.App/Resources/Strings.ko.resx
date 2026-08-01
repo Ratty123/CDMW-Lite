@@ -346,6 +346,7 @@
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>영구 인벤토리 아이콘 캐시를 준비하는 중...</value></data>
   <data name="ItemFinderIconWarmupReady" xml:space="preserve"><value>영구 인벤토리 아이콘 캐시 준비 완료: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderLinkedSummary" xml:space="preserve"><value>모델 링크 {0:N0}개, 아이콘 경로 {1:N0}개, 변형 {2:N0}개</value></data>
+  <data name="ItemFinderDescription" xml:space="preserve"><value>설명</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>근거</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>현지화된 이름</value></data>
   <data name="ItemFinderMaterials" xml:space="preserve"><value>머티리얼 태그</value></data>

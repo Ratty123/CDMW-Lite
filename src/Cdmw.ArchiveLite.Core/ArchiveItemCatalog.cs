@@ -150,6 +150,7 @@ public sealed class ArchiveItemCatalog
         {
             InternalName = internalName,
             DisplayName = displayName,
+            Description = (source.Description ?? string.Empty).Trim(),
             Category = category,
             Group = group,
             CategoryEvidence = categoryEvidence,
@@ -207,6 +208,8 @@ public sealed class ArchiveItemCatalog
         return first with
         {
             DisplayName = displayName,
+            Description = rows.Select(static row => row.Description)
+                .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
             LocalizedNames = localizedNames,
             PrefabHashes = rows.SelectMany(static row => row.PrefabHashes).Distinct().ToArray(),
             PacFiles = pacFiles,
@@ -551,6 +554,7 @@ public sealed record ArchiveItemCatalogRecord(
     string CategoryEvidence = "",
     int VariantCount = 1,
     string Evidence = "",
+    string Description = "",
     [property: JsonIgnore] string SearchText = "");
 
 public sealed record ArchiveItemCatalogPage(
