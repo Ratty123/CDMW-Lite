@@ -729,7 +729,273 @@ static NativeSubmesh combine_pamlod_group_meshes(const std::vector<NativeSubmesh
     return combined;
 }
 
+// The PAMLOD entry table as CDMW Full reads it.
+//
+// Lite had been walking the table at a fixed stride and searching a wide range of paddings for the
+// vertex block; Full finds each entry by its texture name instead, taking the counts and offsets
+// from fixed positions around the string, and searches a narrow padding range. The two land on
+// different strides for the same file, which is a disagreement about the format itself rather than
+// about exporting, and it put every coordinate of a LOD export somewhere else. Full's reading is
+// the one an exported LOD has to match, so it is tried first; Lite's own search still stands
+// behind it for a file this cannot read.
+struct PamlodWorkbenchEntry {
+    std::uint32_t vertex_count = 0;
+    std::uint32_t index_count = 0;
+    std::uint32_t vertex_element_offset = 0;
+    std::uint32_t index_element_offset = 0;
+    std::string texture_name;
+    std::string material_name;
+};
+
+// Equivalent to scanning the entry region for /[^\0]{1,255}\.dds\0/: each name is a run of
+// non-null bytes ending in ".dds", and the match starts where that run does.
+static std::vector<PamlodWorkbenchEntry> read_pamlod_workbench_entries(
+    const std::vector<char>& data,
+    size_t geom_offset
+) {
+    std::vector<PamlodWorkbenchEntry> entries;
+    const size_t region_start = static_cast<size_t>(kPamlodEntryTableOffset);
+    if (geom_offset <= region_start || geom_offset > data.size()) return entries;
+    static const std::string suffix = ".dds";
+    size_t cursor = region_start;
+    while (cursor + suffix.size() + 1u <= geom_offset) {
+        const size_t found = std::string_view(data.data(), geom_offset)
+            .find(suffix, cursor);
+        if (found == std::string_view::npos || found + suffix.size() >= geom_offset) break;
+        const size_t terminator = found + suffix.size();
+        if (static_cast<unsigned char>(data[terminator]) != 0u) {
+            cursor = found + 1u;
+            continue;
+        }
+        size_t run_start = found;
+        while (run_start > region_start
+               && static_cast<unsigned char>(data[run_start - 1u]) != 0u
+               && found - run_start < 255u) {
+            --run_start;
+        }
+        cursor = terminator + 1u;
+        // The pattern needs at least one byte before the suffix.
+        if (run_start >= found) continue;
+        const size_t name_start = run_start;
+        if (name_start < region_start + 0x10u) continue;
+        const size_t counts_offset = name_start - 0x10u;
+        PamlodWorkbenchEntry entry;
+        entry.vertex_count = read_u32(data, counts_offset);
+        entry.index_count = read_u32(data, counts_offset + 4u);
+        if (entry.vertex_count < 1u || entry.vertex_count > 131072u
+            || entry.index_count == 0u || entry.index_count % 3u != 0u) {
+            continue;
+        }
+        entry.vertex_element_offset = read_u32(data, name_start - 0x08u);
+        entry.index_element_offset = read_u32(data, name_start - 0x04u);
+        entry.texture_name = read_c_string(data, name_start, kPamNameMaxLength);
+        const size_t material_start = name_start + 0x100u;
+        entry.material_name = material_start < geom_offset
+            ? read_c_string(data, material_start, kPamNameMaxLength)
+            : std::string();
+        entries.push_back(std::move(entry));
+    }
+    return entries;
+}
+
+static std::vector<std::vector<PamlodWorkbenchEntry>> group_pamlod_workbench_entries(
+    const std::vector<PamlodWorkbenchEntry>& entries,
+    int lod_count
+) {
+    std::vector<std::vector<PamlodWorkbenchEntry>> groups;
+    std::vector<PamlodWorkbenchEntry> current;
+    std::uint64_t vertex_accumulator = 0;
+    std::uint64_t index_accumulator = 0;
+    for (const PamlodWorkbenchEntry& entry : entries) {
+        if (entry.vertex_element_offset == vertex_accumulator
+            && entry.index_element_offset == index_accumulator) {
+            current.push_back(entry);
+            vertex_accumulator += entry.vertex_count;
+            index_accumulator += entry.index_count;
+            continue;
+        }
+        if (!current.empty()) groups.push_back(std::move(current));
+        current.clear();
+        current.push_back(entry);
+        vertex_accumulator = entry.vertex_count;
+        index_accumulator = entry.index_count;
+    }
+    if (!current.empty()) groups.push_back(std::move(current));
+    if (lod_count >= 0 && static_cast<int>(groups.size()) > lod_count) {
+        groups.resize(static_cast<size_t>(lod_count));
+    }
+    return groups;
+}
+
+// Full checks only the first hundred indices, and against the group's total rather than each
+// entry's own count.
+static std::optional<std::tuple<size_t, int, size_t>> find_pamlod_workbench_layout(
+    const std::vector<char>& data,
+    size_t cursor,
+    std::uint64_t total_vertices,
+    std::uint64_t total_indices
+) {
+    static const std::array<int, 22> strides = {
+        6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 60, 64
+    };
+    for (int padding = 0; padding < 64; padding += 2) {
+        const size_t base = cursor + static_cast<size_t>(padding);
+        for (int stride : strides) {
+            const size_t candidate = base + static_cast<size_t>(total_vertices) * static_cast<size_t>(stride);
+            if (candidate + static_cast<size_t>(total_indices) * 2u > data.size()) continue;
+            const std::uint64_t checked = std::min<std::uint64_t>(total_indices, 100u);
+            bool ok = true;
+            for (std::uint64_t i = 0; i < checked; ++i) {
+                if (read_u16(data, candidate + static_cast<size_t>(i) * 2u) >= total_vertices) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok) return std::make_tuple(base, stride, candidate);
+        }
+    }
+    return std::nullopt;
+}
+
+static std::optional<NativeMeshParseResult> parse_pamlod_submeshes_workbench(const std::vector<char>& data) {
+    if (data.size() < kPamlodEntryTableOffset) return std::nullopt;
+    const std::uint32_t lod_count = read_u32(data, kPamlodHeaderLodCountOffset);
+    const std::uint32_t geom_offset = read_u32(data, kPamlodHeaderGeomOffset);
+    if (lod_count == 0u || geom_offset == 0u || static_cast<size_t>(geom_offset) >= data.size()) {
+        return std::nullopt;
+    }
+    const Vec3 bbox_min = read_vec3_f32(data, kPamlodHeaderBboxMinOffset);
+    const Vec3 bbox_max = read_vec3_f32(data, kPamlodHeaderBboxMaxOffset);
+    const std::vector<PamlodWorkbenchEntry> entries =
+        read_pamlod_workbench_entries(data, static_cast<size_t>(geom_offset));
+    if (entries.empty()) return std::nullopt;
+    const std::vector<std::vector<PamlodWorkbenchEntry>> groups =
+        group_pamlod_workbench_entries(entries, static_cast<int>(lod_count));
+    if (groups.empty()) return std::nullopt;
+
+    std::vector<NativeSubmesh> levels;
+    size_t cursor = static_cast<size_t>(geom_offset);
+    for (size_t lod_index = 0; lod_index < groups.size(); ++lod_index) {
+        const std::vector<PamlodWorkbenchEntry>& group = groups[lod_index];
+        std::uint64_t total_vertices = 0;
+        std::uint64_t total_indices = 0;
+        for (const PamlodWorkbenchEntry& entry : group) {
+            total_vertices += entry.vertex_count;
+            total_indices += entry.index_count;
+        }
+        auto layout = find_pamlod_workbench_layout(data, cursor, total_vertices, total_indices);
+        if (!layout.has_value()) {
+            levels.emplace_back();
+            cursor += 2u;
+            continue;
+        }
+        const size_t vertex_base = std::get<0>(*layout);
+        const int stride = std::get<1>(*layout);
+        const size_t index_base = std::get<2>(*layout);
+        const bool has_uv = stride >= 12;
+
+        NativeSubmesh mesh;
+        std::uint32_t vertex_offset = 0;
+        for (const PamlodWorkbenchEntry& entry : group) {
+            const size_t entry_vertex_base =
+                vertex_base + static_cast<size_t>(entry.vertex_element_offset) * static_cast<size_t>(stride);
+            const size_t entry_index_base =
+                index_base + static_cast<size_t>(entry.index_element_offset) * 2u;
+            std::vector<std::uint32_t> source_indices;
+            source_indices.reserve(entry.index_count);
+            std::set<std::uint32_t> unique_indices;
+            for (std::uint32_t i = 0; i < entry.index_count; ++i) {
+                const std::uint32_t index = read_u16(data, entry_index_base + static_cast<size_t>(i) * 2u);
+                source_indices.push_back(index);
+                unique_indices.insert(index);
+            }
+            std::unordered_map<std::uint32_t, std::uint32_t> source_to_local;
+            for (std::uint32_t source_index : unique_indices) {
+                source_to_local[source_index] =
+                    static_cast<std::uint32_t>(source_to_local.size()) + vertex_offset;
+            }
+            for (std::uint32_t source_index : unique_indices) {
+                const size_t offset =
+                    entry_vertex_base + static_cast<size_t>(source_index) * static_cast<size_t>(stride);
+                if (offset + 6u > data.size()) break;
+                mesh.positions.push_back(Vec3{
+                    dequantize_u16(read_u16(data, offset), bbox_min.x, bbox_max.x),
+                    dequantize_u16(read_u16(data, offset + 2u), bbox_min.y, bbox_max.y),
+                    dequantize_u16(read_u16(data, offset + 4u), bbox_min.z, bbox_max.z),
+                });
+                mesh.export_positions.push_back(ExportVec3{
+                    dequantize_u16_exact(read_u16(data, offset), bbox_min.x, bbox_max.x),
+                    dequantize_u16_exact(read_u16(data, offset + 2u), bbox_min.y, bbox_max.y),
+                    dequantize_u16_exact(read_u16(data, offset + 4u), bbox_min.z, bbox_max.z),
+                });
+                if (has_uv && offset + 12u <= data.size()) {
+                    mesh.uvs.push_back(Vec2{
+                        half_to_float(read_u16(data, offset + 8u)),
+                        half_to_float(read_u16(data, offset + 10u)),
+                    });
+                    mesh.export_uvs.push_back(ExportVec2{
+                        static_cast<double>(half_to_float(read_u16(data, offset + 8u))),
+                        static_cast<double>(half_to_float(read_u16(data, offset + 10u))),
+                    });
+                } else {
+                    mesh.uvs.push_back(Vec2{});
+                    mesh.export_uvs.push_back(ExportVec2{});
+                }
+            }
+            for (size_t i = 0; i + 2u < source_indices.size(); i += 3u) {
+                auto a = source_to_local.find(source_indices[i]);
+                auto b = source_to_local.find(source_indices[i + 1u]);
+                auto c = source_to_local.find(source_indices[i + 2u]);
+                if (a == source_to_local.end() || b == source_to_local.end() || c == source_to_local.end()) {
+                    continue;
+                }
+                mesh.indices.push_back(a->second);
+                mesh.indices.push_back(b->second);
+                mesh.indices.push_back(c->second);
+            }
+            vertex_offset += static_cast<std::uint32_t>(unique_indices.size());
+        }
+
+        const std::string material = group.front().material_name.empty()
+            ? "lod" + std::to_string(lod_index)
+            : group.front().material_name;
+        const std::string label = lod_index < 10
+            ? "lod0" + std::to_string(lod_index)
+            : "lod" + std::to_string(lod_index);
+        mesh.name = label + "_" + material;
+        mesh.export_name = mesh.name;
+        mesh.material = material;
+        mesh.raw_material = group.front().material_name;
+        mesh.texture = group.front().texture_name;
+        mesh.has_texture_coordinates = has_uv;
+        mesh.source_submesh_index = static_cast<int>(lod_index);
+        mesh.source_local_submesh_index = static_cast<int>(lod_index);
+        mesh.vertex_stride = stride;
+        mesh.uv_offset = has_uv ? 8 : -1;
+        mesh.normal_offset = -1;
+        mesh.vertex_layout_name = "pamlod_u16_bbox_half_uv";
+        for (size_t local = 0; local < mesh.positions.size(); ++local) {
+            mesh.source_vertex_indices.push_back(static_cast<std::int32_t>(local));
+        }
+        levels.push_back(std::move(mesh));
+        cursor = index_base + static_cast<size_t>(total_indices) * 2u;
+    }
+
+    for (NativeSubmesh& level : levels) {
+        if (level.positions.empty() || level.indices.size() < 3u) continue;
+        std::vector<NativeSubmesh> selected;
+        selected.push_back(std::move(level));
+        complete_native_meshes_without_filtering(selected);
+        return NativeMeshParseResult{
+            std::move(selected), "native_pamlod_lod0_workbench", static_cast<int>(groups.size())};
+    }
+    return std::nullopt;
+}
+
 static NativeMeshParseResult parse_pamlod_submeshes(const std::vector<char>& data) {
+    if (auto workbench = parse_pamlod_submeshes_workbench(data); workbench.has_value()) {
+        return std::move(*workbench);
+    }
     if (data.size() < kPamlodEntryTableOffset) {
         throw std::runtime_error("selected PAMLOD is too small");
     }
