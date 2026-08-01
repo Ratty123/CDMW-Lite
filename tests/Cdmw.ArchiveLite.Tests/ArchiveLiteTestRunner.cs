@@ -54,6 +54,7 @@ internal static class ArchiveLiteTestRunner
             ("shared content manifest and semantic analyzers stay decoder-parity safe", TestSharedContentAnalyzersAsync),
             ("native preview core parses PAT LOD0 geometry", TestNativePatGeometryAsync),
             ("native model packages adapt safely and export Blender interchange formats", TestNativeModelPreviewPackageAsync),
+            ("an exported mesh keeps the source's own vertices, order, and part names", TestMeshExportSourceVertexParityAsync),
             ("renderer warmup package is complete and loadable", TestRendererWarmupPackageAsync),
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
@@ -3629,6 +3630,159 @@ internal static class ArchiveLiteTestRunner
         }
     }
 
+    /// <summary>
+    /// An interchange file has to present the array the archive holds, in the archive's own order.
+    /// </summary>
+    /// <remarks>
+    /// Shape keys, morph targets and every other per-vertex correspondence are matched by index, so
+    /// a mesh whose vertices are the right points in the wrong order loads and then deforms into
+    /// noise. The package stores three corners per triangle with the index buffer already spent, so
+    /// the array is rebuilt on the way out; the identity buffer says which source vertex each corner
+    /// came from, and that is what fixes the order. Rejoining corners by matching attribute bits
+    /// instead -- what this used to do -- lands them in order of first appearance in the triangle
+    /// stream, and folds two source vertices together whenever they agree on position, normal and
+    /// texture coordinate. The batch below is built to catch both: its triangles introduce source
+    /// vertices out of order, and two of its vertices are attribute-for-attribute identical.
+    /// </remarks>
+    private static async Task TestMeshExportSourceVertexParityAsync()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-archive-lite-mesh-parity-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "geometry"));
+
+            // Five source vertices. 1 and 4 are deliberately indistinguishable: same position,
+            // same normal, same texture coordinate, and separate records in the source.
+            var sourcePositions = new[]
+            {
+                new[] { 0.00f, 0.00f, 0.0f },
+                new[] { 0.25f, 0.00f, 0.0f },
+                new[] { 0.25f, 0.25f, 0.0f },
+                new[] { 0.00f, 0.25f, 0.0f },
+                new[] { 0.25f, 0.00f, 0.0f },
+            };
+            var sourceUvs = new[]
+            {
+                new[] { 0.0f, 0.0f },
+                new[] { 0.5f, 0.0f },
+                new[] { 0.5f, 0.5f },
+                new[] { 0.0f, 0.5f },
+                new[] { 0.5f, 0.0f },
+            };
+            // No triangle starts at vertex 0, so first-appearance order and source order differ.
+            int[] corners = [3, 2, 4, 2, 1, 0, 0, 3, 4];
+
+            await using (var geometry = File.Create(Path.Combine(root, "geometry", "batch_000.bin")))
+            await using (var identity = File.Create(Path.Combine(root, "geometry", "batch_000_identity.bin")))
+            {
+                var vertexWriter = new BinaryWriter(geometry, Encoding.UTF8, leaveOpen: true);
+                var identityWriter = new BinaryWriter(identity, Encoding.UTF8, leaveOpen: true);
+                foreach (var source in corners)
+                {
+                    var record = new float[23];
+                    record[0] = sourcePositions[source][0];
+                    record[1] = sourcePositions[source][1];
+                    record[2] = sourcePositions[source][2];
+                    record[5] = 1.0f;
+                    record[9] = sourceUvs[source][0];
+                    record[10] = sourceUvs[source][1];
+                    foreach (var value in record) vertexWriter.Write(value);
+                    identityWriter.Write(0);
+                    identityWriter.Write(source);
+                }
+                vertexWriter.Flush();
+                identityWriter.Flush();
+            }
+
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "manifest.json"),
+                JsonSerializer.Serialize(new
+                {
+                    schema_version = 8,
+                    normalization_center = new[] { 4.0f, 8.0f, 16.0f },
+                    normalization_scale = 2.0f,
+                    batches = new[]
+                    {
+                        new
+                        {
+                            index = 0,
+                            material_name = "shared_cloth",
+                            vertex_file = "geometry/batch_000.bin",
+                            vertex_count = corners.Length,
+                            editor_identity = new { identity_file = "geometry/batch_000_identity.bin" },
+                        },
+                    },
+                    // Two parts can share one material, so the name that tells them apart is the
+                    // submesh's, which only the material slots carry.
+                    material_slots = new[]
+                    {
+                        new { batch_index = 0, material_name = "shared_cloth", submesh_name = "Hood_Left" },
+                    },
+                }),
+                Encoding.UTF8).ConfigureAwait(false);
+
+            var destination = Path.Combine(root, "hood.obj");
+            await new NativeModelExportService(new NativeModelPreviewService()).ExportPackageAsync(
+                root,
+                "character/model/hood.pac",
+                ExportKind.Obj,
+                destination,
+                overwrite: false,
+                null,
+                null,
+                CancellationToken.None).ConfigureAwait(false);
+
+            var lines = await File.ReadAllLinesAsync(destination).ConfigureAwait(false);
+            var positions = lines
+                .Where(static line => line.StartsWith("v ", StringComparison.Ordinal))
+                .Select(static line => line[2..])
+                .ToArray();
+            Require(
+                positions.Length == sourcePositions.Length,
+                $"the export merged source vertices the archive kept apart: {positions.Length} of {sourcePositions.Length}");
+            // The manifest recentres on (4, 8, 16) and scales by two, so undoing it doubles each
+            // coordinate's distance from the centre. Written in source order, vertex 1 lands on the
+            // second line and vertex 4 on the fifth, even though the triangles meet 3 and 2 first.
+            var expected = sourcePositions
+                .Select(static position => FormattableString.Invariant(
+                    $"{(position[0] / 2.0) + 4.0} {(position[1] / 2.0) + 8.0} {(position[2] / 2.0) + 16.0}"))
+                .ToArray();
+            Require(
+                positions.SequenceEqual(expected, StringComparer.Ordinal),
+                $"exported vertices are not the source's own, in source order: {string.Join(" | ", positions)}");
+
+            var faces = lines
+                .Where(static line => line.StartsWith("f ", StringComparison.Ordinal))
+                .ToArray();
+            Require(
+                faces.SequenceEqual(["f 4/4/4 3/3/3 5/5/5", "f 3/3/3 2/2/2 1/1/1", "f 1/1/1 4/4/4 5/5/5"], StringComparer.Ordinal),
+                $"faces do not point at the source vertices they were built from: {string.Join(" | ", faces)}");
+
+            Require(
+                lines.Contains("o Hood_Left", StringComparer.Ordinal),
+                "the exported object is not named after the submesh the source named");
+            Require(
+                lines.Contains("usemtl shared_cloth", StringComparer.Ordinal),
+                "the exported object no longer selects its own material");
+
+            using var sidecar = JsonDocument.Parse(
+                await File.ReadAllTextAsync(destination + ".meta.json").ConfigureAwait(false));
+            var sourceVertexMap = sidecar.RootElement
+                .GetProperty("submeshes")[0]
+                .GetProperty("source_vertex_map")
+                .EnumerateArray()
+                .Select(static value => value.GetInt32())
+                .ToArray();
+            Require(
+                sourceVertexMap.SequenceEqual([0, 1, 2, 3, 4]),
+                $"the round-trip sidecar does not map exported vertices back to the source: {string.Join(",", sourceVertexMap)}");
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task TestRendererWarmupPackageAsync()
     {
         var packageRoot = await GetRendererWarmupPackageAsync().ConfigureAwait(false);
@@ -3760,7 +3914,7 @@ internal static class ArchiveLiteTestRunner
         {
             var root = cacheManifest.RootElement;
             Require(
-                root.GetProperty("version").GetString() == "archive_lite_native_model_v4_lazy_prefab",
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v6_lazy_prefab",
                 "the default texture-free preview changed its established cache version");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
@@ -3973,8 +4127,8 @@ internal static class ArchiveLiteTestRunner
         Require(
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v4_lazy_prefab\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v5_textured_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v6_lazy_prefab\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v7_textured_lazy_prefab\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");

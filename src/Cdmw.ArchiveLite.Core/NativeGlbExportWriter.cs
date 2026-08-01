@@ -19,25 +19,23 @@ internal static class NativeGlbExportWriter
         string? currentItem,
         CancellationToken cancellationToken)
     {
-        var totalWork = checked(package.TotalVertices * 4L);
+        var totalWork = checked(package.TotalVertices * 2L);
         long completed = 0;
         await ReportAsync(progress, completed, totalWork, "mesh_export_prepare", currentItem).ConfigureAwait(false);
         // glTF carries an index buffer of its own, so the package's corner-by-corner geometry is
-        // rejoined into an indexed mesh here exactly as it is for OBJ and FBX. The pass also
-        // measures the bounds, which have to describe the vertices actually written.
-        var meshes = new List<WeldedBatch>(package.Batches.Count);
+        // rebuilt into the source's own indexed array here exactly as it is for OBJ and FBX.
+        var meshes = new List<NativePreviewVertexRebuild>(package.Batches.Count);
         foreach (var batch in package.Batches)
         {
-            var result = await WeldBatchAsync(
+            meshes.Add(await NativePreviewVertexRebuild.BuildAsync(
                 batch,
-                package.Normalization,
-                completed,
-                totalWork,
-                progress,
-                currentItem,
-                cancellationToken).ConfigureAwait(false);
-            meshes.Add(result.Welded);
-            completed = result.Completed;
+                async corners =>
+                {
+                    completed += corners;
+                    await ReportAsync(progress, completed, totalWork, "mesh_export_prepare", currentItem)
+                        .ConfigureAwait(false);
+                },
+                cancellationToken).ConfigureAwait(false));
         }
 
         var bufferViews = new List<Dictionary<string, object?>>();
@@ -48,18 +46,20 @@ internal static class NativeGlbExportWriter
         for (var index = 0; index < package.Batches.Count; index++)
         {
             var batch = package.Batches[index];
-            var welded = meshes[index];
+            var rebuilt = meshes[index];
+            // Bounds describe the vertices the file will hold, in the frame it writes them in.
+            var bounds = MeasureBounds(rebuilt.Positions, package.Normalization);
             var positionAccessor = AddFloatAccessor(
                 bufferViews,
                 accessors,
                 ref binaryLength,
-                welded.UniqueCount,
+                rebuilt.VertexCount,
                 3,
-                welded.Bounds.Minimum,
-                welded.Bounds.Maximum);
-            var normalAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, welded.UniqueCount, 3, null, null);
-            var uvAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, welded.UniqueCount, 2, null, null);
-            var indexAccessor = AddIndexAccessor(bufferViews, accessors, ref binaryLength, welded.Indices.Length);
+                bounds.Minimum,
+                bounds.Maximum);
+            var normalAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, rebuilt.VertexCount, 3, null, null);
+            var uvAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, rebuilt.VertexCount, 2, null, null);
+            var indexAccessor = AddIndexAccessor(bufferViews, accessors, ref binaryLength, rebuilt.CornerIndices.Length);
             primitives.Add(new Dictionary<string, object?>
             {
                 ["attributes"] = new Dictionary<string, object?>
@@ -74,7 +74,7 @@ internal static class NativeGlbExportWriter
             });
             materials.Add(new Dictionary<string, object?>
             {
-                ["name"] = CleanName(batch.MaterialName, $"material_{batch.Index:000}"),
+                ["name"] = CleanName(batch.MaterialName, CleanName(batch.SubmeshName, $"material_{batch.Index:000}")),
                 ["pbrMetallicRoughness"] = new Dictionary<string, object?>
                 {
                     ["baseColorFactor"] = new[] { batch.BaseColor[0], batch.BaseColor[1], batch.BaseColor[2], 1.0f },
@@ -133,52 +133,35 @@ internal static class NativeGlbExportWriter
                 BinaryPrimitives.WriteUInt32LittleEndian(binaryHeader.AsSpan(4, 4), 0x004E4942);
                 await output.WriteAsync(binaryHeader, token).ConfigureAwait(false);
 
-                for (var index = 0; index < package.Batches.Count; index++)
+                foreach (var rebuilt in meshes)
                 {
-                    var batch = package.Batches[index];
-                    var welded = meshes[index];
-                    completed = await CopyFloatAttributeAsync(
-                        batch,
-                        welded,
-                        output,
-                        0,
+                    await WriteFloatAttributeAsync(
+                        rebuilt.Positions,
                         3,
                         flipSecondComponent: false,
                         package.Normalization,
-                        completed,
-                        totalWork,
-                        progress,
-                        currentItem,
+                        output,
                         token).ConfigureAwait(false);
                     // Only positions carry the preview's framing transform; a
                     // uniform recentre and rescale leaves normals and UVs alone.
-                    completed = await CopyFloatAttributeAsync(
-                        batch,
-                        welded,
-                        output,
-                        3,
+                    await WriteFloatAttributeAsync(
+                        rebuilt.Normals,
                         3,
                         flipSecondComponent: false,
                         restore: null,
-                        completed,
-                        totalWork,
-                        progress,
-                        currentItem,
-                        token).ConfigureAwait(false);
-                    completed = await CopyFloatAttributeAsync(
-                        batch,
-                        welded,
                         output,
-                        9,
+                        token).ConfigureAwait(false);
+                    await WriteFloatAttributeAsync(
+                        rebuilt.TextureCoordinates,
                         2,
                         flipSecondComponent: true,
                         restore: null,
-                        completed,
-                        totalWork,
-                        progress,
-                        currentItem,
+                        output,
                         token).ConfigureAwait(false);
-                    await WriteIndicesAsync(welded, output, token).ConfigureAwait(false);
+                    await WriteIndicesAsync(rebuilt.CornerIndices, output, token).ConfigureAwait(false);
+                    completed += rebuilt.CornerIndices.Length;
+                    await ReportAsync(progress, completed, totalWork, "mesh_export_write", currentItem)
+                        .ConfigureAwait(false);
                 }
                 for (long padding = binaryLength; padding < binaryPaddedLength; padding++)
                 {
@@ -225,143 +208,70 @@ internal static class NativeGlbExportWriter
         return accessors.Count - 1;
     }
 
-    private static async Task<WeldProgress> WeldBatchAsync(
-        NativePreviewMeshBatch batch,
-        NativePreviewNormalization normalization,
-        long completed,
-        long totalWork,
-        Func<ProgressUpdate, Task>? progress,
-        string? currentItem,
-        CancellationToken cancellationToken)
+    private static MeshBounds MeasureBounds(float[] positions, NativePreviewNormalization normalization)
     {
         var minimum = new[] { float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity };
         var maximum = new[] { float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity };
-        var welder = new NativePreviewVertexWelder(batch.VertexCount);
-        var indices = new int[batch.VertexCount];
-        await using var input = OpenRead(batch.GeometryPath);
-        var buffer = new byte[RecordsPerChunk * BytesPerPreviewVertex];
-        var batchCompleted = 0;
-        while (batchCompleted < batch.VertexCount)
+        for (var index = 0; index < positions.Length; index++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var count = Math.Min(RecordsPerChunk, batch.VertexCount - batchCompleted);
-            var bytes = checked(count * BytesPerPreviewVertex);
-            await input.ReadExactlyAsync(buffer.AsMemory(0, bytes), cancellationToken).ConfigureAwait(false);
-            for (var localIndex = 0; localIndex < count; localIndex++)
-            {
-                var offset = localIndex * BytesPerPreviewVertex;
-                var isNew = welder.TryAssign(
-                    buffer.AsSpan(offset, BytesPerPreviewVertex),
-                    out var vertexIndex);
-                indices[batchCompleted + localIndex] = vertexIndex;
-                if (!isNew)
-                {
-                    continue;
-                }
-                // Bounds describe the vertices the file will hold, so only a vertex that is
-                // actually written contributes -- a repeated corner cannot widen them anyway.
-                for (var component = 0; component < 3; component++)
-                {
-                    var value = RestoredPosition(buffer, offset, component, normalization);
-                    minimum[component] = Math.Min(minimum[component], value);
-                    maximum[component] = Math.Max(maximum[component], value);
-                }
-            }
-            batchCompleted += count;
-            completed += count;
-            await ReportAsync(progress, completed, totalWork, "mesh_export_prepare", currentItem).ConfigureAwait(false);
+            var component = index % 3;
+            var value = (float)normalization.Restore(positions[index], component);
+            minimum[component] = Math.Min(minimum[component], value);
+            maximum[component] = Math.Max(maximum[component], value);
         }
-        return new WeldProgress(
-            new WeldedBatch(indices, welder.UniqueCount, new MeshBounds(minimum, maximum)),
-            completed);
+        return new MeshBounds(minimum, maximum);
     }
 
-    private static async Task WriteIndicesAsync(WeldedBatch welded, Stream output, CancellationToken cancellationToken)
+    private static async Task WriteIndicesAsync(int[] cornerIndices, Stream output, CancellationToken cancellationToken)
     {
         var buffer = new byte[RecordsPerChunk * sizeof(uint)];
         var written = 0;
-        while (written < welded.Indices.Length)
+        while (written < cornerIndices.Length)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var count = Math.Min(RecordsPerChunk, welded.Indices.Length - written);
+            var count = Math.Min(RecordsPerChunk, cornerIndices.Length - written);
             for (var localIndex = 0; localIndex < count; localIndex++)
             {
                 BinaryPrimitives.WriteUInt32LittleEndian(
                     buffer.AsSpan(localIndex * sizeof(uint), sizeof(uint)),
-                    (uint)welded.Indices[written + localIndex]);
+                    (uint)cornerIndices[written + localIndex]);
             }
             await output.WriteAsync(buffer.AsMemory(0, count * sizeof(uint)), cancellationToken).ConfigureAwait(false);
             written += count;
         }
     }
 
-    private static async Task<long> CopyFloatAttributeAsync(
-        NativePreviewMeshBatch batch,
-        WeldedBatch welded,
-        Stream output,
-        int sourceFloatOffset,
+    private static async Task WriteFloatAttributeAsync(
+        float[] source,
         int components,
         bool flipSecondComponent,
         NativePreviewNormalization? restore,
-        long completed,
-        long totalWork,
-        Func<ProgressUpdate, Task>? progress,
-        string? currentItem,
+        Stream output,
         CancellationToken cancellationToken)
     {
-        await ReportAsync(progress, completed, totalWork, "mesh_export_write", currentItem).ConfigureAwait(false);
-        await using var input = OpenRead(batch.GeometryPath);
-        var inputBuffer = new byte[RecordsPerChunk * BytesPerPreviewVertex];
-        var outputBuffer = new byte[RecordsPerChunk * components * sizeof(float)];
-        var batchCompleted = 0;
-        var emitted = 0;
-        while (batchCompleted < batch.VertexCount)
+        var buffer = new byte[RecordsPerChunk * components * sizeof(float)];
+        var written = 0;
+        while (written < source.Length)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var count = Math.Min(RecordsPerChunk, batch.VertexCount - batchCompleted);
-            var inputBytes = checked(count * BytesPerPreviewVertex);
-            await input.ReadExactlyAsync(inputBuffer.AsMemory(0, inputBytes), cancellationToken).ConfigureAwait(false);
-            var outputOffset = 0;
-            for (var localIndex = 0; localIndex < count; localIndex++)
+            var count = Math.Min(buffer.Length / sizeof(float), source.Length - written);
+            for (var index = 0; index < count; index++)
             {
-                // Indices were assigned in order of first appearance, so a corner introduces its
-                // vertex exactly when its index equals the number already written. That replays
-                // the welding decision without keeping a second copy of it.
-                if (welded.Indices[batchCompleted + localIndex] != emitted)
+                var component = (written + index) % components;
+                var value = source[written + index];
+                if (restore is not null)
                 {
-                    continue;
+                    value = (float)restore.Restore(value, component);
                 }
-                emitted++;
-                var sourceOffset = (localIndex * BytesPerPreviewVertex) + (sourceFloatOffset * sizeof(float));
-                for (var component = 0; component < components; component++)
+                if (flipSecondComponent && component == 1)
                 {
-                    var value = restore is null
-                        ? ReadFiniteSingle(inputBuffer, sourceOffset + (component * sizeof(float)), "mesh attribute")
-                        : RestoredPosition(inputBuffer, sourceOffset, component, restore);
-                    if (flipSecondComponent && component == 1)
-                    {
-                        value = 1.0f - value;
-                    }
-                    BinaryPrimitives.WriteSingleLittleEndian(outputBuffer.AsSpan(outputOffset, 4), value);
-                    outputOffset += 4;
+                    value = 1.0f - value;
                 }
+                BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(index * sizeof(float), sizeof(float)), value);
             }
-            await output.WriteAsync(outputBuffer.AsMemory(0, outputOffset), cancellationToken).ConfigureAwait(false);
-            batchCompleted += count;
-            completed += count;
-            await ReportAsync(progress, completed, totalWork, "mesh_export_write", currentItem).ConfigureAwait(false);
+            await output.WriteAsync(buffer.AsMemory(0, count * sizeof(float)), cancellationToken).ConfigureAwait(false);
+            written += count;
         }
-        return completed;
-    }
-
-    private static float RestoredPosition(
-        byte[] buffer,
-        int vertexOffset,
-        int component,
-        NativePreviewNormalization normalization)
-    {
-        var value = ReadFiniteSingle(buffer, vertexOffset + (component * sizeof(float)), "position");
-        return (float)normalization.Restore(value, component);
     }
 
     private static async Task ReportAsync(
@@ -434,6 +344,4 @@ internal static class NativeGlbExportWriter
     }
 
     private sealed record MeshBounds(float[] Minimum, float[] Maximum);
-    private sealed record WeldedBatch(int[] Indices, int UniqueCount, MeshBounds Bounds);
-    private sealed record WeldProgress(WeldedBatch Welded, long Completed);
 }
