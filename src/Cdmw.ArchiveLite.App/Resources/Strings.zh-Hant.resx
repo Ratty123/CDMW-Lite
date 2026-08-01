@@ -329,9 +329,9 @@
   <data name="None" xml:space="preserve"><value>無</value></data>
   <data name="ItemFinderTitle" xml:space="preserve"><value>物品搜尋器</value></data>
   <data name="ItemFinderNavigation" xml:space="preserve"><value>物品</value></data>
-  <data name="ItemFinderSubtitle" xml:space="preserve"><value>已復原的名稱、背包圖示、模型連結與材質依據</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>已復原的名稱、背包圖示與模型連結</value></data>
   <data name="ItemFinderIntro" xml:space="preserve"><value>瀏覽與 CDMW Full 相同的原生物品目錄。可見圖示會優先載入；其餘背包縮圖在背景準備，並從持續性快取中重複使用。</value></data>
-  <data name="ItemFinderSearchHint" xml:space="preserve"><value>可依顯示名稱、內部名稱、物品 ID、分類、模型、圖示路徑、本地化名稱或材質標籤搜尋</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>可依顯示名稱、內部名稱、物品 ID、分類、模型、圖示路徑或本地化名稱搜尋</value></data>
   <data name="ItemFinderButtonHint" xml:space="preserve"><value>瀏覽已復原的遊戲物品，背包圖示已持續預先載入。</value></data>
   <data name="ItemFinderOpenArchive" xml:space="preserve"><value>請先載入封存，再開啟物品搜尋器。</value></data>
   <data name="ItemFinderReady" xml:space="preserve"><value>物品搜尋器已就緒。</value></data>
@@ -340,7 +340,6 @@
   <data name="ItemFinderPageSummary" xml:space="preserve"><value>正在顯示第 {0:N0}-{1:N0} 項，共 {2:N0} 個相符物品</value></data>
   <data name="ItemFinderFailed" xml:space="preserve"><value>物品搜尋器失敗：{0}</value></data>
   <data name="ItemFinderAllCategories" xml:space="preserve"><value>所有分類</value></data>
-  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>所有材質標籤</value></data>
   <data name="ItemFinderIconFailed" xml:space="preserve"><value>部分背包圖示無法準備：{0}</value></data>
   <data name="ItemFinderIconWarmup" xml:space="preserve"><value>正在預先載入背包圖示：{0:N0}/{1:N0}</value></data>
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>正在準備持續性的背包圖示快取...</value></data>
@@ -353,7 +352,6 @@
   <data name="ItemFinderDescription" xml:space="preserve"><value>描述</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>依據</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>本地化名稱</value></data>
-  <data name="ItemFinderMaterials" xml:space="preserve"><value>材質標籤</value></data>
   <data name="ItemFinderModels" xml:space="preserve"><value>連結的模型</value></data>
   <data name="ItemFinderIcons" xml:space="preserve"><value>背包圖示路徑</value></data>
   <data name="ItemFinderShowExact" xml:space="preserve"><value>顯示精確連結</value></data>
@@ -447,26 +445,10 @@
   <data name="ItemGroupVehicle" xml:space="preserve"><value>載具</value></data>
   <data name="ItemGroupWandFan" xml:space="preserve"><value>法杖 / 扇</value></data>
   <data name="ItemGroupWoodStone" xml:space="preserve"><value>木材 / 石材</value></data>
-  <data name="ItemMaterialBone" xml:space="preserve"><value>骨</value></data>
-  <data name="ItemMaterialCloth" xml:space="preserve"><value>布料</value></data>
-  <data name="ItemMaterialCrystal" xml:space="preserve"><value>結晶</value></data>
-  <data name="ItemMaterialDirt" xml:space="preserve"><value>泥土</value></data>
-  <data name="ItemMaterialFur" xml:space="preserve"><value>毛皮</value></data>
-  <data name="ItemMaterialGlass" xml:space="preserve"><value>玻璃</value></data>
-  <data name="ItemMaterialGrass" xml:space="preserve"><value>草</value></data>
-  <data name="ItemMaterialHair" xml:space="preserve"><value>毛髮</value></data>
-  <data name="ItemMaterialLeather" xml:space="preserve"><value>皮革</value></data>
-  <data name="ItemMaterialMetal" xml:space="preserve"><value>金屬</value></data>
-  <data name="ItemMaterialRope" xml:space="preserve"><value>繩索</value></data>
-  <data name="ItemMaterialSkin" xml:space="preserve"><value>皮膚</value></data>
-  <data name="ItemMaterialStone" xml:space="preserve"><value>石材</value></data>
-  <data name="ItemMaterialWater" xml:space="preserve"><value>水</value></data>
-  <data name="ItemMaterialWood" xml:space="preserve"><value>木材</value></data>
   <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo 預製物件雜湊</value></data>
   <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>圖示/模型參照</value></data>
   <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>本地化顯示名稱</value></data>
   <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>背包圖示路徑</value></data>
-  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>材質槽標籤</value></data>
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>物品資料庫記錄</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>已復原的物品/模型命名</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>未找到更有力的分類依據</value></data>

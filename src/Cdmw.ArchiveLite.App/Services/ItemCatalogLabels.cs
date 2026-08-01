@@ -7,10 +7,10 @@ namespace Cdmw.ArchiveLite.App.Services;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Categories, groups, material tags, and evidence phrases are produced in English by the managed
-/// classifier and the native accelerator, and they travel back to the worker unchanged as search
-/// filters. Translating them at the source would break that round trip, so the canonical value stays
-/// the identity and only the label is localized here.
+/// Categories, groups, and evidence phrases are produced in English by the managed classifier and
+/// the native accelerator, and they travel back to the worker unchanged as search filters.
+/// Translating them at the source would break that round trip, so the canonical value stays the
+/// identity and only the label is localized here.
 /// </para>
 /// <para>
 /// Keys are derived from the value itself (<c>"Axe / Mace / Hammer"</c> becomes
@@ -24,7 +24,6 @@ public static class ItemCatalogLabels
 {
     private const string CategoryPrefix = "ItemCategory";
     private const string GroupPrefix = "ItemGroup";
-    private const string MaterialPrefix = "ItemMaterial";
     private const string EvidencePrefix = "ItemEvidence";
     private const string EvidenceSeparator = "; ";
 
@@ -53,13 +52,6 @@ public static class ItemCatalogLabels
         "Wand / Fan", "Wood / Stone",
     ];
 
-    /// <summary>The canonical material tags the native accelerator folds its aliases onto.</summary>
-    public static IReadOnlyList<string> MaterialTags { get; } =
-    [
-        "bone", "cloth", "crystal", "dirt", "fur", "glass", "grass", "hair", "leather", "metal",
-        "rope", "skin", "stone", "water", "wood",
-    ];
-
     /// <summary>
     /// Every evidence phrase, covering both the parts joined into an item's evidence line and the
     /// whole-string category evidence.
@@ -67,15 +59,13 @@ public static class ItemCatalogLabels
     public static IReadOnlyList<string> EvidencePhrases { get; } =
     [
         "ItemInfo prefab hash", "icon/model reference", "localized display name",
-        "inventory icon path", "material slot tags", "item database record",
+        "inventory icon path", "item database record",
         "Recovered item/model naming", "No stronger category evidence was recovered",
     ];
 
     public static string Category(string? value) => Localize(CategoryPrefix, value);
 
     public static string Group(string? value) => Localize(GroupPrefix, value);
-
-    public static string MaterialTag(string? value) => Localize(MaterialPrefix, value);
 
     /// <summary>Formats the "category / group" pair a tile and the detail pane both show.</summary>
     public static string CategoryPath(string? category, string? group) =>
@@ -100,8 +90,6 @@ public static class ItemCatalogLabels
     public static string CategoryKey(string value) => CategoryPrefix + Slug(value);
 
     public static string GroupKey(string value) => GroupPrefix + Slug(value);
-
-    public static string MaterialTagKey(string value) => MaterialPrefix + Slug(value);
 
     public static string EvidenceKey(string value) => EvidencePrefix + Slug(value);
 

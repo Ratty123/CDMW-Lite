@@ -329,9 +329,9 @@
   <data name="None" xml:space="preserve"><value>없음</value></data>
   <data name="ItemFinderTitle" xml:space="preserve"><value>아이템 찾기</value></data>
   <data name="ItemFinderNavigation" xml:space="preserve"><value>아이템</value></data>
-  <data name="ItemFinderSubtitle" xml:space="preserve"><value>복원된 이름, 인벤토리 아이콘, 모델 링크, 머티리얼 근거</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>복원된 이름, 인벤토리 아이콘, 모델 링크</value></data>
   <data name="ItemFinderIntro" xml:space="preserve"><value>CDMW Full이 쓰는 것과 같은 네이티브 아이템 카탈로그를 살펴봅니다. 화면에 보이는 아이콘이 먼저 로드되고, 나머지 인벤토리 썸네일은 백그라운드에서 준비되어 영구 캐시에서 재사용됩니다.</value></data>
-  <data name="ItemFinderSearchHint" xml:space="preserve"><value>표시 이름, 내부 이름, 아이템 ID, 범주, 모델, 아이콘 경로, 현지화된 이름, 머티리얼 태그로 검색합니다</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>표시 이름, 내부 이름, 아이템 ID, 범주, 모델, 아이콘 경로, 현지화된 이름으로 검색합니다</value></data>
   <data name="ItemFinderButtonHint" xml:space="preserve"><value>영구적으로 미리 로드된 인벤토리 아이콘과 함께 복원된 게임 아이템을 살펴봅니다.</value></data>
   <data name="ItemFinderOpenArchive" xml:space="preserve"><value>아이템 찾기를 열기 전에 아카이브를 불러오세요.</value></data>
   <data name="ItemFinderReady" xml:space="preserve"><value>아이템 찾기가 준비되었습니다.</value></data>
@@ -340,7 +340,6 @@
   <data name="ItemFinderPageSummary" xml:space="preserve"><value>일치하는 아이템 {2:N0}개 중 {0:N0}-{1:N0}개 표시</value></data>
   <data name="ItemFinderFailed" xml:space="preserve"><value>아이템 찾기에 실패했습니다: {0}</value></data>
   <data name="ItemFinderAllCategories" xml:space="preserve"><value>모든 범주</value></data>
-  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>모든 머티리얼 태그</value></data>
   <data name="ItemFinderIconFailed" xml:space="preserve"><value>일부 인벤토리 아이콘을 준비하지 못했습니다: {0}</value></data>
   <data name="ItemFinderIconWarmup" xml:space="preserve"><value>인벤토리 아이콘 미리 로드 중: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>영구 인벤토리 아이콘 캐시를 준비하는 중...</value></data>
@@ -353,7 +352,6 @@
   <data name="ItemFinderDescription" xml:space="preserve"><value>설명</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>근거</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>현지화된 이름</value></data>
-  <data name="ItemFinderMaterials" xml:space="preserve"><value>머티리얼 태그</value></data>
   <data name="ItemFinderModels" xml:space="preserve"><value>연결된 모델</value></data>
   <data name="ItemFinderIcons" xml:space="preserve"><value>인벤토리 아이콘 경로</value></data>
   <data name="ItemFinderShowExact" xml:space="preserve"><value>정확한 링크 보기</value></data>
@@ -447,26 +445,10 @@
   <data name="ItemGroupVehicle" xml:space="preserve"><value>탈것</value></data>
   <data name="ItemGroupWandFan" xml:space="preserve"><value>완드 / 부채</value></data>
   <data name="ItemGroupWoodStone" xml:space="preserve"><value>목재 / 석재</value></data>
-  <data name="ItemMaterialBone" xml:space="preserve"><value>뼈</value></data>
-  <data name="ItemMaterialCloth" xml:space="preserve"><value>천</value></data>
-  <data name="ItemMaterialCrystal" xml:space="preserve"><value>결정</value></data>
-  <data name="ItemMaterialDirt" xml:space="preserve"><value>흙</value></data>
-  <data name="ItemMaterialFur" xml:space="preserve"><value>모피</value></data>
-  <data name="ItemMaterialGlass" xml:space="preserve"><value>유리</value></data>
-  <data name="ItemMaterialGrass" xml:space="preserve"><value>풀</value></data>
-  <data name="ItemMaterialHair" xml:space="preserve"><value>머리카락</value></data>
-  <data name="ItemMaterialLeather" xml:space="preserve"><value>가죽</value></data>
-  <data name="ItemMaterialMetal" xml:space="preserve"><value>금속</value></data>
-  <data name="ItemMaterialRope" xml:space="preserve"><value>밧줄</value></data>
-  <data name="ItemMaterialSkin" xml:space="preserve"><value>피부</value></data>
-  <data name="ItemMaterialStone" xml:space="preserve"><value>돌</value></data>
-  <data name="ItemMaterialWater" xml:space="preserve"><value>물</value></data>
-  <data name="ItemMaterialWood" xml:space="preserve"><value>목재</value></data>
   <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo 프리팹 해시</value></data>
   <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>아이콘/모델 참조</value></data>
   <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>현지화된 표시 이름</value></data>
   <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>인벤토리 아이콘 경로</value></data>
-  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>머티리얼 슬롯 태그</value></data>
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>아이템 데이터베이스 레코드</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>복원된 아이템/모델 명명</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>더 강력한 분류 단서를 찾지 못했습니다</value></data>

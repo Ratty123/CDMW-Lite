@@ -329,9 +329,9 @@
   <data name="None" xml:space="preserve"><value>Nenhum</value></data>
   <data name="ItemFinderTitle" xml:space="preserve"><value>Buscar itens</value></data>
   <data name="ItemFinderNavigation" xml:space="preserve"><value>Itens</value></data>
-  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Nomes recuperados, ícones de inventário, vínculos de modelo e indícios de material</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Nomes recuperados, ícones de inventário e vínculos de modelo</value></data>
   <data name="ItemFinderIntro" xml:space="preserve"><value>Navegue pelo mesmo catálogo nativo de itens usado pelo CDMW Full. Os ícones visíveis carregam primeiro; as demais miniaturas de inventário são preparadas em segundo plano e reutilizadas do cache persistente.</value></data>
-  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Busque por nome exibido, nome interno, ID do item, categoria, modelo, caminho do ícone, nome localizado ou etiqueta de material</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Busque por nome exibido, nome interno, ID do item, categoria, modelo, caminho do ícone ou nome localizado</value></data>
   <data name="ItemFinderButtonHint" xml:space="preserve"><value>Navegue pelos itens recuperados do jogo com os ícones de inventário pré-carregados de forma persistente.</value></data>
   <data name="ItemFinderOpenArchive" xml:space="preserve"><value>Carregue um arquivo antes de abrir o Buscar itens.</value></data>
   <data name="ItemFinderReady" xml:space="preserve"><value>O Buscar itens está pronto.</value></data>
@@ -340,7 +340,6 @@
   <data name="ItemFinderPageSummary" xml:space="preserve"><value>Exibindo {0:N0}-{1:N0} de {2:N0} itens correspondentes</value></data>
   <data name="ItemFinderFailed" xml:space="preserve"><value>Falha no Buscar itens: {0}</value></data>
   <data name="ItemFinderAllCategories" xml:space="preserve"><value>Todas as categorias</value></data>
-  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>Todas as etiquetas de material</value></data>
   <data name="ItemFinderIconFailed" xml:space="preserve"><value>Não foi possível preparar alguns ícones de inventário: {0}</value></data>
   <data name="ItemFinderIconWarmup" xml:space="preserve"><value>Pré-carregando ícones de inventário: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Preparando o cache persistente de ícones de inventário...</value></data>
@@ -353,7 +352,6 @@
   <data name="ItemFinderDescription" xml:space="preserve"><value>Descrição</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Indícios</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Nomes localizados</value></data>
-  <data name="ItemFinderMaterials" xml:space="preserve"><value>Etiquetas de material</value></data>
   <data name="ItemFinderModels" xml:space="preserve"><value>Modelos vinculados</value></data>
   <data name="ItemFinderIcons" xml:space="preserve"><value>Caminhos dos ícones de inventário</value></data>
   <data name="ItemFinderShowExact" xml:space="preserve"><value>Mostrar vínculos exatos</value></data>
@@ -447,26 +445,10 @@
   <data name="ItemGroupVehicle" xml:space="preserve"><value>Veículo</value></data>
   <data name="ItemGroupWandFan" xml:space="preserve"><value>Varinha / Leque</value></data>
   <data name="ItemGroupWoodStone" xml:space="preserve"><value>Madeira / Pedra</value></data>
-  <data name="ItemMaterialBone" xml:space="preserve"><value>osso</value></data>
-  <data name="ItemMaterialCloth" xml:space="preserve"><value>tecido</value></data>
-  <data name="ItemMaterialCrystal" xml:space="preserve"><value>cristal</value></data>
-  <data name="ItemMaterialDirt" xml:space="preserve"><value>terra</value></data>
-  <data name="ItemMaterialFur" xml:space="preserve"><value>pelo</value></data>
-  <data name="ItemMaterialGlass" xml:space="preserve"><value>vidro</value></data>
-  <data name="ItemMaterialGrass" xml:space="preserve"><value>grama</value></data>
-  <data name="ItemMaterialHair" xml:space="preserve"><value>cabelo</value></data>
-  <data name="ItemMaterialLeather" xml:space="preserve"><value>couro</value></data>
-  <data name="ItemMaterialMetal" xml:space="preserve"><value>metal</value></data>
-  <data name="ItemMaterialRope" xml:space="preserve"><value>corda</value></data>
-  <data name="ItemMaterialSkin" xml:space="preserve"><value>pele</value></data>
-  <data name="ItemMaterialStone" xml:space="preserve"><value>pedra</value></data>
-  <data name="ItemMaterialWater" xml:space="preserve"><value>água</value></data>
-  <data name="ItemMaterialWood" xml:space="preserve"><value>madeira</value></data>
   <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>hash de prefab do ItemInfo</value></data>
   <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>referência de ícone/modelo</value></data>
   <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>nome de exibição localizado</value></data>
   <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>caminho do ícone de inventário</value></data>
-  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>tags de slot de material</value></data>
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>registro do banco de dados de itens</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Nomenclatura de item/modelo recuperada</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Nenhum indício de categoria mais forte foi recuperado</value></data>

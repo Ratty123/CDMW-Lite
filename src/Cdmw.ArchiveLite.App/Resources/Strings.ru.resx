@@ -329,9 +329,9 @@
   <data name="None" xml:space="preserve"><value>Нет</value></data>
   <data name="ItemFinderTitle" xml:space="preserve"><value>Поиск предметов</value></data>
   <data name="ItemFinderNavigation" xml:space="preserve"><value>Предметы</value></data>
-  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Восстановленные имена, значки инвентаря, ссылки на модели и признаки материалов</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Восстановленные имена, значки инвентаря и ссылки на модели</value></data>
   <data name="ItemFinderIntro" xml:space="preserve"><value>Просматривайте тот же нативный каталог предметов, что и CDMW Full. Видимые значки загружаются первыми; остальные миниатюры инвентаря готовятся в фоне и берутся из постоянного кэша.</value></data>
-  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Поиск по отображаемому имени, внутреннему имени, идентификатору, категории, модели, пути значка, локализованному имени или метке материала</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Поиск по отображаемому имени, внутреннему имени, идентификатору, категории, модели, пути значка или локализованному имени</value></data>
   <data name="ItemFinderButtonHint" xml:space="preserve"><value>Просматривайте восстановленные игровые предметы с заранее загруженными значками инвентаря.</value></data>
   <data name="ItemFinderOpenArchive" xml:space="preserve"><value>Загрузите архив, прежде чем открывать Поиск предметов.</value></data>
   <data name="ItemFinderReady" xml:space="preserve"><value>Поиск предметов готов.</value></data>
@@ -340,7 +340,6 @@
   <data name="ItemFinderPageSummary" xml:space="preserve"><value>Показаны {0:N0}-{1:N0} из {2:N0} подходящих предметов</value></data>
   <data name="ItemFinderFailed" xml:space="preserve"><value>Сбой Поиска предметов: {0}</value></data>
   <data name="ItemFinderAllCategories" xml:space="preserve"><value>Все категории</value></data>
-  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>Все метки материалов</value></data>
   <data name="ItemFinderIconFailed" xml:space="preserve"><value>Некоторые значки инвентаря подготовить не удалось: {0}</value></data>
   <data name="ItemFinderIconWarmup" xml:space="preserve"><value>Предзагрузка значков инвентаря: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Подготовка постоянного кэша значков инвентаря...</value></data>
@@ -353,7 +352,6 @@
   <data name="ItemFinderDescription" xml:space="preserve"><value>Описание</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Признаки</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Локализованные имена</value></data>
-  <data name="ItemFinderMaterials" xml:space="preserve"><value>Метки материалов</value></data>
   <data name="ItemFinderModels" xml:space="preserve"><value>Связанные модели</value></data>
   <data name="ItemFinderIcons" xml:space="preserve"><value>Пути значков инвентаря</value></data>
   <data name="ItemFinderShowExact" xml:space="preserve"><value>Показать точные ссылки</value></data>
@@ -447,26 +445,10 @@
   <data name="ItemGroupVehicle" xml:space="preserve"><value>Транспорт</value></data>
   <data name="ItemGroupWandFan" xml:space="preserve"><value>Жезл / Веер</value></data>
   <data name="ItemGroupWoodStone" xml:space="preserve"><value>Дерево / Камень</value></data>
-  <data name="ItemMaterialBone" xml:space="preserve"><value>кость</value></data>
-  <data name="ItemMaterialCloth" xml:space="preserve"><value>ткань</value></data>
-  <data name="ItemMaterialCrystal" xml:space="preserve"><value>кристалл</value></data>
-  <data name="ItemMaterialDirt" xml:space="preserve"><value>земля</value></data>
-  <data name="ItemMaterialFur" xml:space="preserve"><value>мех</value></data>
-  <data name="ItemMaterialGlass" xml:space="preserve"><value>стекло</value></data>
-  <data name="ItemMaterialGrass" xml:space="preserve"><value>трава</value></data>
-  <data name="ItemMaterialHair" xml:space="preserve"><value>волосы</value></data>
-  <data name="ItemMaterialLeather" xml:space="preserve"><value>кожа</value></data>
-  <data name="ItemMaterialMetal" xml:space="preserve"><value>металл</value></data>
-  <data name="ItemMaterialRope" xml:space="preserve"><value>верёвка</value></data>
-  <data name="ItemMaterialSkin" xml:space="preserve"><value>кожа тела</value></data>
-  <data name="ItemMaterialStone" xml:space="preserve"><value>камень</value></data>
-  <data name="ItemMaterialWater" xml:space="preserve"><value>вода</value></data>
-  <data name="ItemMaterialWood" xml:space="preserve"><value>дерево</value></data>
   <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>хеш префаба ItemInfo</value></data>
   <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>ссылка на значок/модель</value></data>
   <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>локализованное отображаемое имя</value></data>
   <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>путь значка инвентаря</value></data>
-  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>теги слотов материалов</value></data>
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>запись в базе данных предметов</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Восстановленные имена предмета/модели</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Более надёжных признаков категории не найдено</value></data>

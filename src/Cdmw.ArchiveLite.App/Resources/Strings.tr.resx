@@ -329,9 +329,9 @@
   <data name="None" xml:space="preserve"><value>Yok</value></data>
   <data name="ItemFinderTitle" xml:space="preserve"><value>Eşya bulucu</value></data>
   <data name="ItemFinderNavigation" xml:space="preserve"><value>Eşyalar</value></data>
-  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Kurtarılan adlar, envanter simgeleri, model bağlantıları ve malzeme kanıtları</value></data>
+  <data name="ItemFinderSubtitle" xml:space="preserve"><value>Kurtarılan adlar, envanter simgeleri ve model bağlantıları</value></data>
   <data name="ItemFinderIntro" xml:space="preserve"><value>CDMW Full'ün kullandığı yerel eşya kataloğunun aynısına gözatın. Görünür simgeler önce yüklenir; kalan envanter küçük resimleri arka planda hazırlanır ve kalıcı önbellekten yeniden kullanılır.</value></data>
-  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Görünen ad, iç ad, eşya kimliği, kategori, model, simge yolu, yerelleştirilmiş ad veya malzeme etiketiyle arayın</value></data>
+  <data name="ItemFinderSearchHint" xml:space="preserve"><value>Görünen ad, iç ad, eşya kimliği, kategori, model, simge yolu veya yerelleştirilmiş adla arayın</value></data>
   <data name="ItemFinderButtonHint" xml:space="preserve"><value>Kalıcı olarak önceden yüklenmiş envanter simgeleriyle kurtarılan oyun eşyalarına gözatın.</value></data>
   <data name="ItemFinderOpenArchive" xml:space="preserve"><value>Eşya bulucuyu açmadan önce bir arşiv yükleyin.</value></data>
   <data name="ItemFinderReady" xml:space="preserve"><value>Eşya bulucu hazır.</value></data>
@@ -340,7 +340,6 @@
   <data name="ItemFinderPageSummary" xml:space="preserve"><value>Eşleşen {2:N0} eşyadan {0:N0}-{1:N0} arası gösteriliyor</value></data>
   <data name="ItemFinderFailed" xml:space="preserve"><value>Eşya bulucu başarısız oldu: {0}</value></data>
   <data name="ItemFinderAllCategories" xml:space="preserve"><value>Tüm kategoriler</value></data>
-  <data name="ItemFinderAllMaterials" xml:space="preserve"><value>Tüm malzeme etiketleri</value></data>
   <data name="ItemFinderIconFailed" xml:space="preserve"><value>Bazı envanter simgeleri hazırlanamadı: {0}</value></data>
   <data name="ItemFinderIconWarmup" xml:space="preserve"><value>Envanter simgeleri önceden yükleniyor: {0:N0}/{1:N0}</value></data>
   <data name="ItemFinderIconWarmupStarting" xml:space="preserve"><value>Kalıcı envanter simgesi önbelleği hazırlanıyor...</value></data>
@@ -353,7 +352,6 @@
   <data name="ItemFinderDescription" xml:space="preserve"><value>Açıklama</value></data>
   <data name="ItemFinderEvidence" xml:space="preserve"><value>Kanıt</value></data>
   <data name="ItemFinderLocalizedNames" xml:space="preserve"><value>Yerelleştirilmiş adlar</value></data>
-  <data name="ItemFinderMaterials" xml:space="preserve"><value>Malzeme etiketleri</value></data>
   <data name="ItemFinderModels" xml:space="preserve"><value>Bağlantılı modeller</value></data>
   <data name="ItemFinderIcons" xml:space="preserve"><value>Envanter simgesi yolları</value></data>
   <data name="ItemFinderShowExact" xml:space="preserve"><value>Tam bağlantıları göster</value></data>
@@ -447,26 +445,10 @@
   <data name="ItemGroupVehicle" xml:space="preserve"><value>Araç</value></data>
   <data name="ItemGroupWandFan" xml:space="preserve"><value>Asa / Yelpaze</value></data>
   <data name="ItemGroupWoodStone" xml:space="preserve"><value>Odun / Taş</value></data>
-  <data name="ItemMaterialBone" xml:space="preserve"><value>kemik</value></data>
-  <data name="ItemMaterialCloth" xml:space="preserve"><value>kumaş</value></data>
-  <data name="ItemMaterialCrystal" xml:space="preserve"><value>kristal</value></data>
-  <data name="ItemMaterialDirt" xml:space="preserve"><value>toprak</value></data>
-  <data name="ItemMaterialFur" xml:space="preserve"><value>kürk</value></data>
-  <data name="ItemMaterialGlass" xml:space="preserve"><value>cam</value></data>
-  <data name="ItemMaterialGrass" xml:space="preserve"><value>çim</value></data>
-  <data name="ItemMaterialHair" xml:space="preserve"><value>saç</value></data>
-  <data name="ItemMaterialLeather" xml:space="preserve"><value>deri</value></data>
-  <data name="ItemMaterialMetal" xml:space="preserve"><value>metal</value></data>
-  <data name="ItemMaterialRope" xml:space="preserve"><value>halat</value></data>
-  <data name="ItemMaterialSkin" xml:space="preserve"><value>ten</value></data>
-  <data name="ItemMaterialStone" xml:space="preserve"><value>taş</value></data>
-  <data name="ItemMaterialWater" xml:space="preserve"><value>su</value></data>
-  <data name="ItemMaterialWood" xml:space="preserve"><value>odun</value></data>
   <data name="ItemEvidenceItemInfoPrefabHash" xml:space="preserve"><value>ItemInfo prefab karması</value></data>
   <data name="ItemEvidenceIconModelReference" xml:space="preserve"><value>simge/model referansı</value></data>
   <data name="ItemEvidenceLocalizedDisplayName" xml:space="preserve"><value>yerelleştirilmiş görünen ad</value></data>
   <data name="ItemEvidenceInventoryIconPath" xml:space="preserve"><value>envanter simgesi yolu</value></data>
-  <data name="ItemEvidenceMaterialSlotTags" xml:space="preserve"><value>malzeme yuvası etiketleri</value></data>
   <data name="ItemEvidenceItemDatabaseRecord" xml:space="preserve"><value>eşya veritabanı kaydı</value></data>
   <data name="ItemEvidenceRecoveredItemModelNaming" xml:space="preserve"><value>Kurtarılan eşya/model adlandırması</value></data>
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Daha güçlü bir kategori kanıtı bulunamadı</value></data>
