@@ -16,6 +16,7 @@ The application is self-contained in this repository and keeps archive queries, 
 - Search text across archives or loose folders with cancellation, result limits, and in-file navigation.
 - Find known items by localized name and follow exact or related archive links.
 - Preview text, XML, images, DDS textures, supported media including the sounds a Wwise `.bnk` embeds, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
+- Export a mesh as OBJ, GLB or FBX, byte-identical to what the full CDMW workbench writes. A skinned character carries its skeleton and its per-vertex weights into GLB and FBX, so it arrives posable rather than as a frozen shell.
 - Discover and export associated assets without altering game data.
 - Run as a portable Windows application or a single self-extracting executable.
 - Switch the interface between the fourteen languages Crimson Desert itself ships; every one but English is machine translated and unreviewed.
@@ -132,13 +133,40 @@ Preview output is checked against the assets themselves rather than by eye. [PRE
 | equipment assets rendered and compared | **~5,400** |
 | whole-corpus scans of all 12,340 equipment PACs | **4** |
 
+## Mesh export
+
+A mesh exports as OBJ, GLB or binary FBX. The vertices, their order and the part names are
+byte-identical to what the full CDMW workbench writes, so a mesh exported here and one exported
+there can be joined as shape keys without moving a vertex.
+
+| | OBJ | GLB | FBX |
+| --- | --- | --- | --- |
+| geometry, in the archive's own units and order | yes | yes | yes |
+| material names, and a material library | `.mtl` | material per part | material per part |
+| armature and per-vertex weights | — | yes | yes |
+| bones written | — | those the mesh uses, plus their ancestors | the whole skeleton |
+| round-trip sidecar naming the source entry | `.obj.meta.json` | — | — |
+
+Geometry is in game units, and a game unit is a metre: a character body measures 1.84 tall in all
+three. The FBX declares this rather than leaving an importer to assume centimetres.
+
+Only a skinned `.pac` carries a rig. A rigidly bound mesh — a prop, an accessory, a vehicle — puts
+its whole weight on one influence and records no bone anywhere in the file, so the bone it follows
+is not the mesh's to state; it exports unrigged. So does a smooth-skinned mesh whose bone palette
+no skeleton named by its own path accounts for, which is most NPC and monster gear. The preview
+package records which of those cases it found and why.
+
+`scripts/blender/` holds a headless script that imports an export, checks every vertex is weighted
+and sums to 1.0, poses a bone and asserts the vertices that moved are the ones near it. It is not
+part of the focused gate, since it needs Blender and licensed game assets.
+
 ## Verified behaviour
 
 These are asserted by the focused gate, not measured by hand. `scripts/test_archive_lite.ps1 -Configuration Debug` reproduces them.
 
 | | |
 | --- | --- |
-| focused scenarios | 48, covering archive, preview, export, worker lifetime and cache eviction |
+| focused scenarios | 53, covering archive, preview, export, worker lifetime and cache eviction |
 | model preview, cold cache | ~100 ms |
 | model preview, warm cache | ~1 ms, and warm across sessions |
 | renderer | headless GPU soak, production D3D11 backend, windows stay hidden |
