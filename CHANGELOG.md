@@ -4,6 +4,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-08-01
+
 ### Added
 
 - A character mesh exports with its skeleton and its weights, as a rigged GLB and a rigged FBX. Until now a `.pac` arrived in Blender as an unposable shell: nothing in the export path read skinning at all.
