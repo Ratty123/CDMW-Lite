@@ -234,11 +234,20 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
 
     public const string DirectoryOnlyItemDescription = "Readable only when the row directory is present.";
 
+    /// <summary>The item-string category, which is what the shipped table files item names under.</summary>
+    private const uint ItemStringCategory = 7;
+
     /// <param name="includeRowDirectory">
     /// When false the package ships the table blob without its .pabgh companion, which is the shape
     /// that forces the indexer onto its pattern-scanning fallback.
     /// </param>
-    public static async Task<SyntheticArchiveFixture> CreateNameIndexAsync(bool includeRowDirectory = true)
+    /// <param name="corruptLocalization">
+    /// When true the string table's footer declares more records than the table holds, which is a
+    /// buffer no reader should accept as a partially valid string table.
+    /// </param>
+    public static async Task<SyntheticArchiveFixture> CreateNameIndexAsync(
+        bool includeRowDirectory = true,
+        bool corruptLocalization = false)
     {
         const uint exactModelHash = 0x1D586E71;        // cd_test_01_sword
         const uint relatedModelHash = 0xA1B2C3D4;
@@ -258,10 +267,13 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
                 exactModelHash,
                 relatedModelHash,
                 scanMarkerField: 1)),
+            // Shipped item keys are all numeric, and this one deliberately is not: the reader this
+            // replaced accepted only six-to-twenty ASCII digits, so a key of any other shape was
+            // unreachable no matter how the record was found.
             (5678, BuildItemInfoRow(
                 itemId: 5678,
                 internalName: "Item_Hidden_Armor",
-                localizationId: "22345678",
+                localizationId: "iteminfo_hidden_armor_name",
                 descriptionId: "22345679",
                 hiddenExactModelHash,
                 hiddenRelatedModelHash,
@@ -274,11 +286,12 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         ]);
         var localization = BuildLocalization(
         [
-            ("12345678", ScannableItemName),
-            ("12345679", ScannableItemDescription),
-            ("22345678", DirectoryOnlyItemName),
-            ("22345679", DirectoryOnlyItemDescription),
-        ]);
+            (ItemStringCategory, "12345678", ScannableItemName),
+            (ItemStringCategory, "12345679", ScannableItemDescription),
+            (ItemStringCategory, "iteminfo_hidden_armor_name", DirectoryOnlyItemName),
+            (ItemStringCategory, "22345679", DirectoryOnlyItemDescription),
+        ],
+        corruptLocalization ? 1 : 0);
 
         var tables = new List<(string Path, byte[] Bytes)>
         {
@@ -305,7 +318,7 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         await BuildPackageAsync(
             root,
             "0020",
-            [("localization/localizationstring_eng.pabgb", localization)]).ConfigureAwait(false);
+            [("gamedata/stringtable/binary__/localizationstring_eng.paloc", localization)]).ConfigureAwait(false);
         return fixture;
     }
 
@@ -591,18 +604,31 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         return (blob.ToArray(), directory.ToArray());
     }
 
-    private static byte[] BuildLocalization(IReadOnlyList<(string Id, string Value)> rows)
+    /// <summary>
+    /// A .paloc string table: a flat run of {category, reserved, key length, key, text length,
+    /// text} records closed by a four-byte record count.
+    /// </summary>
+    /// <param name="declaredCountOffset">
+    /// Added to the count written in the footer. A non-zero value makes the footer disagree with
+    /// the records in front of it, which is the shape a reader has to reject rather than truncate.
+    /// </param>
+    private static byte[] BuildLocalization(
+        IReadOnlyList<(uint Category, string Id, string Value)> rows,
+        int declaredCountOffset = 0)
     {
         using var output = new MemoryStream();
-        foreach (var (id, value) in rows)
+        foreach (var (category, id, value) in rows)
         {
-            var idBytes = Encoding.ASCII.GetBytes(id);
+            var idBytes = Encoding.UTF8.GetBytes(id);
             var valueBytes = Encoding.UTF8.GetBytes(value);
+            WriteUInt32(output, category);
+            WriteUInt32(output, 0);
             WriteUInt32(output, checked((uint)idBytes.Length));
             output.Write(idBytes);
             WriteUInt32(output, checked((uint)valueBytes.Length));
             output.Write(valueBytes);
         }
+        WriteUInt32(output, checked((uint)(rows.Count + declaredCountOffset)));
         return output.ToArray();
     }
 

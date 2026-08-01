@@ -886,6 +886,10 @@ struct NativeItemRecord {
     std::string description;
     std::string name_key;
     std::string description_key;
+    // Which kind of string the table filed each key under. Carried so a run's decode can be
+    // described and compared against CDMW Full's rather than only counted.
+    int name_category = -1;
+    int description_category = -1;
     std::vector<std::string> localized_names;
     std::vector<std::uint32_t> prefab_hashes;
     std::vector<std::string> model_stems;
@@ -899,28 +903,70 @@ void add_unique(std::vector<std::string>& values, const std::string& value) {
     if (std::find(values.begin(), values.end(), value) == values.end()) values.push_back(value);
 }
 
-std::map<std::string, std::string> parse_localization_bin(const std::vector<char>& data) {
-    std::map<std::string, std::string> rows;
+struct LocalizationRow {
+    std::uint32_t category = 0;
+    std::string text;
+};
+
+using LocalizationTable = std::map<std::string, LocalizationRow>;
+using LocalizationTables = std::map<std::string, LocalizationTable>;
+
+// The game's string table is a flat run of records closed by a four-byte record count. Each record
+// is {category uint32, reserved uint32, key length uint32, key, text length uint32, text}, with the
+// category grouping strings by kind: item strings are 7, node 28, textdialog 29, aidialogstring-
+// groupinfo 31, quest 34, questdialog 38.
+//
+// Two facts have to hold for the buffer to be this format at all, and both are checked rather than
+// assumed: the walk must land exactly on the footer, and the number of records walked must equal
+// the number the footer declares. A file that fails either is not a string table, and saying so is
+// worth more than returning however much of it happened to parse.
+LocalizationTable parse_paloc(const std::vector<char>& data) {
+    if (data.size() < 4) throw std::runtime_error("localization table is smaller than its own footer");
+    const size_t end = data.size() - 4;
+    const std::uint32_t declared_count = read_u32(data, end);
+    LocalizationTable rows;
     size_t pos = 0;
-    while (pos + 8 < data.size()) {
-        const std::uint32_t slen = read_u32(data, pos);
-        if (slen > 0 && slen <= 50000 && pos + 4 + slen <= data.size()) {
-            std::string id(data.begin() + static_cast<std::ptrdiff_t>(pos + 4), data.begin() + static_cast<std::ptrdiff_t>(pos + 4 + slen));
-            bool digits = slen >= 6 && slen <= 20 && std::all_of(id.begin(), id.end(), [](unsigned char ch) { return std::isdigit(ch); });
-            const size_t text_pos = pos + 4 + slen;
-            if (digits && text_pos + 4 < data.size()) {
-                const std::uint32_t text_len = read_u32(data, text_pos);
-                if (text_len > 0 && text_len < 50000 && text_pos + 4 + text_len <= data.size()) {
-                    std::string text(data.begin() + static_cast<std::ptrdiff_t>(text_pos + 4), data.begin() + static_cast<std::ptrdiff_t>(text_pos + 4 + text_len));
-                    rows[id] = text;
-                    pos = text_pos + 4 + text_len;
-                    continue;
-                }
-            }
-        }
-        ++pos;
+    std::uint64_t walked = 0;
+    while (pos < end) {
+        if (end - pos < 12) throw std::runtime_error("localization record header runs past the table");
+        const std::uint32_t category = read_u32(data, pos);
+        const std::uint32_t key_length = read_u32(data, pos + 8);
+        if (key_length > end - (pos + 12)) throw std::runtime_error("localization key runs past the table");
+        const size_t text_length_at = pos + 12 + key_length;
+        if (end - text_length_at < 4) throw std::runtime_error("localization text length runs past the table");
+        const std::uint32_t text_length = read_u32(data, text_length_at);
+        if (text_length > end - (text_length_at + 4)) throw std::runtime_error("localization text runs past the table");
+        std::string key(
+            data.begin() + static_cast<std::ptrdiff_t>(pos + 12),
+            data.begin() + static_cast<std::ptrdiff_t>(pos + 12 + key_length));
+        LocalizationRow row;
+        row.category = category;
+        row.text.assign(
+            data.begin() + static_cast<std::ptrdiff_t>(text_length_at + 4),
+            data.begin() + static_cast<std::ptrdiff_t>(text_length_at + 4 + text_length));
+        rows[std::move(key)] = std::move(row);
+        pos = text_length_at + 4 + text_length;
+        ++walked;
+    }
+    if (pos != end) throw std::runtime_error("localization records did not end on the table footer");
+    if (walked != declared_count) {
+        throw std::runtime_error(
+            "localization table declares " + std::to_string(declared_count)
+            + " records but holds " + std::to_string(walked));
     }
     return rows;
+}
+
+const LocalizationRow* localized_row(
+    const LocalizationTables& tables,
+    const std::string& language,
+    const std::string& key
+) {
+    if (key.empty()) return nullptr;
+    auto table = tables.find(language);
+    if (table == tables.end()) return nullptr;
+    auto found = table->second.find(key);
+    return found == table->second.end() ? nullptr : &found->second;
 }
 
 std::string normalize_icon_model_stem(std::string value) {
@@ -1216,15 +1262,12 @@ std::vector<std::string> iteminfo_localization_id_candidates(
 }
 
 std::string localized_text(
-    const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
+    const LocalizationTables& loc_tables,
     const std::string& language,
     const std::string& key
 ) {
-    if (key.empty()) return {};
-    auto table = loc_tables.find(language);
-    if (table == loc_tables.end()) return {};
-    auto found = table->second.find(key);
-    return found == table->second.end() ? std::string() : found->second;
+    const LocalizationRow* row = localized_row(loc_tables, language, key);
+    return row == nullptr ? std::string() : row->text;
 }
 
 // Fills in everything that is read out of the record body rather than its header: the localized
@@ -1233,7 +1276,7 @@ std::string localized_text(
 // in how they decide where a record starts and ends.
 void fill_item_record_body(
     const std::vector<char>& data,
-    const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
+    const LocalizationTables& loc_tables,
     const std::map<std::uint32_t, std::string>& icon_hashes,
     const std::string& loc_id,
     size_t scan_begin,
@@ -1246,15 +1289,19 @@ void fill_item_record_body(
     if (!loc_id.empty()) {
         for (const auto& table : loc_tables) {
             auto found = table.second.find(loc_id);
-            if (found != table.second.end() && !found->second.empty()) {
-                const std::string key = lower_copy(found->second);
+            if (found != table.second.end() && !found->second.text.empty()) {
+                const std::string key = lower_copy(found->second.text);
                 if (!seen_names.count(key)) {
-                    record.localized_names.push_back(found->second);
+                    record.localized_names.push_back(found->second.text);
                     seen_names.insert(key);
                 }
             }
         }
-        record.display_name = localized_text(loc_tables, "eng", loc_id);
+        const LocalizationRow* english = localized_row(loc_tables, "eng", loc_id);
+        if (english != nullptr) {
+            record.display_name = english->text;
+            record.name_category = static_cast<int>(english->category);
+        }
         if (record.display_name.empty() && !record.localized_names.empty()) record.display_name = record.localized_names.front();
     }
 
@@ -1303,7 +1350,7 @@ void fill_item_record_body(
 std::vector<NativeItemRecord> parse_iteminfo_rows(
     const std::vector<char>& data,
     const PabgTable& table,
-    const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
+    const LocalizationTables& loc_tables,
     const std::map<std::uint32_t, std::string>& icon_hashes
 ) {
     std::vector<NativeItemRecord> items;
@@ -1327,7 +1374,10 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
             row.begin,
             row.end,
             record);
-        record.description = localized_text(loc_tables, "eng", record.description_key);
+        if (const LocalizationRow* row = localized_row(loc_tables, "eng", record.description_key)) {
+            record.description = row->text;
+            record.description_category = static_cast<int>(row->category);
+        }
         items.push_back(std::move(record));
     }
     return items;
@@ -1339,7 +1389,7 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
 // the table and has to guess where the localization key sits.
 std::vector<NativeItemRecord> parse_iteminfo_bin(
     const std::vector<char>& data,
-    const std::map<std::string, std::map<std::string, std::string>>& loc_tables,
+    const LocalizationTables& loc_tables,
     const std::map<std::uint32_t, std::string>& icon_hashes
 ) {
     static const unsigned char marker[] = {0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x70,0x00,0x00,0x00};
@@ -1372,7 +1422,7 @@ std::vector<NativeItemRecord> parse_iteminfo_bin(
         for (const std::string& candidate : localization_ids) {
             const bool has_name = std::any_of(loc_tables.begin(), loc_tables.end(), [&](const auto& table) {
                 auto found = table.second.find(candidate);
-                return found != table.second.end() && !found->second.empty();
+                return found != table.second.end() && !found->second.text.empty();
             });
             if (has_name) {
                 loc_id = candidate;
@@ -1529,6 +1579,17 @@ std::string json_u32_array(const std::vector<std::uint32_t>& values) {
     return out.str();
 }
 
+void append_category_json(std::ostringstream& out, const std::map<std::uint32_t, std::uint64_t>& rows) {
+    out << "[";
+    bool first = true;
+    for (const auto& row : rows) {
+        if (!first) out << ",";
+        first = false;
+        out << "[" << row.first << "," << row.second << "]";
+    }
+    out << "]";
+}
+
 void append_map_json(std::ostringstream& out, const std::map<std::string, std::string>& rows) {
     out << "[";
     bool first = true;
@@ -1548,10 +1609,25 @@ int run_item_index_job(
 ) {
     try {
         std::vector<Entry> entries = read_entries_tsv(entries_path);
-        std::map<std::string, std::map<std::string, std::string>> loc_tables;
+        LocalizationTables loc_tables;
+        std::vector<std::string> localization_failures;
+        std::map<std::uint32_t, std::uint64_t> localization_categories;
+        std::uint64_t localization_row_count = 0;
         for (const std::string& lang : {"kor","eng","jpn","rus","tur","spa-es","spa-mx","fre","ger","ita","pol","por-br","zho-tw","zho-cn"}) {
             std::vector<char> data = read_binary_if_exists(work_dir / ("loc_" + lang + ".bin"));
-            if (!data.empty()) loc_tables[lang] = parse_localization_bin(data);
+            if (data.empty()) continue;
+            // One unreadable language costs that language's names, not the whole catalog, so the
+            // failure is named in the report rather than thrown all the way out of the job.
+            try {
+                LocalizationTable table = parse_paloc(data);
+                localization_row_count += table.size();
+                if (lang == "eng") {
+                    for (const auto& row : table) ++localization_categories[row.second.category];
+                }
+                loc_tables[lang] = std::move(table);
+            } catch (const std::exception& exc) {
+                localization_failures.push_back(lang + ": " + exc.what());
+            }
         }
         const std::vector<char> stringinfo = read_binary_if_exists(work_dir / "stringinfo.bin");
         PabgTable stringinfo_table;
@@ -1654,7 +1730,9 @@ int run_item_index_job(
                 << ",\"internal_name\":\"" << json_escape(item.internal_name)
                 << "\",\"display_name\":\"" << json_escape(item.display_name)
                 << "\",\"description\":\"" << json_escape(item.description)
-                << "\",\"localized_names\":" << json_string_array(item.localized_names)
+                << "\",\"name_category\":" << item.name_category
+                << ",\"description_category\":" << item.description_category
+                << ",\"localized_names\":" << json_string_array(item.localized_names)
                 << ",\"prefab_hashes\":" << json_u32_array(item.prefab_hashes)
                 << ",\"model_stems\":" << json_string_array(item.model_stems)
                 << ",\"pac_files\":" << json_string_array(item.pac_files)
@@ -1678,6 +1756,10 @@ int run_item_index_job(
             << "\",\"string_row_source\":\"" << (stringinfo_from_directory ? "row_directory" : "marker_scan")
             << "\",\"item_row_count\":" << iteminfo_row_count
             << ",\"item_parsed_count\":" << items.size()
+            << ",\"localization_row_count\":" << localization_row_count
+            << ",\"localization_categories\":";
+        append_category_json(out, localization_categories);
+        out << ",\"localization_failures\":" << json_string_array(localization_failures)
             << "}";
         write_text(report_path, out.str());
         return 0;
