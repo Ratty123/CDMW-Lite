@@ -503,6 +503,23 @@ struct Vec3 {
     float z = 0.0f;
 };
 
+// What an interchange file carries, as opposed to what the renderer draws. The render vertex is a
+// float: the GPU wants one, and a preview is framed into a display cube anyway, so the last digits
+// were never going to survive. An exported mesh has no such excuse, and CDMW Full decodes the same
+// records in double, so a position or a normal recovered here in float would differ from Full's in
+// the eighth digit for no reason but the type it passed through. These are decoded once, in double,
+// straight from the source record and never framed.
+struct ExportVec3 {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+};
+
+struct ExportVec2 {
+    double x = 0.0;
+    double y = 0.0;
+};
+
 struct ParSection {
     int index = 0;
     std::uint32_t offset = 0;
@@ -523,11 +540,21 @@ struct PacDescriptor {
 struct NativeSubmesh {
     std::string name;
     std::string material;
+    // The texture the source names for this part, which is what an OBJ's material library binds
+    // as map_Kd. Held separately from the name and the material because the three coincide in
+    // some formats and not in others.
+    std::string texture;
     std::string source_model_path;
     std::string source_component_label;
     std::vector<Vec3> positions;
     std::vector<Vec2> uvs;
     std::vector<Vec3> normals;
+    // The same vertices an interchange file has to carry, in this array's own order, decoded in
+    // double and left in source space. Empty when a parser has no exact decode to offer, in which
+    // case the export falls back to the render vertices.
+    std::vector<ExportVec3> export_positions;
+    std::vector<ExportVec3> export_normals;
+    std::vector<ExportVec2> export_uvs;
     std::vector<std::uint32_t> indices;
     std::vector<std::int32_t> source_vertex_indices;
     int source_submesh_index = -1;

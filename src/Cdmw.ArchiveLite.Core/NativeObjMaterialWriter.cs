@@ -50,12 +50,22 @@ internal static class NativeObjMaterialWriter
             builder.Append("Ns 50.000\n");
             builder.Append("d 1.000\n");
             builder.Append("illum 2\n");
-            var texture = MatchTexture(name, batch.MaterialName, companionTextures);
+            // A texture exported alongside is bound by its actual relative path. Otherwise the
+            // source's own texture name is stated, which is what CDMW Full writes: the name is
+            // what the material is for, and an importer that has the file under that name finds it.
+            var texture = MatchTexture(name, batch.MaterialName, companionTextures)
+                ?? TextureReference(batch.TextureName);
             if (texture is not null)
             {
                 builder.Append("map_Kd ").Append(texture).Append('\n');
             }
             builder.Append('\n');
+        }
+        // The blank line between definitions separates them; after the last there is nothing to
+        // separate, and CDMW Full's library ends on the final definition rather than a blank.
+        while (builder.Length >= 2 && builder[^1] == '\n' && builder[^2] == '\n')
+        {
+            builder.Length--;
         }
 
         await AtomicFile.WriteAsync(
@@ -67,6 +77,20 @@ internal static class NativeObjMaterialWriter
             },
             cancellationToken,
             overwrite).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The source's texture name as a material-library reference, given the extension the archive
+    /// stores these under when the name carries none of its own.
+    /// </summary>
+    private static string? TextureReference(string? textureName)
+    {
+        var normalized = textureName?.Trim().Replace('\\', '/');
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return null;
+        }
+        return Path.HasExtension(normalized) ? normalized : normalized + ".dds";
     }
 
     /// <summary>
