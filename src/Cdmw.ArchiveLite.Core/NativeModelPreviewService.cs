@@ -9,10 +9,12 @@ namespace Cdmw.ArchiveLite.Core;
 
 public sealed class NativeModelPreviewService
 {
-    // A cached package keeps the submesh and material names the parser gave it, so recovering a
-    // name the descriptor scan used to miss only reaches a model whose package is rebuilt.
-    private const string PackageVersion = "archive_lite_native_model_v16_lazy_prefab";
-    private const string TexturedPackageVersion = "archive_lite_native_model_v17_textured_lazy_prefab";
+    // A cached package keeps the submesh and material names the parser gave it, and now the rig it
+    // resolved, so anything the native core learns to read only reaches a model whose package is
+    // rebuilt. These strings key the cache: leave them alone after changing what the core writes
+    // and a stale package is served instead, which reads as the change having had no effect.
+    private const string PackageVersion = "archive_lite_native_model_v18_skinned";
+    private const string TexturedPackageVersion = "archive_lite_native_model_v19_textured_skinned";
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan ColdBuildCoalesceDelay = TimeSpan.FromMilliseconds(35);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _buildGates = new(StringComparer.Ordinal);

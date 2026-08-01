@@ -40,7 +40,8 @@ internal sealed class NativePreviewVertexRebuild
         double[] normals,
         double[] textureCoordinates,
         int[]? sourceVertexMap,
-        bool isSourceSpace)
+        bool isSourceSpace,
+        NativePreviewVertexSkin? skin)
     {
         CornerIndices = cornerIndices;
         VertexCount = vertexCount;
@@ -49,6 +50,7 @@ internal sealed class NativePreviewVertexRebuild
         TextureCoordinates = textureCoordinates;
         SourceVertexMap = sourceVertexMap;
         IsSourceSpace = isSourceSpace;
+        Skin = skin;
     }
 
     /// <summary>The exported vertex each triangle corner refers to, in the package's corner order.</summary>
@@ -76,6 +78,18 @@ internal sealed class NativePreviewVertexRebuild
     /// </summary>
     public bool IsSourceSpace { get; }
 
+    /// <summary>
+    /// The rig binding of each exported vertex, or null when this batch carries none.
+    /// </summary>
+    /// <remarks>
+    /// The package writes one skin row per vertex the parser decoded, in the parser's order. The
+    /// exported array is not that array -- <see cref="SourceVertexMap"/> exists precisely because
+    /// rebuilding renumbers it -- so the rows are read through that map rather than straight
+    /// across. Bound the other way round, a rig lands on the wrong points: the mesh imports and
+    /// weights cleanly, and then folds itself inside out the moment a bone moves.
+    /// </remarks>
+    public NativePreviewVertexSkin? Skin { get; }
+
     /// <param name="cornersRead">
     /// Reports corners consumed, so a caller can report progress over the package's corner count.
     /// </param>
@@ -87,13 +101,14 @@ internal sealed class NativePreviewVertexRebuild
         var plan = batch.IdentityPath is null
             ? await PlanByAttributesAsync(batch, cancellationToken).ConfigureAwait(false)
             : await PlanBySourceIdentityAsync(batch, cancellationToken).ConfigureAwait(false);
+        var skin = await ReadSkinAsync(batch, plan, cancellationToken).ConfigureAwait(false);
 
         // The export geometry is only usable when the rebuild agrees with it about how many
         // vertices this submesh has, which it does whenever the parser numbered them from zero
         // without gaps. Anything else falls back rather than pairing two different arrays.
         if (batch.ExportGeometryPath is not null && batch.ExportVertexCount == plan.VertexCount)
         {
-            var exact = await ReadExportGeometryAsync(batch, plan, cancellationToken).ConfigureAwait(false);
+            var exact = await ReadExportGeometryAsync(batch, plan, skin, cancellationToken).ConfigureAwait(false);
             if (cornersRead is not null)
             {
                 await cornersRead(batch.VertexCount).ConfigureAwait(false);
@@ -101,12 +116,54 @@ internal sealed class NativePreviewVertexRebuild
             return exact;
         }
 
-        return await ReadRenderGeometryAsync(batch, plan, cornersRead, cancellationToken).ConfigureAwait(false);
+        return await ReadRenderGeometryAsync(batch, plan, skin, cornersRead, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// This batch's skin rows, reordered onto the exported vertices.
+    /// </summary>
+    /// <remarks>
+    /// Only a rebuild that knows where each exported vertex came from can place them. A package
+    /// with no identity buffer numbers its vertices by first appearance, and that order is not the
+    /// parser's, so its skin rows are left unread rather than applied to the wrong points.
+    /// A batch whose rows do not cover every exported vertex is skipped for the same reason, and
+    /// without failing the export: the rig is a sidecar, and the mesh in front of it still stands.
+    /// </remarks>
+    private static async Task<NativePreviewVertexSkin?> ReadSkinAsync(
+        NativePreviewMeshBatch batch,
+        VertexPlan plan,
+        CancellationToken cancellationToken)
+    {
+        if (batch.SkinPath is null || plan.SourceVertexMap is null)
+        {
+            return null;
+        }
+        if (plan.SourceVertexMap.Any(source => source < 0 || source >= batch.SkinVertexCount))
+        {
+            return null;
+        }
+        var rows = await File.ReadAllBytesAsync(batch.SkinPath, cancellationToken).ConfigureAwait(false);
+        var influences = NativePreviewMeshPackage.SkinInfluencesPerVertex;
+        var joints = new ushort[checked(plan.VertexCount * influences)];
+        var weights = new byte[joints.Length];
+        for (var index = 0; index < plan.VertexCount; index++)
+        {
+            var source = plan.SourceVertexMap[index];
+            var offset = source * NativePreviewMeshPackage.SkinBytesPerVertex;
+            for (var influence = 0; influence < influences; influence++)
+            {
+                joints[(index * influences) + influence] = BinaryPrimitives.ReadUInt16LittleEndian(
+                    rows.AsSpan(offset + (influence * sizeof(ushort)), sizeof(ushort)));
+                weights[(index * influences) + influence] = rows[offset + (influences * sizeof(ushort)) + influence];
+            }
+        }
+        return new NativePreviewVertexSkin(joints, weights);
     }
 
     private static async Task<NativePreviewVertexRebuild> ReadExportGeometryAsync(
         NativePreviewMeshBatch batch,
         VertexPlan plan,
+        NativePreviewVertexSkin? skin,
         CancellationToken cancellationToken)
     {
         var positions = new double[checked(plan.VertexCount * 3)];
@@ -149,12 +206,14 @@ internal sealed class NativePreviewVertexRebuild
             normals,
             textureCoordinates,
             plan.SourceVertexMap,
-            isSourceSpace: true);
+            isSourceSpace: true,
+            skin);
     }
 
     private static async Task<NativePreviewVertexRebuild> ReadRenderGeometryAsync(
         NativePreviewMeshBatch batch,
         VertexPlan plan,
+        NativePreviewVertexSkin? skin,
         Func<int, Task>? cornersRead,
         CancellationToken cancellationToken)
     {
@@ -200,7 +259,8 @@ internal sealed class NativePreviewVertexRebuild
             normals,
             textureCoordinates,
             plan.SourceVertexMap,
-            isSourceSpace: false);
+            isSourceSpace: false,
+            skin);
     }
 
     private static double ReadFiniteDouble(byte[] input, int offset, string label)
@@ -313,3 +373,15 @@ internal sealed class NativePreviewVertexRebuild
 
     private sealed record VertexPlan(int[] CornerIndices, int VertexCount, int[]? SourceVertexMap);
 }
+
+/// <summary>
+/// Six bone indices and six raw <c>u8</c> weights per exported vertex, flattened.
+/// </summary>
+/// <remarks>
+/// The weights are the source's own bytes, which descend and sum to 255 give or take rounding.
+/// They are left that way here: an exporter that needs them summing to one can divide by their
+/// total, and scaling them earlier would throw away what the record actually stated.
+/// <see cref="NativePreviewMeshPackage.UnusedSkinBone"/> marks an influence the record leaves
+/// empty, and its weight is zero.
+/// </remarks>
+internal sealed record NativePreviewVertexSkin(ushort[] Joints, byte[] Weights);

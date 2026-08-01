@@ -28,6 +28,17 @@ static void append_double(std::vector<char>& out, double value) {
     out.insert(out.end(), bytes, bytes + sizeof(double));
 }
 
+static void append_u16(std::vector<char>& out, std::uint16_t value) {
+    out.push_back(static_cast<char>(value & 0xFFu));
+    out.push_back(static_cast<char>((value >> 8) & 0xFFu));
+}
+
+// Parent, bind matrix, inverse bind matrix, scale, rotation, position.
+constexpr size_t kSkeletonBytesPerBone = 4u + 64u + 64u + 12u + 16u + 12u;
+
+// Six u16 bone indices then six u8 weights.
+constexpr size_t kSkinBytesPerVertex = kPacSkinInfluences * 3u;
+
 // Eight doubles per vertex -- position, normal, texture coordinate -- in this submesh's own vertex
 // order, which is the order the source holds them in and the order an export has to reproduce.
 // Unlike the render blob beside it, nothing here is per-corner, framed, or narrowed to a float.
@@ -53,6 +64,57 @@ static void write_export_geometry_blob(const fs::path& path, const NativeSubmesh
     write_binary(path, out);
 }
 
+
+// One row per exported vertex, written beside the export geometry and in the same order, so a rig
+// built from it binds to the points that file actually holds. Six skeleton bone indices and six
+// weights, with 0xFFFF and a weight of zero standing for an influence the record does not use.
+//
+// The slots are resolved to bone indices here rather than published raw: a slot means nothing
+// without the palette that maps it, and a reader holding one without the other could only guess.
+static void write_skin_rows_blob(
+    const fs::path& path,
+    const NativeSubmesh& mesh,
+    const std::vector<std::int32_t>& palette
+) {
+    const size_t count = mesh.export_positions.size();
+    if (count == 0 || mesh.export_skin.size() != count || palette.empty()) return;
+    std::vector<char> out;
+    out.reserve(count * kSkinBytesPerVertex);
+    for (const NativeSkinInfluence& skin : mesh.export_skin) {
+        std::array<std::uint16_t, kPacSkinInfluences> bones{};
+        std::array<std::uint8_t, kPacSkinInfluences> weights{};
+        for (int influence = 0; influence < kPacSkinInfluences; ++influence) {
+            const size_t slot = skin.slots[static_cast<size_t>(influence)];
+            const std::uint8_t weight = skin.weights[static_cast<size_t>(influence)];
+            const bool usable = weight != 0 && slot < palette.size();
+            bones[static_cast<size_t>(influence)] = usable
+                ? static_cast<std::uint16_t>(palette[slot])
+                : static_cast<std::uint16_t>(0xFFFFu);
+            weights[static_cast<size_t>(influence)] = usable ? weight : static_cast<std::uint8_t>(0);
+        }
+        for (const std::uint16_t bone : bones) append_u16(out, bone);
+        for (const std::uint8_t weight : weights) out.push_back(static_cast<char>(weight));
+    }
+    write_binary(path, out);
+}
+
+// The rig itself, one fixed record per bone: the parent, the bind matrix, its inverse, and the
+// bone's own scale, rotation and position relative to that parent. The names travel in the
+// manifest beside it, which keeps this stride fixed and checkable.
+static void write_skeleton_blob(const fs::path& path, const std::vector<NativeBone>& bones) {
+    if (bones.empty()) return;
+    std::vector<char> out;
+    out.reserve(bones.size() * kSkeletonBytesPerBone);
+    for (const NativeBone& bone : bones) {
+        append_int32(out, bone.parent_index);
+        for (const float element : bone.bind_matrix) append_float(out, element);
+        for (const float element : bone.inverse_bind_matrix) append_float(out, element);
+        for (const float element : bone.scale) append_float(out, element);
+        for (const float element : bone.rotation) append_float(out, element);
+        for (const float element : bone.position) append_float(out, element);
+    }
+    write_binary(path, out);
+}
 
 static void write_geometry_blob(
     const fs::path& geometry_path,

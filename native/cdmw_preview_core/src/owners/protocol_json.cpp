@@ -537,6 +537,64 @@ struct PacDescriptor {
     std::uint32_t descriptor_offset = 0;
 };
 
+// A PAC vertex record carries six skin influences, not four.
+//
+//   bytes 20-23  u32 little-endian, three 10-bit palette slots (influences 0, 1, 2)
+//   bytes 24-27  u32 little-endian, three 10-bit palette slots (influences 3, 4, 5)
+//   bytes 28-33  six u8 weights, descending, summing to 255 give or take u8 rounding
+//
+// The top two bits of each u32 are unused. This is the same packing the vertex normal uses at
+// byte 16, which is what the layout was hiding behind: read as four u8 slots instead, the field
+// pairs a forehead bone with a forearm, because influence 1's index straddles bytes 21 and 22.
+//
+// Measured on cd_phw_00_nude_00_0001_damian.pac, 13,740 vertices over three submeshes: the six
+// weights sum to 255 +/- 2 on every record, they descend on every record, the influence counts
+// split 2145/2869/2851/2284/1830/1761 across one through six, every decoded slot lands inside the
+// file's 206-entry palette, and each vertex sits a median 0.054 from the weighted centroid of its
+// own bones on a 1.84-unit figure.
+constexpr int kPacSkinInfluences = 6;
+constexpr int kPacSkinSlotOffset = 20;
+constexpr int kPacSkinWeightOffset = 28;
+constexpr int kPacSkinRecordEnd = kPacSkinWeightOffset + kPacSkinInfluences;
+constexpr std::uint16_t kPacSkinSlotMask = 0x3FF;
+
+// One vertex's binding as the record states it. A slot is not a skeleton bone index: it indexes
+// the PAC's own palette of .pab bone-name hashes, which resolve_pac_bone_palette recovers.
+struct NativeSkinInfluence {
+    std::array<std::uint16_t, kPacSkinInfluences> slots{};
+    std::array<std::uint8_t, kPacSkinInfluences> weights{};
+};
+
+// One .pab bone. The two matrices are sixteen floats in the order the file stores them, which is
+// already glTF's: the translation sits at elements 12, 13 and 14, and the last column reads all
+// zeros. The scale, rotation and position beside them are the bone's transform relative to its
+// parent -- chaining those through the hierarchy reproduces the bind matrix to within 3.4e-6.
+struct NativeBone {
+    std::string name;
+    std::uint32_t name_hash = 0;
+    std::int32_t parent_index = -1;
+    std::array<float, 16> bind_matrix{};
+    std::array<float, 16> inverse_bind_matrix{};
+    std::array<float, 3> scale{1.0f, 1.0f, 1.0f};
+    std::array<float, 4> rotation{0.0f, 0.0f, 0.0f, 1.0f};
+    std::array<float, 3> position{};
+};
+
+// What the package knows about the rig a model follows, and why.
+//
+// `status` is the honest reading of the mesh, not a success flag. A rigidly bound mesh -- props,
+// accessories, vehicles -- puts the whole weight of 255 on one influence and leaves every slot at
+// zero, and carries no bone hash anywhere; which bone it follows is recorded outside the mesh
+// file, so there is nothing here to resolve and nothing has gone wrong.
+struct NativePackageSkeleton {
+    std::string status = "not_skinned";
+    std::string source_path;
+    std::string note;
+    std::vector<NativeBone> bones;
+    // Palette slot to bone index in `bones`. Empty unless the status is "rigged".
+    std::vector<std::int32_t> palette;
+};
+
 struct NativeSubmesh {
     std::string name;
     std::string material;
@@ -567,6 +625,10 @@ struct NativeSubmesh {
     std::vector<ExportVec3> export_positions;
     std::vector<ExportVec3> export_normals;
     std::vector<ExportVec2> export_uvs;
+    // The skin binding of each exported vertex, in `export_positions` order so a rig written
+    // beside the exported geometry binds to the points that geometry actually holds. Empty for
+    // every format but PAC, and for a PAC whose vertex layout has no room for the field.
+    std::vector<NativeSkinInfluence> export_skin;
     std::vector<std::uint32_t> indices;
     std::vector<std::int32_t> source_vertex_indices;
     int source_submesh_index = -1;
@@ -785,6 +847,7 @@ struct NativePackage {
     std::vector<std::string> rejected_texture_examples;
     std::vector<NativeAssetFamilyRow> asset_family_rows;
     int asset_family_reference_count = 0;
+    NativePackageSkeleton skeleton;
 };
 
 static std::uint16_t read_u16(const std::vector<char>& data, size_t offset) {

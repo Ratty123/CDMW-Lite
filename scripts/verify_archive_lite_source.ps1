@@ -12,9 +12,18 @@ $rendererRoot = Join-Path $repositoryRoot "tools\dotnet_mesh_editor_experiment"
 $roots = @($liteRoot, $nativeRoot, $previewRoot, $acceleratorRoot, $meshCoreRoot, $textureRoot, $rendererRoot)
 $bannedExtensions = @(".py", ".pyc", ".pyo", ".pyd", ".pyw", ".whl", ".egg", ".ipynb")
 
+# Scripts that run inside Blender, which brings its own interpreter. These verify an exported
+# asset from outside the application -- that a rigged GLB imports with an armature the mesh is
+# bound to, and that posing a bone actually moves the vertices near it -- which nothing reading
+# the file's own bytes can establish. They are not shipped, not built, and not run by the focused
+# test gate, so they add no Python to Archive Lite's product, build or tests. Only .py files under
+# this one directory are exempt; anywhere else the ban stands.
+$blenderTestRoot = [IO.Path]::GetFullPath((Join-Path $liteRoot "scripts\blender"))
+
 $bannedFiles = foreach ($root in $roots) {
     Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object {
-        $bannedExtensions -contains $_.Extension.ToLowerInvariant()
+        $bannedExtensions -contains $_.Extension.ToLowerInvariant() -and
+        -not $_.DirectoryName.Equals($blenderTestRoot, [StringComparison]::OrdinalIgnoreCase)
     }
 }
 if ($bannedFiles) {
@@ -45,4 +54,4 @@ if ($violations) {
     throw "Archive Lite build/runtime source invokes a Python tool: $($violations.FullName -join ', ')"
 }
 
-Write-Host "Source guard passed: Archive Lite production, build, and tests contain no Python payload or invocation."
+Write-Host "Source guard passed: Archive Lite production, build, and tests contain no Python payload or invocation (Blender test scripts under scripts\blender excepted)."

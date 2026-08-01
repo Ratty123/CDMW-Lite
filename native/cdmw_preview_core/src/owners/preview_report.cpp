@@ -170,6 +170,13 @@ static NativePackage try_generate_native_package(const EntryJob& job, const std:
     }
     package.mesh_parse = parsed.parser;
     package.lod_count = parsed.lod_count;
+    if (job.extension == ".pac") {
+        // Resolved against the raw entry bytes, which is where the palette sits: the geometry
+        // parser works on a copy with the PAR sections expanded, and the offsets in that copy are
+        // not the ones the palette was written at.
+        package.skeleton = resolve_native_package_skeleton(job, index, data, parsed.meshes);
+        package.notes.push_back("native skeleton: " + package.skeleton.status + " -- " + package.skeleton.note);
+    }
     std::vector<TextureBinding> bindings;
     if (job.use_textures) {
         bindings = build_material_bindings(job, index, parsed.meshes, package);
