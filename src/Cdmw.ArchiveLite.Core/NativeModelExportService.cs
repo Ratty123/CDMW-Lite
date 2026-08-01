@@ -174,6 +174,9 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 totalWork,
                 progress,
                 currentItem,
+                // Only FBX carries a rig. OBJ has no way to state one, and writing the skin
+                // sidecars for it would cost the export work whose result nothing reads.
+                kind == ExportKind.Fbx,
                 cancellationToken).ConfigureAwait(false);
 
             var jobPath = Path.Combine(workRoot, "job.json");
@@ -216,7 +219,10 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             }
             else
             {
-                job["bones"] = Array.Empty<object>();
+                // The whole skeleton, when the package resolved one. The native writer builds a
+                // LimbNode per bone and binds the mesh to it with the Skin and Cluster deformers
+                // the submesh payloads above carry.
+                job["bones"] = NativeFbxRig.BonePayloads(package.Skeleton);
             }
 
             await WriteJsonAsync(jobPath, job, cancellationToken).ConfigureAwait(false);
@@ -264,6 +270,7 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
         long totalWork,
         Func<ProgressUpdate, Task>? progress,
         string? currentItem,
+        bool includeSkin,
         CancellationToken cancellationToken)
     {
         var result = new List<PreparedNativeBatch>(package.Batches.Count);
@@ -310,7 +317,15 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 cancellationToken).ConfigureAwait(false);
             await WriteFacesAsync(facesPath, rebuilt.CornerIndices, cancellationToken).ConfigureAwait(false);
 
-            result.Add(new PreparedNativeBatch(new Dictionary<string, object?>
+            var skin = includeSkin ? NativeFbxRig.BuildRows(rebuilt, package.Skeleton) : null;
+            if (skin is not null)
+            {
+                await WriteIntsAsync(prefix + "_bone_counts.bin", skin.Counts, cancellationToken).ConfigureAwait(false);
+                await WriteIntsAsync(prefix + "_bone_indices.bin", skin.Bones, cancellationToken).ConfigureAwait(false);
+                await WriteDoublesAsync(prefix + "_bone_weights.bin", skin.Weights, cancellationToken).ConfigureAwait(false);
+            }
+
+            var payload = new Dictionary<string, object?>
             {
                 ["index"] = batch.Index,
                 // Full names the object after the submesh and the material after the material, so
@@ -324,10 +339,56 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 ["normals_binary"] = BinaryDescriptor(normalsPath, rebuilt.VertexCount, 3, "f64"),
                 ["uvs_binary"] = BinaryDescriptor(uvsPath, uvCount, 2, "f64"),
                 ["source_vertex_map"] = rebuilt.SourceVertexMap,
-            },
-            rebuilt.VertexCount));
+            };
+            if (skin is not null)
+            {
+                payload["bone_counts_binary"] = BinaryDescriptor(prefix + "_bone_counts.bin", skin.Counts.Length, 1, "i32");
+                payload["bone_indices_binary"] = BinaryDescriptor(prefix + "_bone_indices.bin", skin.Bones.Length, 1, "i32");
+                payload["bone_weights_binary"] = BinaryDescriptor(prefix + "_bone_weights.bin", skin.Weights.Length, 1, "f64");
+            }
+            result.Add(new PreparedNativeBatch(payload, rebuilt.VertexCount));
         }
         return result;
+    }
+
+    private static async Task WriteIntsAsync(string path, int[] values, CancellationToken cancellationToken)
+    {
+        await using var output = OpenNew(path);
+        var buffer = new byte[RecordsPerChunk * sizeof(int)];
+        var written = 0;
+        while (written < values.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = Math.Min(RecordsPerChunk, values.Length - written);
+            for (var index = 0; index < count; index++)
+            {
+                BinaryPrimitives.WriteInt32LittleEndian(
+                    buffer.AsSpan(index * sizeof(int), sizeof(int)),
+                    values[written + index]);
+            }
+            await output.WriteAsync(buffer.AsMemory(0, count * sizeof(int)), cancellationToken).ConfigureAwait(false);
+            written += count;
+        }
+    }
+
+    private static async Task WriteDoublesAsync(string path, double[] values, CancellationToken cancellationToken)
+    {
+        await using var output = OpenNew(path);
+        var buffer = new byte[RecordsPerChunk * sizeof(double)];
+        var written = 0;
+        while (written < values.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = Math.Min(RecordsPerChunk, values.Length - written);
+            for (var index = 0; index < count; index++)
+            {
+                BinaryPrimitives.WriteDoubleLittleEndian(
+                    buffer.AsSpan(index * sizeof(double), sizeof(double)),
+                    values[written + index]);
+            }
+            await output.WriteAsync(buffer.AsMemory(0, count * sizeof(double)), cancellationToken).ConfigureAwait(false);
+            written += count;
+        }
     }
 
     /// <param name="restore">

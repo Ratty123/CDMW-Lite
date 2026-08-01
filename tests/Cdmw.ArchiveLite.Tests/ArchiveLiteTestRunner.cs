@@ -55,7 +55,7 @@ internal static class ArchiveLiteTestRunner
             ("native preview core parses PAT LOD0 geometry", TestNativePatGeometryAsync),
             ("native model packages adapt safely and export Blender interchange formats", TestNativeModelPreviewPackageAsync),
             ("an exported mesh keeps the source's own vertices, order, and part names", TestMeshExportSourceVertexParityAsync),
-            ("a skinned mesh exports as a rigged GLB, and a rigid one exports as it always did", TestRiggedGlbExportAsync),
+            ("a skinned mesh exports as a rigged GLB and FBX, and a rigid one exports as it always did", TestRiggedGlbExportAsync),
             ("renderer warmup package is complete and loadable", TestRendererWarmupPackageAsync),
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
@@ -3870,6 +3870,42 @@ internal static class ArchiveLiteTestRunner
                         .GetProperty("attributes").TryGetProperty("JOINTS_0", out _),
                     "a rigidly bound mesh was exported with joint attributes");
             }
+
+            // The same rig through FBX. It carries the whole skeleton rather than the bones the
+            // mesh uses plus their ancestors, because FBX is the format an animation clip comes
+            // back in through and a clip addresses bones this mesh is not weighted to.
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(BuildManifest("rigged")), Encoding.UTF8)
+                .ConfigureAwait(false);
+            var fbxPath = Path.Combine(root, "rigged.fbx");
+            await exporter.ExportPackageAsync(
+                root, "character/model/body.pac", ExportKind.Fbx, fbxPath,
+                overwrite: false, null, null, CancellationToken.None).ConfigureAwait(false);
+            var fbx = await File.ReadAllBytesAsync(fbxPath).ConfigureAwait(false);
+            Require(
+                Encoding.ASCII.GetString(fbx, 0, 20) == "Kaydara FBX Binary  ",
+                "the rigged FBX export is not a binary FBX file");
+            var fbxText = Encoding.ASCII.GetString(fbx);
+            Require(fbxText.Contains("LimbNode", StringComparison.Ordinal), "the rigged FBX carries no bone nodes");
+            Require(fbxText.Contains("Skin", StringComparison.Ordinal), "the rigged FBX carries no skin deformer");
+            Require(fbxText.Contains("Cluster", StringComparison.Ordinal), "the rigged FBX carries no skin clusters");
+            Require(fbxText.Contains("TransformLink", StringComparison.Ordinal), "an FBX cluster states no bind pose");
+            foreach (var name in boneNames)
+            {
+                Require(fbxText.Contains(name, StringComparison.Ordinal), $"the rigged FBX lost the bone {name}");
+            }
+
+            // A rigidly bound mesh writes the FBX it always wrote: geometry, no armature.
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(BuildManifest("rigid")), Encoding.UTF8)
+                .ConfigureAwait(false);
+            var rigidFbxPath = Path.Combine(root, "rigid.fbx");
+            await exporter.ExportPackageAsync(
+                root, "character/model/body.pac", ExportKind.Fbx, rigidFbxPath,
+                overwrite: false, null, null, CancellationToken.None).ConfigureAwait(false);
+            var rigidFbxText = Encoding.ASCII.GetString(await File.ReadAllBytesAsync(rigidFbxPath).ConfigureAwait(false));
+            Require(
+                !rigidFbxText.Contains("LimbNode", StringComparison.Ordinal)
+                && !rigidFbxText.Contains("Cluster", StringComparison.Ordinal),
+                "a rigidly bound mesh was exported with an FBX armature it cannot name");
         }
         finally
         {
