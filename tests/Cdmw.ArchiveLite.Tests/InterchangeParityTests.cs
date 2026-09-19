@@ -30,6 +30,25 @@ internal static partial class ArchiveLiteTestRunner
             var good = await service.ExportAsync(request, null, CancellationToken.None);
             Require(good.Exported == 1 && good.Failed == 0, $"{kind} synthetic archive bundle failed: {string.Join(';', good.Items.Select(item => item.Message))}");
             var oldFiles = Directory.GetFiles(directory, "*", SearchOption.AllDirectories).ToDictionary(path => path, File.ReadAllBytes);
+            var skipped = await service.ExportAsync(request with { CollisionPolicy = ExportCollisionPolicy.Skip }, null, CancellationToken.None);
+            Require(skipped.Exported == 0 && skipped.Skipped == 1 && skipped.Failed == 0 && !skipped.Cancelled,
+                $"{kind} did not skip the existing mesh");
+            Require(skipped.Items.All(item => item.Status != "exported" && item.OutputPath is null),
+                $"{kind} reported unpublished companions as exported after skipping the mesh");
+            var cancelledMesh = await service.ExportAsync(request with { CollisionPolicy = ExportCollisionPolicy.Cancel }, null, CancellationToken.None);
+            Require(cancelledMesh.Cancelled && cancelledMesh.Exported == 0 && cancelledMesh.Failed == 0
+                && cancelledMesh.Items.All(item => item.Status != "exported" && item.OutputPath is null),
+                $"{kind} reported unpublished companions as exported after cancelling an existing mesh");
+            var cancelPath = Path.Combine(directory, "cancelled" + NativeModelExportService.FileExtension(kind));
+            var cancelled = await service.ExportAsync(request with
+            {
+                CollisionPolicy = ExportCollisionPolicy.Cancel,
+                SingleOutputPath = cancelPath,
+            }, null, CancellationToken.None);
+            Require(cancelled.Cancelled && cancelled.Exported == 0 && cancelled.Failed == 0 && !File.Exists(cancelPath),
+                $"{kind} did not cancel the complete selection when a companion already existed");
+            Require(cancelled.Items.All(item => item.Status != "exported" && item.OutputPath is null),
+                $"{kind} reported unpublished companions as exported after cancellation");
             var failed = await service.ExportAsync(request with { ReferencedEntryIds = [texture.EntryId, long.MaxValue] }, null, CancellationToken.None);
             Require(failed.Exported == 0 && failed.Failed == 1, $"{kind} reported success with a missing selected companion");
             foreach (var (path, bytes) in oldFiles) Require(File.ReadAllBytes(path).SequenceEqual(bytes), $"{kind} replaced an output before its whole bundle succeeded");
@@ -139,6 +158,29 @@ internal static partial class ArchiveLiteTestRunner
             var colour = glb.GetProperty("materials")[0].GetProperty("pbrMetallicRoughness").GetProperty("baseColorFactor");
             Require(colour[0].GetSingle() == colour[1].GetSingle() && colour[1].GetSingle() == colour[2].GetSingle(), "GLB exported the diagnostic preview palette as an authored tint");
 
+            var placeholder = manifest with
+            {
+                batches = manifest.batches.Select(batch => batch with { submesh_texture = "common/none_texture.dds" }).ToArray(),
+            };
+            await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(placeholder));
+            foreach (var kind in new[] { ExportKind.Obj, ExportKind.Fbx })
+            {
+                var path = Path.Combine(root, "placeholder" + NativeModelExportService.FileExtension(kind));
+                await exporter.ExportPackageAsync(root, "character.pac", kind, path, false, null, null,
+                    [.. textures, "referenced_files/common/none_texture.dds"], CancellationToken.None);
+                var materialPath = kind == ExportKind.Obj ? Path.ChangeExtension(path, ".mtl") : path;
+                var content = Encoding.UTF8.GetString(await File.ReadAllBytesAsync(materialPath));
+                Require(!content.Contains("none_texture", StringComparison.Ordinal), $"{kind} exported a placeholder texture binding");
+                Require(!content.Contains("cloth_n.dds", StringComparison.Ordinal) && !content.Contains("cloth_sp.dds", StringComparison.Ordinal),
+                    $"{kind} substituted a support map for a placeholder diffuse texture");
+                await exporter.ExportPackageAsync(root, "character.pac", kind, path, true, null, null,
+                    [.. textures, "referenced_files/cloth_d.dds"], CancellationToken.None);
+                content = Encoding.UTF8.GetString(await File.ReadAllBytesAsync(materialPath));
+                Require(content.Contains("referenced_files/cloth_d.dds", StringComparison.Ordinal),
+                    $"{kind} failed to resolve a real diffuse companion in place of the placeholder");
+            }
+            await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(manifest));
+
             // A companion collision must not replace any part of the old export bundle.
             var before = new[] { "mesh.obj", "mesh.mtl", "mesh.obj.meta.json" }.ToDictionary(name => name, name => File.ReadAllBytes(Path.Combine(root, name)));
             File.Delete(Path.Combine(root, "mesh.mtl"));
@@ -172,6 +214,23 @@ internal static partial class ArchiveLiteTestRunner
                 Require(File.ReadAllBytes(Path.Combine(root, name)).SequenceEqual(bytes), $"rollback did not restore {name}");
 
             var skinPath = Path.Combine(root, "skin.bin");
+            var fullSkin = await File.ReadAllBytesAsync(skinPath);
+            var shortSkin = manifest with
+            {
+                batches = manifest.batches.Select(batch => batch with { skin_vertex_count = 3 }).ToArray(),
+            };
+            await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(shortSkin));
+            await File.WriteAllBytesAsync(skinPath, fullSkin[..(3 * 8 * 3)]);
+            foreach (var kind in new[] { ExportKind.Obj, ExportKind.Fbx, ExportKind.Glb })
+            {
+                var path = Path.Combine(root, "mesh" + NativeModelExportService.FileExtension(kind));
+                var previous = await File.ReadAllBytesAsync(path);
+                await RequireThrowsAsync<InvalidDataException>(() => exporter.ExportPackageAsync(root, "character.pac", kind,
+                    path, true, null, null, textures, CancellationToken.None));
+                Require(File.ReadAllBytes(path).SequenceEqual(previous), $"{kind} silently discarded an incomplete declared skin table");
+            }
+            await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), JsonSerializer.Serialize(manifest));
+            await File.WriteAllBytesAsync(skinPath, fullSkin);
             using (var skin = File.OpenWrite(skinPath)) skin.SetLength(skin.Length - 1);
             foreach (var kind in new[] { ExportKind.Obj, ExportKind.Fbx, ExportKind.Glb })
             {

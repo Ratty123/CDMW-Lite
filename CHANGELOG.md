@@ -6,6 +6,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- OBJ and FBX omit placeholder texture bindings and can resolve a real diffuse companion instead. Incomplete declared skin tables fail export instead of silently dropping the rig. Skipped or cancelled mesh selections no longer report unpublished companions as exported, and Cancel applies to companion collisions too.
 - OBJ, FBX and GLB exports retain unused source vertices, corrected PAC normals and all eight skin influences. PAMLOD exports keep separate material parts; partially compressed PAM geometry now decodes correctly. Invalid declared export buffers are rejected instead of silently losing geometry or rig data.
 - FBX now references matching selected diffuse textures. OBJ and FBX prefer exact authored texture names, and nested exports resolve companion paths from each mesh's directory. GLB no longer invents missing UVs or exports preview palette colours as authored material tints.
 - Mesh export selections prepare their mesh files, selected companions and metadata together. Missing companions, cancellation and publication failures preserve previous outputs, with rollback for completed replacements.

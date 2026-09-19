@@ -126,8 +126,8 @@ internal sealed class NativePreviewVertexRebuild
     /// Only a rebuild that knows where each exported vertex came from can place them. A package
     /// with no identity buffer numbers its vertices by first appearance, and that order is not the
     /// parser's, so its skin rows are left unread rather than applied to the wrong points.
-    /// A batch whose rows do not cover every exported vertex is skipped for the same reason, and
-    /// without failing the export: the rig is a sidecar, and the mesh in front of it still stands.
+    /// Declared rows must cover every mapped source vertex; an incomplete table fails export
+    /// rather than silently turning a rigged mesh into an unrigged one.
     /// </remarks>
     private static async Task<NativePreviewVertexSkin?> ReadSkinAsync(
         NativePreviewMeshBatch batch,
@@ -140,7 +140,7 @@ internal sealed class NativePreviewVertexRebuild
         }
         if (plan.SourceVertexMap.Any(source => source < 0 || source >= batch.SkinVertexCount))
         {
-            return null;
+            throw new InvalidDataException($"Native preview batch {batch.Index} has no skin row for an exported source vertex.");
         }
         var rows = await File.ReadAllBytesAsync(batch.SkinPath, cancellationToken).ConfigureAwait(false);
         var influences = NativePreviewMeshPackage.SkinInfluencesPerVertex;

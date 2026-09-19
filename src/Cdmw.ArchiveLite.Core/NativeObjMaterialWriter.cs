@@ -91,14 +91,26 @@ internal static class NativeObjMaterialWriter
             return null;
         }
         if (normalized.Any(char.IsControl)) throw new InvalidDataException("Texture reference contains a control character.");
+        if (IsPlaceholderTexture(normalized)) return null;
         return Path.HasExtension(normalized) ? normalized : normalized + ".dds";
+    }
+
+    private static bool IsPlaceholderTexture(string path)
+    {
+        // Match Full's no-texture markers regardless of path, punctuation or case.
+        var stem = new string(Path.GetFileNameWithoutExtension(path)
+            .Where(char.IsAsciiLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+        return stem.Contains("nonetexture", StringComparison.Ordinal)
+            || stem.Contains("nulltexture", StringComparison.Ordinal)
+            || stem.Contains("dummytexture", StringComparison.Ordinal)
+            || stem is "none" or "notexture" or "placeholdertexture";
     }
 
     internal static string? ResolveTexture(NativePreviewMeshBatch batch, IReadOnlyList<string> companionTextures)
     {
         var authored = TextureReference(batch.TextureName);
         var textures = companionTextures.Select(static path => path.Replace('\\', '/'))
-            .Where(static path => path.IndexOfAny(['\r', '\n', '\0']) < 0)
+            .Where(static path => !path.Any(char.IsControl) && !IsPlaceholderTexture(path))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         if (authored is not null)
         {

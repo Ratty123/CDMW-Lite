@@ -164,14 +164,17 @@ package records which of those cases it found and why.
 PAC normals follow the game's signed-z reconstruction. Rigged exports normalize all eight
 influences together, including the two gated half-float palette slots; older six-influence
 preview packages remain readable. Newly built packages use a fresh cache version. Malformed
-declared geometry, identity or skin buffers fail export instead of silently losing data.
+declared geometry, identity or skin buffers fail export instead of silently losing data. Skin
+tables must cover every exported source vertex.
 
 An export selection is prepared in a staging directory, including selected referenced files,
 the OBJ material library and metadata. Failed preparation or cancellation leaves existing
 outputs intact. Publication restores prior outputs if a file replacement fails. Material
 references are relative to each mesh's own directory. An authored texture name wins over
 material-name guesses; ambiguous names and normal/surface-map prefixes are not used as diffuse
-fallbacks.
+fallbacks. Known no-texture placeholders are omitted, allowing a matching real diffuse companion
+to supply the binding. Cancel applies to existing companions as well as the mesh itself. If the
+mesh is skipped or the selection is cancelled, unpublished companions are reported accordingly.
 
 The parity review used CDMW Full through `8527abd0`: PAC normal/eight-influence corrections
 (`fc0e3207`), PAMLOD materials and complete export publication (`67142896`), partial PAM decoding

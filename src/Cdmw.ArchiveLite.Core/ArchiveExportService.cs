@@ -252,17 +252,21 @@ public sealed class ArchiveExportService(
                 SingleOutputPath = singleOutputPath is null ? null : Path.Combine(staging, Path.GetRelativePath(destination, singleOutputPath)),
             };
             var result = await ExportCoreAsync(stagedRequest, progress, cancellationToken, destination).ConfigureAwait(false);
-            ExportPlanResult Aborted(string reason) => result with
+            ExportPlanResult Unpublished(string reason, string status = "failed") => result with
             {
                 Exported = 0,
-                Failed = result.Failed + result.Exported,
+                Failed = result.Failed + (status == "failed" ? result.Exported : 0),
+                Cancelled = result.Cancelled || status == "cancelled",
                 ManifestPath = null,
                 Items = result.Items.Select(item => item.Status == "exported"
-                    ? item with { OutputPath = null, Status = "failed", Message = reason } : item).ToArray(),
+                    ? item with { OutputPath = null, Status = status, Message = reason } : item).ToArray(),
             };
-            if (result.Cancelled || result.Failed > 0 || result.Items.Any(item => item.Status == "failed"))
-                return Aborted("The export bundle was not published because a selected output could not be prepared.");
-            if (result.Exported == 0) return result with { ManifestPath = null };
+            if (result.Failed > 0 || result.Items.Any(item => item.Status == "failed"))
+                return Unpublished("The export bundle was not published because a selected output could not be prepared.");
+            if (result.Cancelled)
+                return Unpublished("The export bundle was cancelled before publication.", "cancelled");
+            if (result.Exported == 0)
+                return Unpublished("No selected mesh needed exporting, so its companions were not published.", "skipped");
             var outputs = new List<(string Staged, string Destination)>();
             try
             {
@@ -273,6 +277,8 @@ public sealed class ArchiveExportService(
                         ExportPathPolicy.NormalizeVirtualPath(Path.GetRelativePath(staging, path).Replace('\\', '/')));
                     ExportPathPolicy.PrepareContainedOutputPath(destination, target);
                     if (!string.IsNullOrWhiteSpace(request.SessionId)) EnsureArchiveSourceIsNotTarget(sessions.GetRequired(request.SessionId), target);
+                    if (File.Exists(target) && request.CollisionPolicy == ExportCollisionPolicy.Cancel)
+                        return Unpublished($"Destination already exists: {target}", "cancelled");
                     if (File.Exists(target) && request.CollisionPolicy == ExportCollisionPolicy.Skip)
                     {
                         // Reuse an existing companion only when it contains the same bytes.
@@ -288,11 +294,12 @@ public sealed class ArchiveExportService(
                     }
                     outputs.Add((path, target));
                 }
-                NativeExportPublication.Publish(outputs, request.CollisionPolicy == ExportCollisionPolicy.Overwrite, cancellationToken);
+                if (outputs.Count > 0)
+                    NativeExportPublication.Publish(outputs, request.CollisionPolicy == ExportCollisionPolicy.Overwrite, cancellationToken);
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
-                return Aborted(exception.Message);
+                return Unpublished(exception.Message);
             }
             return result with
             {
