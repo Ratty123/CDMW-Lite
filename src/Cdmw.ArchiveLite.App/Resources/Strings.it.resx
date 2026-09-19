@@ -454,4 +454,38 @@
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Non sono stati recuperati indizi di categoria più solidi</value></data>
   <data name="ExportIncludeFamily" xml:space="preserve"><value>Includi la famiglia</value></data>
   <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Esporta anche materiali, texture, descrittori e altre risorse risolte collegate al file selezionato. In un'esportazione di mesh vengono messi in una cartella referenced_files/ accanto a essa.</value></data>
+  <data name="CharacterFinderTitle" xml:space="preserve"><value>Ricerca corpi e volti</value></data>
+  <data name="CharacterUniqueAssets" xml:space="preserve"><value>Risorse uniche</value></data>
+  <data name="CharacterAppearances" xml:space="preserve"><value>Varianti di aspetto</value></data>
+  <data name="CharacterBodies" xml:space="preserve"><value>Corpi</value></data>
+  <data name="CharacterFaces" xml:space="preserve"><value>Volti</value></data>
+  <data name="CharacterDetailsBounded" xml:space="preserve"><value>I dettagli sono abbreviati. Mostra i file correlati per esaminare le dipendenze.</value></data>
+  <data name="CharacterFinderReady" xml:space="preserve"><value>Apri la ricerca corpi e volti per esplorare il catalogo dei personaggi.</value></data>
+  <data name="CharacterFinderLoading" xml:space="preserve"><value>Caricamento del catalogo dei personaggi…</value></data>
+  <data name="CharacterPreviewLoading" xml:space="preserve"><value>Preparazione dell’anteprima del personaggio…</value></data>
+  <data name="CharacterAllRoles" xml:space="preserve"><value>Tutti i ruoli</value></data>
+  <data name="CharacterAllTypes" xml:space="preserve"><value>Tutti i tipi</value></data>
+  <data name="CharacterAllFamilies" xml:space="preserve"><value>Tutte le famiglie corporee</value></data>
+  <data name="CharacterAllStates" xml:space="preserve"><value>Tutti gli stati di risoluzione</value></data>
+  <data name="CharacterWhole" xml:space="preserve"><value>Personaggio intero</value></data>
+  <data name="CharacterFacialDetails" xml:space="preserve"><value>Dettagli facciali</value></data>
+  <data name="CharacterBeard" xml:space="preserve"><value>Barba</value></data>
+  <data name="CharacterHumanoids" xml:space="preserve"><value>Umanoidi</value></data>
+  <data name="CharacterPlayers" xml:space="preserve"><value>Personaggi giocabili</value></data>
+  <data name="CharacterCreatures" xml:space="preserve"><value>Creature</value></data>
+  <data name="CharacterNpcs" xml:space="preserve"><value>PNG</value></data>
+  <data name="CharacterMounts" xml:space="preserve"><value>Cavalcature</value></data>
+  <data name="CharacterResolved" xml:space="preserve"><value>Risolto</value></data>
+  <data name="CharacterUnresolved" xml:space="preserve"><value>Non risolto</value></data>
+  <data name="CharacterInferred" xml:space="preserve"><value>Dedotto</value></data>
+  <data name="CharacterAmbiguous" xml:space="preserve"><value>Ambiguo</value></data>
+  <data name="CharacterUnknown" xml:space="preserve"><value>Sconosciuto</value></data>
+  <data name="CharacterSearchHint" xml:space="preserve"><value>Cerca nomi dei personaggi, nomi interni, ID o percorsi</value></data>
+  <data name="CharacterShowAll" xml:space="preserve"><value>Mostra tutti i risultati</value></data>
+  <data name="CharacterDetails" xml:space="preserve"><value>Dettagli</value></data>
+  <data name="CharacterRelationships" xml:space="preserve"><value>Usato da / Componenti</value></data>
+  <data name="CharacterBrowseRelated" xml:space="preserve"><value>Esplora i risultati correlati</value></data>
+  <data name="CharacterCopyPath" xml:space="preserve"><value>Copia percorso</value></data>
+  <data name="CharacterScopeLoading" xml:space="preserve"><value>Risoluzione dei file dei personaggi…</value></data>
+  <data name="CharacterScopeApplied" xml:space="preserve"><value>Ricerca corpi e volti: {0} — {1:N0} file, inclusi {2:N0} collegamenti diretti</value></data>
 </root>

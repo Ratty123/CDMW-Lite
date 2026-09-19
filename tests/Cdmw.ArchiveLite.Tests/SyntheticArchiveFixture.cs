@@ -268,7 +268,8 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         bool corruptLocalization = false,
         bool useStaticInfoNaming = false,
         ItemPrefabListLayout prefabListLayout = ItemPrefabListLayout.Marked,
-        bool mixedTableNames = false)
+        bool mixedTableNames = false,
+        bool currentMountedSources = false)
     {
         const uint exactModelHash = 0x1D586E71;        // cd_test_01_sword
         const uint relatedModelHash = 0xA1B2C3D4;
@@ -278,8 +279,8 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         Directory.CreateDirectory(root);
         var fixture = new SyntheticArchiveFixture(root);
 
-        var (itemInfo, itemInfoDirectory) = BuildItemInfoTable(
-        [
+        var itemRows = new List<(uint Key, byte[] Row)>
+        {
             (1234, BuildItemInfoRow(
                 itemId: 1234,
                 internalName: "Item_Marni_Laser_Helm",
@@ -305,7 +306,11 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
                 equipTypeHash: UpperbodyEquipTypeHash,
                 grade: 6,
                 prefabListLayout)),
-        ]);
+        };
+        if (currentMountedSources)
+            itemRows.Add((9012, BuildItemInfoRow(9012, "Quest_Unlinked_Letter", "32345678", "32345679",
+                0, 0, 100, 0, 0, ItemPrefabListLayout.Compact)));
+        var (itemInfo, itemInfoDirectory) = BuildItemInfoTable(itemRows);
         var (equipTypeInfo, equipTypeInfoDirectory) = BuildEquipTypeInfoTable(
         [
             (HelmEquipTypeHash, HelmEquipType),
@@ -322,6 +327,8 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
             (ItemStringCategory, "12345679", ScannableItemDescription),
             (ItemStringCategory, "iteminfo_hidden_armor_name", DirectoryOnlyItemName),
             (ItemStringCategory, "22345679", DirectoryOnlyItemDescription),
+            (ItemStringCategory, "32345678", "Lost Letter"),
+            (ItemStringCategory, "32345679", "A letter without a model."),
         ],
         corruptLocalization ? 1 : 0);
 
@@ -329,30 +336,32 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         var headerSuffix = useStaticInfoNaming ? ".staticinfoheader" : ".pabgh";
         var stringBodySuffix = mixedTableNames ? ".pabgb" : bodySuffix;
         var stringHeaderSuffix = mixedTableNames ? ".pabgh" : headerSuffix;
+        var tableRoot = useStaticInfoNaming ? "gamedata/binarystaticinfo__/bin" : "gamedata/binary__/client/bin";
+        var stringRoot = mixedTableNames ? "gamedata/binary__/client/bin" : tableRoot;
         var tables = new List<(string Path, byte[] Bytes)>
         {
             // Similar names are not ItemInfo, even when encountered before the real table.
-            ($"gamecommon/item/decoyiteminfo{bodySuffix}", new byte[16]),
-            ($"gamecommon/item/iteminfo{bodySuffix}", itemInfo),
-            ($"gamecommon/item/stringinfo{stringBodySuffix}", stringInfo),
-            ($"gamecommon/item/equiptypeinfo{bodySuffix}", equipTypeInfo),
+            ($"{tableRoot}/decoyiteminfo{bodySuffix}", new byte[16]),
+            ($"{tableRoot}/iteminfo{bodySuffix}", itemInfo),
+            ($"{stringRoot}/stringinfo{stringBodySuffix}", stringInfo),
+            ($"{tableRoot}/equiptypeinfo{bodySuffix}", equipTypeInfo),
         };
         if (includeRowDirectory)
         {
-            tables.Add(($"gamecommon/item/iteminfo{headerSuffix}", itemInfoDirectory));
-            tables.Add(($"gamecommon/item/stringinfo{stringHeaderSuffix}", stringInfoDirectory));
-            tables.Add(($"gamecommon/item/equiptypeinfo{headerSuffix}", equipTypeInfoDirectory));
+            tables.Add(($"{tableRoot}/iteminfo{headerSuffix}", itemInfoDirectory));
+            tables.Add(($"{stringRoot}/stringinfo{stringHeaderSuffix}", stringInfoDirectory));
+            tables.Add(($"{tableRoot}/equiptypeinfo{headerSuffix}", equipTypeInfoDirectory));
             if (useStaticInfoNaming)
             {
-                tables.Add(("gamecommon/item/iteminfo.pabgh", new byte[16]));
+                tables.Add(($"{tableRoot}/iteminfo.pabgh", new byte[16]));
                 tables.Add(("elsewhere/iteminfo.staticinfoheader", new byte[16]));
             }
         }
 
-        await BuildPackageAsync(root, "0008", tables).ConfigureAwait(false);
+        await BuildPackageAsync(root, currentMountedSources ? "0036" : "0008", tables).ConfigureAwait(false);
         await BuildPackageAsync(
             root,
-            "0009",
+            currentMountedSources ? "0042" : "0009",
             [
                 ("character/model/cd_test_01_sword.pac", new byte[] { 0x50, 0x41, 0x43, 0x00 }),
                 ("character/model/cd_marni_laser_hel_0001_index01.pac", new byte[] { 0x50, 0x41, 0x43, 0x01 }),
@@ -362,9 +371,48 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
             ]).ConfigureAwait(false);
         await BuildPackageAsync(
             root,
-            "0020",
-            [("gamedata/stringtable/binary__/localizationstring_eng.paloc", localization)]).ConfigureAwait(false);
+            currentMountedSources ? "0037" : "0020",
+            [(useStaticInfoNaming ? "gamedata/stringtable/binary__/eng/item.paloc"
+                : "gamedata/stringtable/binary__/localizationstring_eng.paloc", localization)]).ConfigureAwait(false);
+        if (currentMountedSources)
+        {
+            await BuildPackageAsync(root, "0008", [
+                ("gamedata/binary__/client/bin/iteminfo.pabgb", itemInfo),
+                ("gamedata/binary__/client/bin/iteminfo.pabgh", itemInfoDirectory)]).ConfigureAwait(false);
+            await BuildPackageAsync(root, "0060", [
+                ($"{tableRoot}/iteminfo{bodySuffix}", new byte[16]),
+                ($"{tableRoot}/iteminfo{headerSuffix}", new byte[16])]).ConfigureAwait(false);
+            await BuildPackageAsync(root, "0038", [("gamedata/stringtable/binary__/ara/item.paloc",
+                BuildLocalization([(ItemStringCategory, "32345678", "رسالة مفقودة")], 0))]).ConfigureAwait(false);
+            await fixture.WriteMountOrderAsync(["0036", "0037", "0038", "0042", "0008"]).ConfigureAwait(false);
+        }
         return fixture;
+    }
+
+    public async Task WriteMountOrderAsync(IReadOnlyList<string> packages)
+    {
+        using var names = new MemoryStream();
+        using var rows = new MemoryStream();
+        foreach (var package in packages)
+        {
+            WriteUInt32(rows, 0);
+            WriteUInt32(rows, checked((uint)names.Length));
+            WriteUInt32(rows, 0);
+            names.Write(Encoding.ASCII.GetBytes(package));
+            names.WriteByte(0);
+        }
+        using var table = new MemoryStream();
+        table.Write(new byte[12]);
+        rows.Position = 0;
+        rows.CopyTo(table);
+        WriteUInt32(table, checked((uint)names.Length));
+        names.Position = 0;
+        names.CopyTo(table);
+        var bytes = table.ToArray();
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(4),
+            Cdmw.ArchiveLite.Core.ArchiveMetadataReader.HashLittle(bytes.AsSpan(12), 0xC5EDE));
+        Directory.CreateDirectory(Path.Combine(Root, "meta"));
+        await File.WriteAllBytesAsync(Path.Combine(Root, "meta", "0.papgt"), bytes).ConfigureAwait(false);
     }
 
     public async Task AddSingleEntryPackageAsync(string packageName, string virtualPath, byte[] payload)

@@ -11,6 +11,13 @@ internal static class Program
     {
         try
         {
+            var thumbnails = Array.IndexOf(args, "--character-thumbnails");
+            if (thumbnails >= 0)
+            {
+                if (thumbnails + 1 >= args.Length) throw new ArgumentException("--character-thumbnails requires a job path.");
+                ApplicationConfiguration.Initialize();
+                return CharacterThumbnailBatch.Run(args[thumbnails + 1]);
+            }
             var provenanceReportIndex = Array.FindIndex(
                 args,
                 arg => string.Equals(arg, "--helper-provenance-report", StringComparison.OrdinalIgnoreCase));
@@ -87,6 +94,7 @@ internal static class Program
             var suppressDialog = Array.Exists(args, arg =>
                 string.Equals(arg, "--embedded", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--headless-smoke", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(arg, "--character-thumbnails", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--headless-gpu-frame-pacing-soak", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--headless-gpu-sparse-soak", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--visual-audit-batch", StringComparison.OrdinalIgnoreCase)

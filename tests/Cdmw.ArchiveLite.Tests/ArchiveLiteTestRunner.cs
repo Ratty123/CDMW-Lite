@@ -67,6 +67,11 @@ internal static partial class ArchiveLiteTestRunner
             ("an archive with no row directory degrades to a scan and says so", TestArchiveItemNameScanFallbackAsync),
             ("a string table that disagrees with its own footer is rejected, not truncated", TestLocalizationTableIntegrityAsync),
             ("Item Finder shares the Full catalog contract and keeps icon work bounded", TestItemFinderCatalogAsync),
+            ("current mounted item tables retain every item and localized search across cache reloads", TestCurrentItemCatalogAsync),
+            ("Body & Face Finder preserves mounted models, names, relationships and unresolved appearances", CharacterCatalogTests.CatalogueAsync),
+            ("character catalogue caching, cancellation and archive scopes are read-only", TestCharacterCatalogServiceAsync),
+            ("character preview assembly retains component coordinates and resources", TestCharacterPreviewAssemblyAsync),
+            ("Body & Face Finder paging, thumbnails and selection reject stale results", TestCharacterFinderLifecycleAsync),
             ("Item Finder debounce, facet refresh, icons, close, and session changes stay latest-wins", TestItemFinderViewModelLifecycleAsync),
             ("DDS file type and terminal-suffix usage classification stay explicit", TestDdsTextureClassificationAsync),
             ("UTF-8, UTF-16, and Latin-1 text decode without Python codecs", TestTextDecodingAsync),
@@ -4922,7 +4927,7 @@ internal static partial class ArchiveLiteTestRunner
         var staleCachePath = Path.Combine(ArchiveLiteDataPaths.NameIndexCache, $"{opened.Fingerprint}.json");
         await File.WriteAllTextAsync(
             staleCachePath,
-            """{"schema_version":6,"exact_names":{"stale":"Stale Name"},"related_names":{},"items":[]}""")
+            """{"schema_version":7,"exact_names":{"stale":"Stale Name"},"related_names":{},"items":[]}""")
             .ConfigureAwait(false);
         var service = new ArchiveItemNameIndexService(sessions, native);
         var result = await service.BuildAsync(
@@ -5256,18 +5261,18 @@ internal static partial class ArchiveLiteTestRunner
                 []),
         ]);
 
-        Require(catalog.Count == 3, "Item Finder discarded valid native catalog rows");
+        Require(catalog.Count == 4, "Item Finder discarded valid native catalog rows");
         var sword = catalog.Search("gilded longsword", "Weapon", "Sword", 0, 72);
-        Require(sword.TotalMatches == 1 && sword.Items[0].ItemId == 101, "Item Finder did not search across names and category facets");
-        Require(sword.Items[0].VariantCount == 2, "Item Finder did not group enhancement/model variants like Full");
+        Require(sword.TotalMatches == 2 && sword.Items[0].ItemId == 101, "Item Finder did not search across names and category facets");
+        Require(sword.Items.All(item => item.VariantCount == 1), "Item Finder merged distinct item IDs");
         Require(sword.Items[0].CategoryEvidence.Contains("Recovered", StringComparison.Ordinal), "Item Finder category evidence is missing");
         var localized = catalog.Search("vergoldetes", null, null, 0, 72);
         Require(localized.TotalMatches == 1 && localized.Items[0].ItemId == 101, "localized Item Finder search did not match");
         var byId = catalog.Search("202", null, null, 0, 72);
         Require(byId.TotalMatches == 1 && byId.Items[0].Category == "Armor", "numeric item-id search or category recovery failed");
-        Require(catalog.Search("102", null, null, 0, 72).TotalMatches == 1, "grouped secondary item IDs are not searchable");
+        Require(catalog.Search("102", null, null, 0, 72).TotalMatches == 1, "distinct enhancement item IDs are not searchable");
         var paged = catalog.Search(string.Empty, null, null, 1, 1);
-        Require(paged.TotalMatches == 3 && paged.Items.Count == 1, "Item Finder search is not predictably paged");
+        Require(paged.TotalMatches == 4 && paged.Items.Count == 1, "Item Finder search is not predictably paged");
         Require(catalog.CategoryFacets.Any(facet => facet.Category == "Weapon" && facet.Group == "Sword"), "Item Finder category facets omit weapons");
         var cachedRowJson = JsonSerializer.Serialize(catalog.Items.Single(item => item.ItemId == 101), WorkerProtocol.JsonOptions);
         Require(!cachedRowJson.Contains("search_text", StringComparison.Ordinal), "Item Finder persisted its rebuildable search text");
@@ -5277,6 +5282,12 @@ internal static partial class ArchiveLiteTestRunner
             ArchiveItemCatalog.FromRecords([cachedRow]).Search("gilded", null, null, 0, 72).TotalMatches == 1,
             "Item Finder did not rebuild search text after a persistent-cache load");
 
+        var cachedItems = JsonSerializer.Deserialize<ArchiveItemCatalogRecord[]>(
+            JsonSerializer.Serialize(catalog.Items, WorkerProtocol.JsonOptions), WorkerProtocol.JsonOptions)!;
+        var reloaded = ArchiveItemCatalog.FromRecords(cachedItems);
+        Require(reloaded.Count == 4 && reloaded.Search("102", null, null, 0, 72).Items.Single().ItemId == 102
+            && reloaded.TryGet(102, out var enhanced) && enhanced!.InternalName == "OneHandSword_Gilded_+1",
+            "cache reload lost an enhancement ID or returned a different item's details");
         var extensionFacets = Enumerable.Range(0, 12)
             .Select(index => new ArchiveExtensionFacet(
                 $".{(char)('a' + index)}",
@@ -7361,6 +7372,15 @@ internal static partial class ArchiveLiteTestRunner
                 ?? throw new InvalidDataException("worker open response is missing");
             Require(opened.EntryCount == 4, "worker archive count is wrong");
             Require(workerProgress.Any(update => update.Phase == "fingerprint"), "worker did not forward archive-open progress");
+
+            var charactersMessage = await ExchangeAsync(writer, reader, WorkerProtocol.SearchCharacterCatalog, 2,
+                new CharacterCatalogSearchRequest(opened.SessionId), timeout.Token).ConfigureAwait(false);
+            Require(WorkerProtocol.ReadPayload<CharacterCatalogSearchResult>(charactersMessage)?.TotalMatches == 0,
+                "worker character search did not return the empty catalogue");
+            var thumbnailsMessage = await ExchangeAsync(writer, reader, WorkerProtocol.CharacterThumbnails, 2,
+                new CharacterThumbnailRequest(opened.SessionId, []), timeout.Token).ConfigureAwait(false);
+            Require(WorkerProtocol.ReadPayload<CharacterThumbnailResult>(thumbnailsMessage)?.Items.Count == 0,
+                "worker thumbnail route failed or blocked on its own foreground lease");
 
             var queryMessage = await ExchangeAsync(
                 writer,

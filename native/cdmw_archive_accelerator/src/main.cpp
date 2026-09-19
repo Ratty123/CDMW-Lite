@@ -1595,7 +1595,8 @@ std::map<std::uint32_t, std::string> build_model_hash_table(const std::vector<En
     for (const Entry& entry : entries) {
         const std::string lower_path = lower_copy(slash_copy(entry.path));
         const std::string ext = extension_for(lower_path);
-        if (package_group_for(entry) != "0009" || !(ext == ".prefab" || ext == ".pac" || ext == ".pact")) continue;
+        // The managed catalogue supplies the active mounted version of each path.
+        if (!(ext == ".prefab" || ext == ".pac" || ext == ".pact")) continue;
         const std::string base = stem_for_path(lower_path);
         for (const std::string& candidate_base : model_candidate_bases(base)) {
             for (const std::string& suffix : suffixes) {
@@ -1663,8 +1664,12 @@ int run_item_index_job(
         std::vector<std::string> localization_failures;
         std::map<std::uint32_t, std::uint64_t> localization_categories;
         std::uint64_t localization_row_count = 0;
-        for (const std::string& lang : {"kor","eng","jpn","rus","tur","spa-es","spa-mx","fre","ger","ita","pol","por-br","zho-tw","zho-cn"}) {
-            std::vector<char> data = read_binary_if_exists(work_dir / ("loc_" + lang + ".bin"));
+        for (const auto& file : fs::directory_iterator(work_dir)) {
+            if (!file.is_regular_file()) continue;
+            const auto name = file.path().filename().string();
+            if (name.size() <= 8 || name.compare(0, 4, "loc_") != 0 || file.path().extension() != ".bin") continue;
+            const std::string lang = name.substr(4, name.size() - 8);
+            std::vector<char> data = read_binary_if_exists(file.path());
             if (data.empty()) continue;
             // One unreadable language costs that language's names, not the whole catalog, so the
             // failure is named in the report rather than thrown all the way out of the job.
@@ -1765,7 +1770,9 @@ int run_item_index_job(
                     }
                 }
             }
-            if (!item.pac_files.empty() || !item.model_stems.empty()) linked_items.push_back(std::move(item));
+            // Items without an installed mesh (documents, rewards, ingredients, etc.)
+            // are still inventory records and must remain discoverable by name and ID.
+            linked_items.push_back(std::move(item));
         }
 
         std::ostringstream out;

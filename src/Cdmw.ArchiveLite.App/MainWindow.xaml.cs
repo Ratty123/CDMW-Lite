@@ -366,6 +366,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnCharacterFinderClick(object sender, RoutedEventArgs eventArgs)
+    {
+        var dialog = new CharacterFinderDialog(_viewModel.CharacterFinder) { Owner = this };
+        if (dialog.ShowDialog() == true) WorkspaceTabs.SelectedIndex = 0;
+    }
+
     private void OnArchivePreviewFindNextClick(object sender, RoutedEventArgs eventArgs) =>
         FindInEditor(ArchiveTextPreviewEditor, ArchivePreviewFindBox.Text, findPrevious: false);
 

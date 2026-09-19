@@ -59,10 +59,13 @@ public sealed class MainWindowViewModel : ObservableObject
             UpdateStatus,
             ArchiveBrowser.ShowItemScopeAsync,
             settings.ItemFinder);
+        CharacterFinder = new CharacterFinderViewModel(worker, () => ArchiveBrowser.SessionId,
+            ArchiveBrowser.ShowCharacterScopeAsync, settings.CharacterFinder);
         ArchiveBrowser.SessionChanged += (_, _) =>
         {
             TextSearch.NotifyArchiveSessionChanged();
             ItemFinder.NotifyArchiveSessionChanged();
+            CharacterFinder.NotifyArchiveSessionChanged();
         };
         ArchiveBrowser.ItemCatalogReady += (_, eventArgs) => ItemFinder.NotifyCatalogReady(eventArgs.SessionId);
     }
@@ -72,6 +75,7 @@ public sealed class MainWindowViewModel : ObservableObject
     public TextSearchViewModel TextSearch { get; }
 
     public ItemFinderViewModel ItemFinder { get; }
+    public CharacterFinderViewModel CharacterFinder { get; }
 
     public IReadOnlyList<LanguageOption> Languages { get; }
 
@@ -133,6 +137,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 ArchiveBrowser.RefreshLocalization();
                 TextSearch.RefreshLocalization();
                 ItemFinder.RefreshLocalization();
+                CharacterFinder.RefreshLocalization();
                 RefreshAppearanceLabels();
                 Status = LocalizationManager.Get("LanguageApplied");
             }
@@ -224,6 +229,7 @@ public sealed class MainWindowViewModel : ObservableObject
         ArchiveBrowser.RequestShutdown();
         TextSearch.RequestShutdown();
         ItemFinder.RequestShutdown();
+        CharacterFinder.RequestShutdown();
         _settings = _settings with
         {
             ArchiveRoot = ArchiveBrowser.ArchiveRoot,
@@ -248,6 +254,7 @@ public sealed class MainWindowViewModel : ObservableObject
                 TextSearch.UseRegularExpression,
                 TextSearch.CaseSensitive),
             ItemFinder = ItemFinder.CaptureSettings(),
+            CharacterFinder = CharacterFinder.CaptureSettings(),
         };
         try
         {

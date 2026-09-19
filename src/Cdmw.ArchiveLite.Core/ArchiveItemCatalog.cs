@@ -8,18 +8,6 @@ namespace Cdmw.ArchiveLite.Core;
 
 public sealed class ArchiveItemCatalog
 {
-    private static readonly Regex DisplayVariantSuffix = new(
-        @"(?:\s*\(\+\d+\)|\s+\+\d+)$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly Regex InternalVariantSuffix = new(
-        @"(?:_?\+\d+|_lv\d+|_level\d+|_grade\d+)$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex ModelVariantSuffix = new(
-        @"(?:_(?:index\d+(?:_[lr])?|sub\d+)|_[lrustcd])$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly Regex ModelTrailingLetterVariant = new(
-        @"(?<=\d)[a-z]$",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private readonly IReadOnlyList<ArchiveItemCatalogRecord> _items;
     private readonly IReadOnlyDictionary<int, ArchiveItemCatalogRecord> _byItemId;
     private readonly IReadOnlyList<ItemCatalogCategoryFacet> _categoryFacets;
@@ -48,8 +36,8 @@ public sealed class ArchiveItemCatalog
         var normalized = records
             .Where(static item => item.ItemId > 0 && !string.IsNullOrWhiteSpace(item.InternalName))
             .Select(NormalizeRecord)
-            .GroupBy(BuildGroupKey, StringComparer.OrdinalIgnoreCase)
-            .Select(MergeVariants)
+            .GroupBy(static item => item.ItemId)
+            .Select(static group => group.First())
             .OrderBy(static item => item.Category, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static item => item.Group, StringComparer.OrdinalIgnoreCase)
             .ThenBy(static item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
@@ -151,86 +139,6 @@ public sealed class ArchiveItemCatalog
         };
     }
 
-    private static string BuildGroupKey(ArchiveItemCatalogRecord item)
-    {
-        var displayBase = DisplayVariantSuffix.Replace(item.DisplayName, string.Empty).Trim();
-        var internalBase = InternalVariantSuffix.Replace(item.InternalName, string.Empty).Trim('_');
-        var scope = item.PacFiles
-            .Concat(item.ModelStems)
-            .Select(StripModelVariant)
-            .Where(static value => value.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var identity = string.IsNullOrWhiteSpace(displayBase) ? internalBase : displayBase;
-        return $"{identity}|{(scope.Length > 0 ? string.Join('|', scope) : internalBase)}";
-    }
-
-    private static ArchiveItemCatalogRecord MergeVariants(IGrouping<string, ArchiveItemCatalogRecord> group)
-    {
-        var rows = group.ToArray();
-        var first = rows[0];
-        if (rows.Length == 1)
-        {
-            return first;
-        }
-        static string[] MergeStrings(IEnumerable<IReadOnlyList<string>> sources) => sources
-            .SelectMany(static values => values)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var displayName = DisplayVariantSuffix.Replace(first.DisplayName, string.Empty).Trim();
-        var localizedNames = MergeStrings(rows.Select(static row => row.LocalizedNames));
-        var pacFiles = MergeStrings(rows.Select(static row => row.PacFiles));
-        var modelStems = MergeStrings(rows.Select(static row => row.ModelStems));
-        var iconPaths = MergeStrings(rows.Select(static row => row.IconPaths));
-        var evidence = string.Join(
-            "; ",
-            rows.Select(static row => row.Evidence)
-                .Where(static value => !string.IsNullOrWhiteSpace(value))
-                .Distinct(StringComparer.OrdinalIgnoreCase));
-        return first with
-        {
-            DisplayName = displayName,
-            Description = rows.Select(static row => row.Description)
-                .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty,
-            LocalizedNames = localizedNames,
-            PrefabHashes = rows.SelectMany(static row => row.PrefabHashes).Distinct().ToArray(),
-            PacFiles = pacFiles,
-            ModelStems = modelStems,
-            IconPaths = iconPaths,
-            VariantCount = rows.Sum(static row => Math.Max(1, row.VariantCount)),
-            Evidence = evidence,
-            SearchText = BuildSearchText(
-                first.ItemId,
-                first.InternalName,
-                displayName,
-                first.Category,
-                first.Group,
-                localizedNames,
-                pacFiles,
-                modelStems,
-                iconPaths,
-                first.EquipType)
-                + string.Join(' ', rows.Select(static row => $" {row.ItemId} {NormalizeSearchText(row.InternalName)} ")),
-        };
-    }
-
-    private static string StripModelVariant(string value)
-    {
-        var basename = Path.GetFileNameWithoutExtension(value.Replace('\\', '/')).Trim().ToLowerInvariant();
-        while (true)
-        {
-            var stripped = ModelTrailingLetterVariant.Replace(
-                ModelVariantSuffix.Replace(basename, string.Empty),
-                string.Empty).Trim('_');
-            if (stripped == basename || stripped.Length == 0)
-            {
-                return basename;
-            }
-            basename = stripped;
-        }
-    }
 
     private static string BuildSearchText(
         int itemId,

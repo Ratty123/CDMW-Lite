@@ -11,6 +11,7 @@ public sealed class ArchiveSession : IDisposable
     private long _lastQueryTotal;
     private ArchiveItemNameIndex? _nameIndex;
     private ArchiveItemCatalog? _itemCatalog;
+    private ArchiveCharacterCatalog? _characterCatalog;
     private IReadOnlyList<ArchiveExtensionFacet>? _extensionFacets;
     /// <summary>
     /// One resident folder tree per filter. The unfiltered tree is the expensive one and is kept for
@@ -58,6 +59,7 @@ public sealed class ArchiveSession : IDisposable
     internal ArchiveExtensionIndex ExtensionIndex { get; }
     public IReadOnlyList<string> SourceFiles { get; }
     internal SemaphoreSlim NameIndexBuildGate { get; } = new(1, 1);
+    internal SemaphoreSlim CharacterCatalogBuildGate { get; } = new(1, 1);
     internal SemaphoreSlim FolderTreeBuildGate { get; } = new(1, 1);
 
     internal ArchiveEntryDto EnrichEntry(ArchiveEntryDto entry)
@@ -95,6 +97,21 @@ public sealed class ArchiveSession : IDisposable
             catalog = _itemCatalog;
             return catalog is not null;
         }
+    }
+
+    internal bool TryGetCharacterCatalog(out ArchiveCharacterCatalog? catalog)
+    {
+        lock (_catalogueGate)
+        {
+            catalog = _characterCatalog;
+            return catalog is not null;
+        }
+    }
+
+    internal void SetCharacterCatalog(ArchiveCharacterCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        lock (_catalogueGate) _characterCatalog = catalog;
     }
 
     internal void SetCatalogue(ArchiveItemNameIndex nameIndex, ArchiveItemCatalog itemCatalog)
@@ -177,6 +194,7 @@ public sealed class ArchiveSession : IDisposable
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             NameIndexBuildGate.Dispose();
+            CharacterCatalogBuildGate.Dispose();
             FolderTreeBuildGate.Dispose();
             try
             {

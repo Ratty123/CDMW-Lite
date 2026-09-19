@@ -22,6 +22,12 @@ public static class WorkerProtocol
     public const string LoadItemIcons = "load_item_icons";
     public const string WarmItemIcons = "warm_item_icons";
     public const string ScopeItemCatalog = "scope_item_catalog";
+    public const string BuildCharacterCatalog = "build_character_catalog";
+    public const string SearchCharacterCatalog = "search_character_catalog";
+    public const string CharacterCatalogDetail = "character_catalog_detail";
+    public const string ScopeCharacterCatalog = "scope_character_catalog";
+    public const string PreviewCharacter = "preview_character";
+    public const string CharacterThumbnails = "character_thumbnails";
     public const string FindAssociatedAssets = "find_associated_assets";
     public const string Preview = "preview";
     public const string TextSearch = "text_search";

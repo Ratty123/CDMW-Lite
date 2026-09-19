@@ -454,4 +454,38 @@
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Более надёжных признаков категории не найдено</value></data>
   <data name="ExportIncludeFamily" xml:space="preserve"><value>Включить семейство</value></data>
   <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Также экспортирует связанные материалы, текстуры, дескрипторы и прочие найденные ресурсы выбранного файла. При экспорте меша они помещаются в папку referenced_files/ рядом с ним.</value></data>
+  <data name="CharacterFinderTitle" xml:space="preserve"><value>Поиск тел и лиц</value></data>
+  <data name="CharacterUniqueAssets" xml:space="preserve"><value>Уникальные ресурсы</value></data>
+  <data name="CharacterAppearances" xml:space="preserve"><value>Варианты внешности</value></data>
+  <data name="CharacterBodies" xml:space="preserve"><value>Тела</value></data>
+  <data name="CharacterFaces" xml:space="preserve"><value>Лица</value></data>
+  <data name="CharacterDetailsBounded" xml:space="preserve"><value>Сведения сокращены. Откройте связанные файлы для просмотра зависимостей.</value></data>
+  <data name="CharacterFinderReady" xml:space="preserve"><value>Откройте поиск тел и лиц для просмотра каталога персонажей.</value></data>
+  <data name="CharacterFinderLoading" xml:space="preserve"><value>Загрузка каталога персонажей…</value></data>
+  <data name="CharacterPreviewLoading" xml:space="preserve"><value>Подготовка предпросмотра персонажа…</value></data>
+  <data name="CharacterAllRoles" xml:space="preserve"><value>Все роли</value></data>
+  <data name="CharacterAllTypes" xml:space="preserve"><value>Все типы</value></data>
+  <data name="CharacterAllFamilies" xml:space="preserve"><value>Все семейства тел</value></data>
+  <data name="CharacterAllStates" xml:space="preserve"><value>Все состояния разрешения</value></data>
+  <data name="CharacterWhole" xml:space="preserve"><value>Персонаж целиком</value></data>
+  <data name="CharacterFacialDetails" xml:space="preserve"><value>Детали лица</value></data>
+  <data name="CharacterBeard" xml:space="preserve"><value>Борода</value></data>
+  <data name="CharacterHumanoids" xml:space="preserve"><value>Гуманоиды</value></data>
+  <data name="CharacterPlayers" xml:space="preserve"><value>Игровые персонажи</value></data>
+  <data name="CharacterCreatures" xml:space="preserve"><value>Существа</value></data>
+  <data name="CharacterNpcs" xml:space="preserve"><value>NPC</value></data>
+  <data name="CharacterMounts" xml:space="preserve"><value>Ездовые животные</value></data>
+  <data name="CharacterResolved" xml:space="preserve"><value>Разрешено</value></data>
+  <data name="CharacterUnresolved" xml:space="preserve"><value>Не разрешено</value></data>
+  <data name="CharacterInferred" xml:space="preserve"><value>Предположено</value></data>
+  <data name="CharacterAmbiguous" xml:space="preserve"><value>Неоднозначно</value></data>
+  <data name="CharacterUnknown" xml:space="preserve"><value>Неизвестно</value></data>
+  <data name="CharacterSearchHint" xml:space="preserve"><value>Поиск по имени персонажа, внутреннему имени, ID или пути</value></data>
+  <data name="CharacterShowAll" xml:space="preserve"><value>Показать все результаты</value></data>
+  <data name="CharacterDetails" xml:space="preserve"><value>Сведения</value></data>
+  <data name="CharacterRelationships" xml:space="preserve"><value>Используется в / Компоненты</value></data>
+  <data name="CharacterBrowseRelated" xml:space="preserve"><value>Просмотреть связанные результаты</value></data>
+  <data name="CharacterCopyPath" xml:space="preserve"><value>Копировать путь</value></data>
+  <data name="CharacterScopeLoading" xml:space="preserve"><value>Определение файлов персонажа…</value></data>
+  <data name="CharacterScopeApplied" xml:space="preserve"><value>Поиск тел и лиц: {0} — файлов: {1:N0}, прямых связей: {2:N0}</value></data>
 </root>

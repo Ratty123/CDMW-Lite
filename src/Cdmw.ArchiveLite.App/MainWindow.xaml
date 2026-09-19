@@ -98,6 +98,12 @@
                         ToolTip="{infra:Loc Key=ItemFinderButtonHint}"
                         IsEnabled="{Binding ItemFinder.IsAvailable}"
                         Click="OnItemFinderClick" />
+                <Button x:Name="CharacterFinderNavigationButton"
+                        Margin="6,0,0,0" Padding="8,6"
+                        Style="{StaticResource TopNavigationActionButtonStyle}"
+                        Content="{infra:Loc Key=CharacterFinderTitle}"
+                        IsEnabled="{Binding CharacterFinder.IsAvailable}"
+                        Click="OnCharacterFinderClick" />
             </StackPanel>
             <Border Grid.Column="2"
                     Background="Transparent"

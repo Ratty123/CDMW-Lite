@@ -454,4 +454,38 @@
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>未找到更有力的分类依据</value></data>
   <data name="ExportIncludeFamily" xml:space="preserve"><value>包含关联文件</value></data>
   <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>同时导出与所选文件相关的材质、贴图、描述符及其他已解析资源。导出网格时，它们会放在旁边的 referenced_files/ 文件夹中。</value></data>
+  <data name="CharacterFinderTitle" xml:space="preserve"><value>身体与面部查找器</value></data>
+  <data name="CharacterUniqueAssets" xml:space="preserve"><value>独立资源</value></data>
+  <data name="CharacterAppearances" xml:space="preserve"><value>外观变体</value></data>
+  <data name="CharacterBodies" xml:space="preserve"><value>身体</value></data>
+  <data name="CharacterFaces" xml:space="preserve"><value>面部</value></data>
+  <data name="CharacterDetailsBounded" xml:space="preserve"><value>详情已缩略。显示相关文件以检查依赖项。</value></data>
+  <data name="CharacterFinderReady" xml:space="preserve"><value>打开身体与面部查找器以浏览角色目录。</value></data>
+  <data name="CharacterFinderLoading" xml:space="preserve"><value>正在加载角色目录…</value></data>
+  <data name="CharacterPreviewLoading" xml:space="preserve"><value>正在准备角色预览…</value></data>
+  <data name="CharacterAllRoles" xml:space="preserve"><value>所有角色部位</value></data>
+  <data name="CharacterAllTypes" xml:space="preserve"><value>所有类型</value></data>
+  <data name="CharacterAllFamilies" xml:space="preserve"><value>所有身体系列</value></data>
+  <data name="CharacterAllStates" xml:space="preserve"><value>所有解析状态</value></data>
+  <data name="CharacterWhole" xml:space="preserve"><value>完整角色</value></data>
+  <data name="CharacterFacialDetails" xml:space="preserve"><value>面部细节</value></data>
+  <data name="CharacterBeard" xml:space="preserve"><value>胡须</value></data>
+  <data name="CharacterHumanoids" xml:space="preserve"><value>人形</value></data>
+  <data name="CharacterPlayers" xml:space="preserve"><value>玩家角色</value></data>
+  <data name="CharacterCreatures" xml:space="preserve"><value>生物</value></data>
+  <data name="CharacterNpcs" xml:space="preserve"><value>NPC</value></data>
+  <data name="CharacterMounts" xml:space="preserve"><value>坐骑</value></data>
+  <data name="CharacterResolved" xml:space="preserve"><value>已解析</value></data>
+  <data name="CharacterUnresolved" xml:space="preserve"><value>未解析</value></data>
+  <data name="CharacterInferred" xml:space="preserve"><value>推断</value></data>
+  <data name="CharacterAmbiguous" xml:space="preserve"><value>不明确</value></data>
+  <data name="CharacterUnknown" xml:space="preserve"><value>未知</value></data>
+  <data name="CharacterSearchHint" xml:space="preserve"><value>搜索角色名称、内部名称、ID 或路径</value></data>
+  <data name="CharacterShowAll" xml:space="preserve"><value>显示所有结果</value></data>
+  <data name="CharacterDetails" xml:space="preserve"><value>详情</value></data>
+  <data name="CharacterRelationships" xml:space="preserve"><value>使用者 / 组件</value></data>
+  <data name="CharacterBrowseRelated" xml:space="preserve"><value>浏览相关结果</value></data>
+  <data name="CharacterCopyPath" xml:space="preserve"><value>复制路径</value></data>
+  <data name="CharacterScopeLoading" xml:space="preserve"><value>正在解析角色文件…</value></data>
+  <data name="CharacterScopeApplied" xml:space="preserve"><value>身体与面部查找器：{0} — {1:N0} 个文件，其中 {2:N0} 个直接链接</value></data>
 </root>

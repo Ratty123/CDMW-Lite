@@ -18,6 +18,8 @@ internal sealed class WorkerRuntime : IDisposable
     private readonly ArchiveItemCatalogService _itemCatalog;
     private readonly ArchiveItemIconService _itemIcons;
     private readonly ArchiveItemCatalogScopeService _itemScopes;
+    private readonly ArchiveCharacterCatalogService _characters;
+    private readonly ArchiveCharacterPreviewService _characterPreviews;
     private readonly ArchiveAssociationService _associations;
     private readonly ArchivePreviewService _previews;
     private readonly TextSearchService _textSearch;
@@ -60,6 +62,8 @@ internal sealed class WorkerRuntime : IDisposable
         _associations = new ArchiveAssociationService(_sessions, _native);
         _itemScopes = new ArchiveItemCatalogScopeService(_sessions, _nameIndex, _associations);
         var modelPreviews = new NativeModelPreviewService();
+        _characters = new ArchiveCharacterCatalogService(_sessions, _native);
+        _characterPreviews = new ArchiveCharacterPreviewService(_sessions, _characters, modelPreviews, _workPriority);
         var texturePreviews = new NativeTexturePreviewService();
         _itemIcons = new ArchiveItemIconService(_sessions, _nameIndex, _native, texturePreviews, _workPriority);
         _previews = new ArchivePreviewService(_sessions, _native, modelPreviews, texturePreviews);
@@ -76,7 +80,7 @@ internal sealed class WorkerRuntime : IDisposable
         Func<ProgressUpdate, Task> publishProgress,
         CancellationToken cancellationToken)
     {
-        using var foregroundLease = request.Kind is WorkerProtocol.WarmItemIcons or WorkerProtocol.BuildNameIndex
+        using var foregroundLease = request.Kind is WorkerProtocol.WarmItemIcons or WorkerProtocol.BuildNameIndex or WorkerProtocol.CharacterThumbnails
             ? null
             : _workPriority.EnterForeground();
         switch (request.Kind)
@@ -151,6 +155,24 @@ internal sealed class WorkerRuntime : IDisposable
                     var result = await _itemScopes.ResolveAsync(payload, publishProgress, cancellationToken).ConfigureAwait(false);
                     return WorkerProtocol.Response(request, WorkerMessageStatus.Result, result);
                 }
+            case WorkerProtocol.BuildCharacterCatalog:
+                return WorkerProtocol.Response(request, WorkerMessageStatus.Result,
+                    await _characters.BuildAsync(RequirePayload<BuildCharacterCatalogRequest>(request), publishProgress, cancellationToken).ConfigureAwait(false));
+            case WorkerProtocol.SearchCharacterCatalog:
+                return WorkerProtocol.Response(request, WorkerMessageStatus.Result,
+                    await _characters.SearchAsync(RequirePayload<CharacterCatalogSearchRequest>(request), publishProgress, cancellationToken).ConfigureAwait(false));
+            case WorkerProtocol.CharacterCatalogDetail:
+                return WorkerProtocol.Response(request, WorkerMessageStatus.Result,
+                    await _characters.DetailAsync(RequirePayload<CharacterCatalogDetailRequest>(request), publishProgress, cancellationToken).ConfigureAwait(false));
+            case WorkerProtocol.ScopeCharacterCatalog:
+                return WorkerProtocol.Response(request, WorkerMessageStatus.Result,
+                    await _characters.ScopeAsync(RequirePayload<CharacterCatalogScopeRequest>(request), publishProgress, cancellationToken).ConfigureAwait(false));
+            case WorkerProtocol.PreviewCharacter:
+                return WorkerProtocol.Response(request, WorkerMessageStatus.Result,
+                    await _characterPreviews.BuildAsync(RequirePayload<CharacterPreviewRequest>(request), publishProgress, cancellationToken).ConfigureAwait(false));
+            case WorkerProtocol.CharacterThumbnails:
+                return WorkerProtocol.Response(request, WorkerMessageStatus.Result,
+                    await _characterPreviews.ThumbnailsAsync(RequirePayload<CharacterThumbnailRequest>(request), cancellationToken).ConfigureAwait(false));
             case WorkerProtocol.FindAssociatedAssets:
                 {
                     var payload = RequirePayload<FindAssociatedAssetsRequest>(request);

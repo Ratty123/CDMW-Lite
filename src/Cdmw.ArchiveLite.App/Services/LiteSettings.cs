@@ -19,7 +19,12 @@ public sealed record LiteSettings(
     WorkspaceLayoutSettings? WorkspaceLayout = null,
     GridColumnSettings[]? ArchiveColumnLayout = null,
     GridColumnSettings[]? TextSearchColumnLayout = null,
-    int ArchiveColumnDefaultsRevision = 0);
+    int ArchiveColumnDefaultsRevision = 0,
+    CharacterFinderSettings? CharacterFinder = null);
+
+public sealed record CharacterFinderSettings(
+    string Query = "", string View = "assets", string Tab = "bodies", string Role = "",
+    string SourceGroup = "", string BodyFamily = "", string Resolution = "", double Width = 1320, double Height = 840);
 
 /// <summary>
 /// Tracks which shipped catalog column defaults a settings file was written against. A file left at

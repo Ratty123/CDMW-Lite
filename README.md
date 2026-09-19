@@ -15,13 +15,16 @@ The application is self-contained in this repository and keeps archive queries, 
 - Browse large archives through a folder tree or a flat list, with an optional category navigator, paging, filters, sorting, and persistent indexes.
 - Search text across archives or loose folders with cancellation, result limits, and in-file navigation.
 - Find known items by localized name and follow exact or related archive links.
-- Item Finder supports both `.pabgb`/`.pabgh` and `.staticinfobody`/`.staticinfoheader` table names, including compact prefab lists. Item-name caches from earlier versions rebuild automatically.
+- Item Finder reads the active mounted item and localization tables, including current `item.paloc` languages. Distinct item IDs remain separate and items without model links stay searchable. Earlier item-name caches rebuild automatically.
+- Body & Face Finder browses unique model assets and named appearances, with Bodies/Faces views, filters, thumbnails, an interactive 3D preview, and exact or related files in the archive browser. Unresolved and ambiguous appearances remain searchable with their evidence.
 - Preview text, XML, images, DDS textures, supported media including the sounds a Wwise `.bnk` embeds, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
 - Export a mesh as OBJ, GLB or FBX, preserving source coordinates, vertex order and material parts. A resolved skinned character carries its skeleton and all eight per-vertex influences into GLB and FBX.
 - Discover and export associated assets without altering game data.
 - Run as a portable Windows application or a single self-extracting executable.
 - Switch the interface between the fourteen languages Crimson Desert itself ships; every one but English is machine translated and unreviewed.
 - Keep settings, caches, logs, and crash reports isolated from the full CDMW workbench.
+
+Body & Face Finder builds its catalogue and previews in the worker and renderer processes. Pages contain at most 72 rows and thumbnail jobs contain at most four results. Appearance previews preserve component placement and authored scale. Customization, morphs and animation are not applied; their descriptors remain available for inspection or export.
 
 ## Safety boundary
 

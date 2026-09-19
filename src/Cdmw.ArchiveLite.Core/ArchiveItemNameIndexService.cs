@@ -10,7 +10,7 @@ public sealed class ArchiveItemNameIndexService(
     NativeArchiveCore native,
     ArchiveWorkPriority? workPriority = null)
 {
-    private const int CacheSchemaVersion = 7;
+    private const int CacheSchemaVersion = 8;
     private const int NativeCatalogSchemaVersion = 4;
     private const int MaximumDiagnosticCharacters = 64 * 1024;
     private static readonly TimeSpan IndexerTimeout = TimeSpan.FromMinutes(3);
@@ -20,23 +20,6 @@ public sealed class ArchiveItemNameIndexService(
         WriteIndented = true,
     };
 
-    private static readonly (string Language, string TableName)[] LocalizationTables =
-    [
-        ("kor", "localizationstring_kor"),
-        ("eng", "localizationstring_eng"),
-        ("jpn", "localizationstring_jpn"),
-        ("rus", "localizationstring_rus"),
-        ("tur", "localizationstring_tur"),
-        ("spa-es", "localizationstring_spa-es"),
-        ("spa-mx", "localizationstring_spa-mx"),
-        ("fre", "localizationstring_fre"),
-        ("ger", "localizationstring_ger"),
-        ("ita", "localizationstring_ita"),
-        ("pol", "localizationstring_pol"),
-        ("por-br", "localizationstring_por-br"),
-        ("zho-tw", "localizationstring_zho-tw"),
-        ("zho-cn", "localizationstring_zho-cn"),
-    ];
 
     public async Task<BuildNameIndexResult> BuildAsync(
         BuildNameIndexRequest request,
@@ -88,7 +71,7 @@ public sealed class ArchiveItemNameIndexService(
                         UsedCache: false,
                         ExactNameCount: 0,
                         RelatedNameCount: 0,
-                        Warning: "ItemInfo was not found in package 0008, so known in-game names and Item Finder are unavailable.",
+                        Warning: "No active ItemInfo table was found, so known in-game names and Item Finder are unavailable.",
                         ItemCount: 0);
                 }
 
@@ -144,26 +127,16 @@ public sealed class ArchiveItemNameIndexService(
             Warning: warning,
             ItemCount: catalog.Count);
 
-    private async Task<NameIndexSources> WriteEntriesAndFindSourcesAsync(
+    private async Task<ArchiveItemSources> WriteEntriesAndFindSourcesAsync(
         ArchiveSession session,
         string entriesPath,
         Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken,
         bool yieldToForeground)
     {
-        var sources = new NameIndexSources();
+        var sources = new ArchiveItemSources(session.PackageRoot);
+        var candidates = new Dictionary<string, List<ArchiveEntryDto>>(StringComparer.OrdinalIgnoreCase);
         var total = session.Index.EntryCount;
-        await using var stream = new FileStream(
-            entriesPath,
-            FileMode.CreateNew,
-            FileAccess.Write,
-            FileShare.None,
-            1024 * 1024,
-            FileOptions.SequentialScan);
-        await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024 * 1024, leaveOpen: false)
-        {
-            NewLine = "\n",
-        };
         for (long entryId = 0; entryId < total; entryId++)
         {
             if ((entryId & 0x1FFF) == 0)
@@ -171,13 +144,27 @@ public sealed class ArchiveItemNameIndexService(
                 cancellationToken.ThrowIfCancellationRequested();
                 await WaitForForegroundAsync(yieldToForeground, cancellationToken).ConfigureAwait(false);
                 if (publishProgress is not null)
-                {
                     await publishProgress(new ProgressUpdate(entryId, total, "name_scan")).ConfigureAwait(false);
-                }
             }
             var entry = session.Index.ReadEntry(entryId);
-            FindSource(sources, entry);
-            writer.Write(entryId);
+            sources.Offer(entry);
+            if (entry.Extension is ".pac" or ".pam" or ".pamlod" or ".prefab" or ".pact"
+                || entry.Extension == ".dds" && entry.Path.Contains("icon", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!candidates.TryGetValue(entry.Path, out var versions)) candidates[entry.Path] = versions = [];
+                versions.Add(entry);
+            }
+        }
+        sources.Finish();
+        await using var stream = new FileStream(entriesPath, FileMode.CreateNew, FileAccess.Write,
+            FileShare.None, 1024 * 1024, FileOptions.SequentialScan);
+        await using var writer = new StreamWriter(stream, new UTF8Encoding(false), 1024 * 1024) { NewLine = "\n" };
+        foreach (var versions in candidates.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = versions.Where(sources.Accepts).MaxBy(sources.Order);
+            if (entry is null) continue;
+            writer.Write(entry.EntryId);
             writer.Write('\t');
             writer.Write(CleanTsv(entry.Path));
             writer.Write('\t');
@@ -196,59 +183,14 @@ public sealed class ArchiveItemNameIndexService(
             writer.Write(entry.PazIndex);
             writer.WriteLine();
         }
-        cancellationToken.ThrowIfCancellationRequested();
         await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
         if (publishProgress is not null)
-        {
             await publishProgress(new ProgressUpdate(total, total, "name_scan")).ConfigureAwait(false);
-        }
         return sources;
     }
 
-    private static void FindSource(NameIndexSources sources, ArchiveEntryDto entry)
-    {
-        var lowerPath = entry.Path.Replace('\\', '/').ToLowerInvariant();
-        var basename = Path.GetFileName(lowerPath);
-        var packageGroup = Path.GetFileName(Path.GetDirectoryName(entry.SourcePamt))?.ToLowerInvariant() ?? string.Empty;
-        if (packageGroup == "0008")
-        {
-            if (sources.ItemInfo is null && basename is "iteminfo.pabgb" or "iteminfo.staticinfobody")
-            {
-                sources.ItemInfo = entry;
-            }
-            else if (sources.StringInfo is null && basename is "stringinfo.pabgb" or "stringinfo.staticinfobody")
-            {
-                sources.StringInfo = entry;
-            }
-            else if (sources.EquipTypeInfo is null && basename is "equiptypeinfo.pabgb" or "equiptypeinfo.staticinfobody")
-            {
-                sources.EquipTypeInfo = entry;
-            }
-            else if (Path.GetExtension(basename) is ".pabgh" or ".staticinfoheader")
-            {
-                // Each table blob ships beside a same-named row directory holding one entry
-                // per row. Collected by path here and paired with its blob once the pass is over,
-                // because either half can appear first and several tables share a name suffix.
-                sources.RowDirectories[lowerPath] = entry;
-            }
-        }
-        if (packageGroup != "0020" || !lowerPath.Contains("localizationstring_", StringComparison.Ordinal))
-        {
-            return;
-        }
-        foreach (var (language, tableName) in LocalizationTables)
-        {
-            if (!sources.Localizations.ContainsKey(language)
-                && lowerPath.Contains(tableName, StringComparison.Ordinal))
-            {
-                sources.Localizations[language] = entry;
-                break;
-            }
-        }
-    }
-
     private async Task ExtractSourcesAsync(
-        NameIndexSources sources,
+        ArchiveItemSources sources,
         string payloadRoot,
         Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken,
@@ -258,23 +200,23 @@ public sealed class ArchiveItemNameIndexService(
         {
             ("iteminfo.bin", sources.ItemInfo!),
         };
-        AddRowDirectory("iteminfo.header.bin", sources.ItemInfo);
+        AddRowDirectory("iteminfo.header.bin", sources.ItemInfoHeader);
         if (sources.StringInfo is not null)
         {
             payloads.Add(("stringinfo.bin", sources.StringInfo));
-            AddRowDirectory("stringinfo.header.bin", sources.StringInfo);
+            AddRowDirectory("stringinfo.header.bin", sources.StringInfoHeader);
         }
         if (sources.EquipTypeInfo is not null)
         {
             payloads.Add(("equiptypeinfo.bin", sources.EquipTypeInfo));
-            AddRowDirectory("equiptypeinfo.header.bin", sources.EquipTypeInfo);
+            AddRowDirectory("equiptypeinfo.header.bin", sources.EquipTypeInfoHeader);
         }
 
         payloads.AddRange(sources.Localizations.Select(pair => ($"loc_{pair.Key}.bin", pair.Value)));
 
-        void AddRowDirectory(string name, ArchiveEntryDto? blob)
+        void AddRowDirectory(string name, ArchiveEntryDto? header)
         {
-            if (sources.RowDirectoryFor(blob) is { } header)
+            if (header is not null)
             {
                 payloads.Add((name, header));
             }
@@ -686,28 +628,6 @@ public sealed class ArchiveItemNameIndexService(
         }
     }
 
-    private sealed class NameIndexSources
-    {
-        public ArchiveEntryDto? ItemInfo { get; set; }
-        public ArchiveEntryDto? StringInfo { get; set; }
-        public ArchiveEntryDto? EquipTypeInfo { get; set; }
-        public Dictionary<string, ArchiveEntryDto> Localizations { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<string, ArchiveEntryDto> RowDirectories { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>The matching row directory beside <paramref name="blob"/>, if the archive has one.</summary>
-        public ArchiveEntryDto? RowDirectoryFor(ArchiveEntryDto? blob)
-        {
-            if (blob is null)
-            {
-                return null;
-            }
-            var headerExtension = Path.GetExtension(blob.Path).Equals(".staticinfobody", StringComparison.OrdinalIgnoreCase)
-                ? ".staticinfoheader"
-                : ".pabgh";
-            var header = Path.ChangeExtension(blob.Path.Replace('\\', '/'), headerExtension).ToLowerInvariant();
-            return RowDirectories.GetValueOrDefault(header);
-        }
-    }
 
     private sealed record NameIndexCachePayload(
         int SchemaVersion,

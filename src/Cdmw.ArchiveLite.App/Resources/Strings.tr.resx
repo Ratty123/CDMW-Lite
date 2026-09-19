@@ -454,4 +454,38 @@
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Daha güçlü bir kategori kanıtı bulunamadı</value></data>
   <data name="ExportIncludeFamily" xml:space="preserve"><value>Aileyi dahil et</value></data>
   <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Odaklanılan dosyayla ilişkili materyalleri, dokuları, tanımlayıcıları ve çözümlenmiş diğer varlıkları da dışa aktarır. Mesh dışa aktarımında bunlar yanındaki referenced_files/ klasörüne konur.</value></data>
+  <data name="CharacterFinderTitle" xml:space="preserve"><value>Gövde ve Yüz Bulucu</value></data>
+  <data name="CharacterUniqueAssets" xml:space="preserve"><value>Benzersiz varlıklar</value></data>
+  <data name="CharacterAppearances" xml:space="preserve"><value>Görünüm varyantları</value></data>
+  <data name="CharacterBodies" xml:space="preserve"><value>Gövdeler</value></data>
+  <data name="CharacterFaces" xml:space="preserve"><value>Yüzler</value></data>
+  <data name="CharacterDetailsBounded" xml:space="preserve"><value>Ayrıntılar kısaltılmıştır. Bağımlılıkları incelemek için ilgili dosyaları gösterin.</value></data>
+  <data name="CharacterFinderReady" xml:space="preserve"><value>Karakter kataloğuna göz atmak için Gövde ve Yüz Bulucu'yu açın.</value></data>
+  <data name="CharacterFinderLoading" xml:space="preserve"><value>Karakter kataloğu yükleniyor…</value></data>
+  <data name="CharacterPreviewLoading" xml:space="preserve"><value>Karakter önizlemesi hazırlanıyor…</value></data>
+  <data name="CharacterAllRoles" xml:space="preserve"><value>Tüm roller</value></data>
+  <data name="CharacterAllTypes" xml:space="preserve"><value>Tüm türler</value></data>
+  <data name="CharacterAllFamilies" xml:space="preserve"><value>Tüm gövde aileleri</value></data>
+  <data name="CharacterAllStates" xml:space="preserve"><value>Tüm çözümleme durumları</value></data>
+  <data name="CharacterWhole" xml:space="preserve"><value>Tüm karakter</value></data>
+  <data name="CharacterFacialDetails" xml:space="preserve"><value>Yüz ayrıntıları</value></data>
+  <data name="CharacterBeard" xml:space="preserve"><value>Sakal</value></data>
+  <data name="CharacterHumanoids" xml:space="preserve"><value>İnsansılar</value></data>
+  <data name="CharacterPlayers" xml:space="preserve"><value>Oyuncu karakterleri</value></data>
+  <data name="CharacterCreatures" xml:space="preserve"><value>Yaratıklar</value></data>
+  <data name="CharacterNpcs" xml:space="preserve"><value>NPC'ler</value></data>
+  <data name="CharacterMounts" xml:space="preserve"><value>Binekler</value></data>
+  <data name="CharacterResolved" xml:space="preserve"><value>Çözümlendi</value></data>
+  <data name="CharacterUnresolved" xml:space="preserve"><value>Çözümlenmedi</value></data>
+  <data name="CharacterInferred" xml:space="preserve"><value>Çıkarımlı</value></data>
+  <data name="CharacterAmbiguous" xml:space="preserve"><value>Belirsiz</value></data>
+  <data name="CharacterUnknown" xml:space="preserve"><value>Bilinmiyor</value></data>
+  <data name="CharacterSearchHint" xml:space="preserve"><value>Karakter adı, dahili ad, kimlik veya yol ara</value></data>
+  <data name="CharacterShowAll" xml:space="preserve"><value>Tüm sonuçları göster</value></data>
+  <data name="CharacterDetails" xml:space="preserve"><value>Ayrıntılar</value></data>
+  <data name="CharacterRelationships" xml:space="preserve"><value>Kullananlar / Bileşenler</value></data>
+  <data name="CharacterBrowseRelated" xml:space="preserve"><value>İlgili sonuçlara göz at</value></data>
+  <data name="CharacterCopyPath" xml:space="preserve"><value>Yolu kopyala</value></data>
+  <data name="CharacterScopeLoading" xml:space="preserve"><value>Karakter dosyaları çözümleniyor…</value></data>
+  <data name="CharacterScopeApplied" xml:space="preserve"><value>Gövde ve Yüz Bulucu: {0} — {1:N0} dosya, {2:N0} doğrudan bağlantı</value></data>
 </root>

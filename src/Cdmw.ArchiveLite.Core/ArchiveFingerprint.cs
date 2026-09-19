@@ -81,6 +81,7 @@ public static class ArchiveFingerprint
 
     private static bool RequiresContentHash(string path) =>
         path.EndsWith(".pamt", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".papgt", StringComparison.OrdinalIgnoreCase) ||
         path.EndsWith(".pathc", StringComparison.OrdinalIgnoreCase);
 
     private static Task PublishProgressAsync(
@@ -106,7 +107,9 @@ public static class ArchiveFingerprint
             var metadataDirectory = Path.Combine(Path.GetDirectoryName(packageDirectory) ?? packageDirectory, "meta");
             if (Directory.Exists(metadataDirectory))
             {
-                related.AddRange(Directory.EnumerateFiles(metadataDirectory, "*.pathc", SearchOption.TopDirectoryOnly));
+                related.AddRange(Directory.EnumerateFiles(metadataDirectory, "*", SearchOption.TopDirectoryOnly)
+                    .Where(static path => path.EndsWith(".pathc", StringComparison.OrdinalIgnoreCase)
+                        || path.EndsWith(".papgt", StringComparison.OrdinalIgnoreCase)));
             }
             return related.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         }
@@ -121,6 +124,7 @@ public static class ArchiveFingerprint
             .Where(static path =>
                 path.EndsWith(".pamt", StringComparison.OrdinalIgnoreCase) ||
                 path.EndsWith(".paz", StringComparison.OrdinalIgnoreCase) ||
+                path.EndsWith(".papgt", StringComparison.OrdinalIgnoreCase) ||
                 path.EndsWith(".pathc", StringComparison.OrdinalIgnoreCase))
             .Where(path => !IsCdmodsPath(root, path))
             .Order(StringComparer.OrdinalIgnoreCase)

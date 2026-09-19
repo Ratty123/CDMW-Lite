@@ -4,8 +4,13 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Body & Face Finder with unique assets and appearances, body/face filters, thumbnails, interactive model previews, character relationships, and exact or related archive-file browsing. Unresolved references remain visible for inspection.
+
 ### Fixed
 
+- Item Finder now follows active package mount order and current localized item tables. Distinct item IDs and items without model links remain searchable, including after a cache reload. Old item caches rebuild automatically and mount changes invalidate them.
 - OBJ and FBX omit placeholder texture bindings and can resolve a real diffuse companion instead. Incomplete declared skin tables fail export instead of silently dropping the rig. Skipped or cancelled mesh selections no longer report unpublished companions as exported, and Cancel applies to companion collisions too.
 - OBJ, FBX and GLB exports retain unused source vertices, corrected PAC normals and all eight skin influences. PAMLOD exports keep separate material parts; partially compressed PAM geometry now decodes correctly. Invalid declared export buffers are rejected instead of silently losing geometry or rig data.
 - FBX now references matching selected diffuse textures. OBJ and FBX prefer exact authored texture names, and nested exports resolve companion paths from each mesh's directory. GLB no longer invents missing UVs or exports preview palette colours as authored material tints.

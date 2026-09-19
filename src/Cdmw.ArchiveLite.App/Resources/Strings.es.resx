@@ -454,4 +454,38 @@
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>No se recuperaron indicios de categoría más sólidos</value></data>
   <data name="ExportIncludeFamily" xml:space="preserve"><value>Incluir la familia</value></data>
   <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Exporta también los materiales, texturas, descriptores y demás recursos resueltos relacionados con el archivo enfocado. En una exportación de malla se colocan en una carpeta referenced_files/ junto a ella.</value></data>
+  <data name="CharacterFinderTitle" xml:space="preserve"><value>Buscador de cuerpos y rostros</value></data>
+  <data name="CharacterUniqueAssets" xml:space="preserve"><value>Recursos únicos</value></data>
+  <data name="CharacterAppearances" xml:space="preserve"><value>Variantes de apariencia</value></data>
+  <data name="CharacterBodies" xml:space="preserve"><value>Cuerpos</value></data>
+  <data name="CharacterFaces" xml:space="preserve"><value>Rostros</value></data>
+  <data name="CharacterDetailsBounded" xml:space="preserve"><value>Los detalles están abreviados. Muestra los archivos relacionados para ver las dependencias.</value></data>
+  <data name="CharacterFinderReady" xml:space="preserve"><value>Abre el buscador de cuerpos y rostros para explorar el catálogo de personajes.</value></data>
+  <data name="CharacterFinderLoading" xml:space="preserve"><value>Cargando catálogo de personajes…</value></data>
+  <data name="CharacterPreviewLoading" xml:space="preserve"><value>Preparando vista previa del personaje…</value></data>
+  <data name="CharacterAllRoles" xml:space="preserve"><value>Todos los roles</value></data>
+  <data name="CharacterAllTypes" xml:space="preserve"><value>Todos los tipos</value></data>
+  <data name="CharacterAllFamilies" xml:space="preserve"><value>Todas las familias corporales</value></data>
+  <data name="CharacterAllStates" xml:space="preserve"><value>Todos los estados de resolución</value></data>
+  <data name="CharacterWhole" xml:space="preserve"><value>Personaje completo</value></data>
+  <data name="CharacterFacialDetails" xml:space="preserve"><value>Detalles faciales</value></data>
+  <data name="CharacterBeard" xml:space="preserve"><value>Barba</value></data>
+  <data name="CharacterHumanoids" xml:space="preserve"><value>Humanoides</value></data>
+  <data name="CharacterPlayers" xml:space="preserve"><value>Personajes jugables</value></data>
+  <data name="CharacterCreatures" xml:space="preserve"><value>Criaturas</value></data>
+  <data name="CharacterNpcs" xml:space="preserve"><value>PNJ</value></data>
+  <data name="CharacterMounts" xml:space="preserve"><value>Monturas</value></data>
+  <data name="CharacterResolved" xml:space="preserve"><value>Resuelto</value></data>
+  <data name="CharacterUnresolved" xml:space="preserve"><value>Sin resolver</value></data>
+  <data name="CharacterInferred" xml:space="preserve"><value>Inferido</value></data>
+  <data name="CharacterAmbiguous" xml:space="preserve"><value>Ambiguo</value></data>
+  <data name="CharacterUnknown" xml:space="preserve"><value>Desconocido</value></data>
+  <data name="CharacterSearchHint" xml:space="preserve"><value>Buscar nombres de personajes, nombres internos, identificadores o rutas</value></data>
+  <data name="CharacterShowAll" xml:space="preserve"><value>Mostrar todos los resultados</value></data>
+  <data name="CharacterDetails" xml:space="preserve"><value>Detalles</value></data>
+  <data name="CharacterRelationships" xml:space="preserve"><value>Usado por / Componentes</value></data>
+  <data name="CharacterBrowseRelated" xml:space="preserve"><value>Explorar resultados relacionados</value></data>
+  <data name="CharacterCopyPath" xml:space="preserve"><value>Copiar ruta</value></data>
+  <data name="CharacterScopeLoading" xml:space="preserve"><value>Resolviendo archivos de personajes…</value></data>
+  <data name="CharacterScopeApplied" xml:space="preserve"><value>Buscador de cuerpos y rostros: {0} — {1:N0} archivos, incluidos {2:N0} enlaces directos</value></data>
 </root>

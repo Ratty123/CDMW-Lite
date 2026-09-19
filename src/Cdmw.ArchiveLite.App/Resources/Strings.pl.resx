@@ -454,4 +454,38 @@
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>Nie odzyskano mocniejszych przesłanek kategorii</value></data>
   <data name="ExportIncludeFamily" xml:space="preserve"><value>Dołącz rodzinę</value></data>
   <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>Eksportuje także powiązane materiały, tekstury, deskryptory i inne rozpoznane zasoby wybranego pliku. Przy eksporcie siatki trafiają one do folderu referenced_files/ obok niej.</value></data>
+  <data name="CharacterFinderTitle" xml:space="preserve"><value>Wyszukiwarka ciał i twarzy</value></data>
+  <data name="CharacterUniqueAssets" xml:space="preserve"><value>Unikalne zasoby</value></data>
+  <data name="CharacterAppearances" xml:space="preserve"><value>Warianty wyglądu</value></data>
+  <data name="CharacterBodies" xml:space="preserve"><value>Ciała</value></data>
+  <data name="CharacterFaces" xml:space="preserve"><value>Twarze</value></data>
+  <data name="CharacterDetailsBounded" xml:space="preserve"><value>Szczegóły są skrócone. Pokaż powiązane pliki, aby sprawdzić zależności.</value></data>
+  <data name="CharacterFinderReady" xml:space="preserve"><value>Otwórz wyszukiwarkę ciał i twarzy, aby przeglądać katalog postaci.</value></data>
+  <data name="CharacterFinderLoading" xml:space="preserve"><value>Wczytywanie katalogu postaci…</value></data>
+  <data name="CharacterPreviewLoading" xml:space="preserve"><value>Przygotowywanie podglądu postaci…</value></data>
+  <data name="CharacterAllRoles" xml:space="preserve"><value>Wszystkie role</value></data>
+  <data name="CharacterAllTypes" xml:space="preserve"><value>Wszystkie typy</value></data>
+  <data name="CharacterAllFamilies" xml:space="preserve"><value>Wszystkie rodziny ciał</value></data>
+  <data name="CharacterAllStates" xml:space="preserve"><value>Wszystkie stany dopasowania</value></data>
+  <data name="CharacterWhole" xml:space="preserve"><value>Cała postać</value></data>
+  <data name="CharacterFacialDetails" xml:space="preserve"><value>Szczegóły twarzy</value></data>
+  <data name="CharacterBeard" xml:space="preserve"><value>Broda</value></data>
+  <data name="CharacterHumanoids" xml:space="preserve"><value>Humanoidy</value></data>
+  <data name="CharacterPlayers" xml:space="preserve"><value>Postacie gracza</value></data>
+  <data name="CharacterCreatures" xml:space="preserve"><value>Stworzenia</value></data>
+  <data name="CharacterNpcs" xml:space="preserve"><value>BN</value></data>
+  <data name="CharacterMounts" xml:space="preserve"><value>Wierzchowce</value></data>
+  <data name="CharacterResolved" xml:space="preserve"><value>Dopasowane</value></data>
+  <data name="CharacterUnresolved" xml:space="preserve"><value>Niedopasowane</value></data>
+  <data name="CharacterInferred" xml:space="preserve"><value>Wywnioskowane</value></data>
+  <data name="CharacterAmbiguous" xml:space="preserve"><value>Niejednoznaczne</value></data>
+  <data name="CharacterUnknown" xml:space="preserve"><value>Nieznane</value></data>
+  <data name="CharacterSearchHint" xml:space="preserve"><value>Szukaj nazw postaci, nazw wewnętrznych, identyfikatorów lub ścieżek</value></data>
+  <data name="CharacterShowAll" xml:space="preserve"><value>Pokaż wszystkie wyniki</value></data>
+  <data name="CharacterDetails" xml:space="preserve"><value>Szczegóły</value></data>
+  <data name="CharacterRelationships" xml:space="preserve"><value>Używane przez / Składniki</value></data>
+  <data name="CharacterBrowseRelated" xml:space="preserve"><value>Przeglądaj powiązane wyniki</value></data>
+  <data name="CharacterCopyPath" xml:space="preserve"><value>Kopiuj ścieżkę</value></data>
+  <data name="CharacterScopeLoading" xml:space="preserve"><value>Dopasowywanie plików postaci…</value></data>
+  <data name="CharacterScopeApplied" xml:space="preserve"><value>Wyszukiwarka ciał i twarzy: {0} — {1:N0} plików, w tym {2:N0} bezpośrednich powiązań</value></data>
 </root>

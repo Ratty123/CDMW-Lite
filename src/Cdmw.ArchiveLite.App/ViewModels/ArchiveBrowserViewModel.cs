@@ -1272,8 +1272,15 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         }
     }
 
-    public async Task<bool> ShowItemScopeAsync(
-        int itemId,
+    public Task<bool> ShowItemScopeAsync(int itemId, string displayName, bool includeRelated, CancellationToken token) =>
+        ShowFinderScopeAsync(itemId, null, displayName, includeRelated, token);
+
+    public Task<bool> ShowCharacterScopeAsync(string key, string displayName, bool includeRelated, CancellationToken token) =>
+        ShowFinderScopeAsync(null, key, displayName, includeRelated, token);
+
+    private async Task<bool> ShowFinderScopeAsync(
+        int? itemId,
+        string? characterKey,
         string displayName,
         bool includeRelated,
         CancellationToken commandToken)
@@ -1288,30 +1295,42 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
         var generation = Interlocked.Increment(ref _foregroundGeneration);
         try
         {
-            SetOperationProgress(LocalizationManager.Get("ItemFinderScopeLoading"));
+            var loadingKey = characterKey is null ? "ItemFinderScopeLoading" : "CharacterScopeLoading";
+            SetOperationProgress(LocalizationManager.Get(loadingKey));
             var progress = new Progress<ProgressUpdate>(update =>
             {
                 if (generation == Volatile.Read(ref _foregroundGeneration))
                 {
-                    SetOperationProgress(LocalizationManager.Get("ItemFinderScopeLoading"));
+                    SetOperationProgress(LocalizationManager.Get(loadingKey));
                     OperationProgressDetail = update.Total > 0
                         ? $"{update.Completed:N0} / {update.Total:N0}"
                         : update.CurrentItem ?? string.Empty;
                 }
             });
-            var scope = await _worker.SendAsync<ItemCatalogScopeRequest, ItemCatalogScopeResult>(
-                WorkerProtocol.ScopeItemCatalog,
-                generation,
-                new ItemCatalogScopeRequest(sessionId, itemId, includeRelated),
-                operation.Token,
-                progress).ConfigureAwait(true);
+            IReadOnlyList<long> entryIds;
+            IReadOnlyList<ArchiveExtensionFacet> extensions;
+            long directCount;
+            if (characterKey is not null)
+            {
+                var scope = await _worker.SendAsync<CharacterCatalogScopeRequest, CharacterCatalogScopeResult>(
+                    WorkerProtocol.ScopeCharacterCatalog, generation,
+                    new(sessionId, characterKey, includeRelated), operation.Token, progress).ConfigureAwait(true);
+                entryIds = scope.EntryIds; extensions = scope.Extensions ?? []; directCount = scope.DirectCount;
+            }
+            else
+            {
+                var scope = await _worker.SendAsync<ItemCatalogScopeRequest, ItemCatalogScopeResult>(
+                    WorkerProtocol.ScopeItemCatalog, generation,
+                    new(sessionId, itemId!.Value, includeRelated), operation.Token, progress).ConfigureAwait(true);
+                entryIds = scope.EntryIds; extensions = scope.Extensions ?? []; directCount = scope.DirectCount;
+            }
             if (generation != Volatile.Read(ref _foregroundGeneration)
                 || !string.Equals(SessionId, sessionId, StringComparison.Ordinal))
             {
                 return false;
             }
 
-            _itemScopeEntryIds = scope.EntryIds;
+            _itemScopeEntryIds = entryIds;
             OnPropertyChanged(nameof(HasItemScope));
             PathFilter = string.Empty;
             ExtensionFilter = string.Empty;
@@ -1323,14 +1342,14 @@ public sealed class ArchiveBrowserViewModel : ObservableObject
             SelectedFolder = Folders.FirstOrDefault(static folder => folder.Path is null);
             SelectedRole = RoleFilters.First(static role => role.Role is null);
             SelectedCategory = null;
-            var scopedCount = scope.EntryIds.Count;
-            var directCount = scope.DirectCount;
+            var scopedCount = entryIds.Count;
+
             SetItemScopeStatus(() => LocalizationManager.Format(
-                includeRelated ? "ItemFinderRelatedScopeApplied" : "ItemFinderExactScopeApplied",
+                characterKey is not null ? "CharacterScopeApplied" : includeRelated ? "ItemFinderRelatedScopeApplied" : "ItemFinderExactScopeApplied",
                 displayName,
                 scopedCount,
                 directCount));
-            ApplyActiveExtensionFacets(scope.Extensions ?? []);
+            ApplyActiveExtensionFacets(extensions);
             await QueryPageCoreAsync(0, generation, operation.Token).ConfigureAwait(true);
             if (generation != Volatile.Read(ref _foregroundGeneration)
                 || !string.Equals(SessionId, sessionId, StringComparison.Ordinal))

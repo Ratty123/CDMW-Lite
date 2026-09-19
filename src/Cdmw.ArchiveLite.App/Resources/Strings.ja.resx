@@ -454,4 +454,38 @@
   <data name="ItemEvidenceNoStrongerCategoryEvidenceWasRecovered" xml:space="preserve"><value>これ以上有力なカテゴリの手がかりは見つかりませんでした</value></data>
   <data name="ExportIncludeFamily" xml:space="preserve"><value>ファミリーも含める</value></data>
   <data name="ExportIncludeFamilyBody" xml:space="preserve"><value>対象ファイルに関連するマテリアル、テクスチャ、記述子などの解決済みアセットもエクスポートします。メッシュのエクスポートでは、その隣の referenced_files/ フォルダーに置かれます。</value></data>
+  <data name="CharacterFinderTitle" xml:space="preserve"><value>身体・顔ファインダー</value></data>
+  <data name="CharacterUniqueAssets" xml:space="preserve"><value>固有アセット</value></data>
+  <data name="CharacterAppearances" xml:space="preserve"><value>外見バリエーション</value></data>
+  <data name="CharacterBodies" xml:space="preserve"><value>身体</value></data>
+  <data name="CharacterFaces" xml:space="preserve"><value>顔</value></data>
+  <data name="CharacterDetailsBounded" xml:space="preserve"><value>詳細は省略されています。関連ファイルを表示して依存関係を確認できます。</value></data>
+  <data name="CharacterFinderReady" xml:space="preserve"><value>身体・顔ファインダーでキャラクターカタログを参照できます。</value></data>
+  <data name="CharacterFinderLoading" xml:space="preserve"><value>キャラクターカタログを読み込み中…</value></data>
+  <data name="CharacterPreviewLoading" xml:space="preserve"><value>キャラクタープレビューを準備中…</value></data>
+  <data name="CharacterAllRoles" xml:space="preserve"><value>すべての役割</value></data>
+  <data name="CharacterAllTypes" xml:space="preserve"><value>すべての種類</value></data>
+  <data name="CharacterAllFamilies" xml:space="preserve"><value>すべての身体系列</value></data>
+  <data name="CharacterAllStates" xml:space="preserve"><value>すべての解決状態</value></data>
+  <data name="CharacterWhole" xml:space="preserve"><value>キャラクター全体</value></data>
+  <data name="CharacterFacialDetails" xml:space="preserve"><value>顔の細部</value></data>
+  <data name="CharacterBeard" xml:space="preserve"><value>ひげ</value></data>
+  <data name="CharacterHumanoids" xml:space="preserve"><value>人型</value></data>
+  <data name="CharacterPlayers" xml:space="preserve"><value>プレイヤーキャラクター</value></data>
+  <data name="CharacterCreatures" xml:space="preserve"><value>生物</value></data>
+  <data name="CharacterNpcs" xml:space="preserve"><value>NPC</value></data>
+  <data name="CharacterMounts" xml:space="preserve"><value>乗騎</value></data>
+  <data name="CharacterResolved" xml:space="preserve"><value>解決済み</value></data>
+  <data name="CharacterUnresolved" xml:space="preserve"><value>未解決</value></data>
+  <data name="CharacterInferred" xml:space="preserve"><value>推定</value></data>
+  <data name="CharacterAmbiguous" xml:space="preserve"><value>曖昧</value></data>
+  <data name="CharacterUnknown" xml:space="preserve"><value>不明</value></data>
+  <data name="CharacterSearchHint" xml:space="preserve"><value>キャラクター名、内部名、ID、パスを検索</value></data>
+  <data name="CharacterShowAll" xml:space="preserve"><value>すべての結果を表示</value></data>
+  <data name="CharacterDetails" xml:space="preserve"><value>詳細</value></data>
+  <data name="CharacterRelationships" xml:space="preserve"><value>使用先 / 構成要素</value></data>
+  <data name="CharacterBrowseRelated" xml:space="preserve"><value>関連結果を参照</value></data>
+  <data name="CharacterCopyPath" xml:space="preserve"><value>パスをコピー</value></data>
+  <data name="CharacterScopeLoading" xml:space="preserve"><value>キャラクターファイルを解決中…</value></data>
+  <data name="CharacterScopeApplied" xml:space="preserve"><value>身体・顔ファインダー: {0} — {1:N0} ファイル、うち直接リンク {2:N0} 件</value></data>
 </root>

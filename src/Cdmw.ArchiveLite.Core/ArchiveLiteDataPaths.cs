@@ -15,6 +15,7 @@ public static class ArchiveLiteDataPaths
     public static string PreviewCache { get; } = Path.Combine(Cache, "preview");
     public static string ContentAnalysisCache { get; } = Path.Combine(PreviewCache, "content-analysis");
     public static string NameIndexCache { get; } = Path.Combine(Cache, "names");
+    public static string CharacterCatalogCache { get; } = Path.Combine(Cache, "characters");
 
     public static string CreateSessionIndexPath() => Path.Combine(
         Path.GetTempPath(),
@@ -27,6 +28,7 @@ public static class ArchiveLiteDataPaths
         Directory.CreateDirectory(PreviewCache);
         Directory.CreateDirectory(ContentAnalysisCache);
         Directory.CreateDirectory(NameIndexCache);
+        Directory.CreateDirectory(CharacterCatalogCache);
     }
 
     private static string ResolveRoot()
