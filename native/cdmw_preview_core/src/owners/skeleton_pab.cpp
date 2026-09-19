@@ -260,6 +260,7 @@ static PacSkinBinding classify_pac_skin(const std::vector<NativeSubmesh>& meshes
         for (const NativeSkinInfluence& skin : mesh.export_skin) {
             for (int influence = 0; influence < kPacSkinInfluences; ++influence) {
                 const bool weighted = skin.weights[static_cast<size_t>(influence)] != 0;
+                if (!weighted) continue;
                 if (skin.slots[static_cast<size_t>(influence)] != 0) return PacSkinBinding::Smooth;
                 if (influence > 0 && weighted) return PacSkinBinding::Smooth;
             }
@@ -329,6 +330,16 @@ static NativePackageSkeleton resolve_native_package_skeleton(
             for (SkeletonCandidate& candidate : candidates) {
                 std::vector<std::int32_t> palette = resolve_palette_against_bones(tables, candidate.bones);
                 if (palette.empty()) continue;
+                bool covers_skin = true;
+                for (const auto& mesh : meshes) {
+                    if (mesh.source_prefab_component) continue;
+                    for (const auto& skin : mesh.export_skin) {
+                        for (int lane = 0; lane < kPacSkinInfluences; ++lane) {
+                            if (skin.weights[lane] && skin.slots[lane] >= palette.size()) covers_skin = false;
+                        }
+                    }
+                }
+                if (!covers_skin) continue;
                 skeleton.status = "rigged";
                 skeleton.source_path = candidate.path;
                 skeleton.bones = std::move(candidate.bones);

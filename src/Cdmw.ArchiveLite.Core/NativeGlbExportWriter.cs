@@ -60,19 +60,17 @@ internal static class NativeGlbExportWriter
                 bounds.Minimum,
                 bounds.Maximum);
             var normalAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, rebuilt.VertexCount, 3, null, null);
-            var uvAccessor = AddFloatAccessor(bufferViews, accessors, ref binaryLength, rebuilt.VertexCount, 2, null, null);
             var attributes = new Dictionary<string, object?>
             {
                 ["POSITION"] = positionAccessor,
                 ["NORMAL"] = normalAccessor,
-                ["TEXCOORD_0"] = uvAccessor,
             };
+            if (batch.HasTextureCoordinates)
+                attributes["TEXCOORD_0"] = AddFloatAccessor(bufferViews, accessors, ref binaryLength, rebuilt.VertexCount, 2, null, null);
             var skinned = rig.Binds(index);
             if (skinned)
             {
-                // One glTF set holds four influences, and the record carries six, so the fifth and
-                // sixth travel in a second set. Dropping them instead would quietly unweight the
-                // 1,761 vertices of a single body that use all six.
+                // Preserve all eight influences across two four-lane glTF attribute sets.
                 for (var set = 0; set < NativeGlbRig.AttributeSets; set++)
                 {
                     attributes[$"JOINTS_{set}"] =
@@ -94,7 +92,8 @@ internal static class NativeGlbExportWriter
                 ["name"] = CleanName(batch.MaterialName, CleanName(batch.SubmeshName, $"material_{batch.Index:000}")),
                 ["pbrMetallicRoughness"] = new Dictionary<string, object?>
                 {
-                    ["baseColorFactor"] = new[] { batch.BaseColor[0], batch.BaseColor[1], batch.BaseColor[2], 1.0f },
+                    // Preview palette colours distinguish parts; they are not authored materials.
+                    ["baseColorFactor"] = new[] { 0.8f, 0.8f, 0.8f, 1.0f },
                     ["metallicFactor"] = batch.Metalness,
                     ["roughnessFactor"] = batch.Roughness,
                 },
@@ -186,7 +185,7 @@ internal static class NativeGlbExportWriter
                         restore: null,
                         output,
                         token).ConfigureAwait(false);
-                    await WriteFloatAttributeAsync(
+                    if (package.Batches[index].HasTextureCoordinates) await WriteFloatAttributeAsync(
                         rebuilt.TextureCoordinates,
                         2,
                         flipSecondComponent: true,
@@ -450,6 +449,7 @@ internal static class NativeGlbExportWriter
                 {
                     value = 1.0f - value;
                 }
+                if (!float.IsFinite(value)) throw new InvalidDataException("GLB vertex data exceeds the finite float range.");
                 BinaryPrimitives.WriteSingleLittleEndian(buffer.AsSpan(index * sizeof(float), sizeof(float)), value);
             }
             await output.WriteAsync(buffer.AsMemory(0, count * sizeof(float)), cancellationToken).ConfigureAwait(false);

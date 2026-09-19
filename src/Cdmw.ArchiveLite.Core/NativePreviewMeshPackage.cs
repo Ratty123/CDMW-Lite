@@ -14,8 +14,8 @@ internal sealed record NativePreviewMeshPackage(
     /// <summary>Position, normal and texture coordinate, as doubles.</summary>
     internal const int ExportBytesPerVertex = 8 * sizeof(double);
 
-    /// <summary>Six skin influences per vertex: a u16 bone index each, then a u8 weight each.</summary>
-    internal const int SkinInfluencesPerVertex = 6;
+    /// <summary>Eight skin influences per vertex: a u16 bone index each, then a u8 weight each.</summary>
+    internal const int SkinInfluencesPerVertex = 8;
 
     internal const int SkinBytesPerVertex = SkinInfluencesPerVertex * (sizeof(ushort) + sizeof(byte));
 
@@ -71,6 +71,12 @@ internal sealed record NativePreviewMeshPackage(
             }
             var exportVertexCount = ReadInt(element, "export_vertex_count", 0);
             var skinVertexCount = ReadInt(element, "skin_vertex_count", 0);
+            // Schema-8 packages written before the eight-influence fix used six lanes.
+            var skinInfluences = ReadInt(element, "skin_influences", 6);
+            if (skinInfluences is not (6 or 8))
+            {
+                throw new InvalidDataException($"Native preview batch {index} has an unsupported skin row width.");
+            }
             batches.Add(new NativePreviewMeshBatch(
                 index,
                 vertexCount,
@@ -78,8 +84,9 @@ internal sealed record NativePreviewMeshPackage(
                 ResolveIdentityFile(root, element, vertexCount),
                 ResolveExportGeometryFile(root, element, exportVertexCount),
                 exportVertexCount,
-                ResolveFixedStrideFile(root, ReadString(element, "skin_file"), skinVertexCount, SkinBytesPerVertex),
+                ResolveFixedStrideFile(root, ReadString(element, "skin_file"), skinVertexCount, skinInfluences * 3),
                 skinVertexCount,
+                skinInfluences,
                 ReadBool(element, "export_has_texture_coordinates", true),
                 ReadString(element, "material_name"),
                 FirstNonEmpty(ReadString(element, "submesh_name"), submeshNames.GetValueOrDefault(index, string.Empty)),
@@ -106,19 +113,14 @@ internal sealed record NativePreviewMeshPackage(
         int recordCount,
         int bytesPerRecord)
     {
-        if (string.IsNullOrWhiteSpace(relative) || recordCount <= 0)
+        if (string.IsNullOrWhiteSpace(relative))
         {
             return null;
         }
-        try
-        {
-            var path = ResolveContainedFile(packageRoot, relative);
-            return new FileInfo(path).Length == checked((long)recordCount * bytesPerRecord) ? path : null;
-        }
-        catch (InvalidDataException)
-        {
-            return null;
-        }
+        var path = ResolveContainedFile(packageRoot, relative);
+        if (recordCount <= 0 || new FileInfo(path).Length != checked((long)recordCount * bytesPerRecord))
+            throw new InvalidDataException($"Native preview package has an invalid data length: {relative}");
+        return path;
     }
 
     private static string FirstNonEmpty(string first, string second) =>
@@ -204,16 +206,11 @@ internal sealed record NativePreviewMeshPackage(
         {
             return null;
         }
-        try
-        {
-            var path = ResolveContainedFile(packageRoot, relative);
-            // Two 32-bit fields per corner: the source submesh and the source vertex.
-            return new FileInfo(path).Length == checked((long)vertexCount * 8) ? path : null;
-        }
-        catch (InvalidDataException)
-        {
-            return null;
-        }
+        var path = ResolveContainedFile(packageRoot, relative);
+        // Two 32-bit fields per corner: the source submesh and the source vertex.
+        if (new FileInfo(path).Length != checked((long)vertexCount * 8))
+            throw new InvalidDataException("Native preview source-vertex identity data is truncated.");
+        return path;
     }
 
     internal static string ResolveContainedFile(string packageRoot, string relativePath)
@@ -338,6 +335,7 @@ internal sealed record NativePreviewMeshBatch(
     int ExportVertexCount,
     string? SkinPath,
     int SkinVertexCount,
+    int SkinInfluences,
     bool HasTextureCoordinates,
     string MaterialName,
     string SubmeshName,

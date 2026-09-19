@@ -32,7 +32,8 @@ internal static class NativeObjMaterialWriter
         foreach (var batch in package.Batches)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var name = NativeModelExportService.CleanName(batch.MaterialName, $"part_{batch.Index:000}");
+            var name = NativeModelExportService.CleanName(batch.MaterialName,
+                NativeModelExportService.CleanName(batch.SubmeshName, $"part_{batch.Index:000}"));
             if (!written.Add(name))
             {
                 // Several submeshes can share one material, and a repeated newmtl is an error in
@@ -53,8 +54,7 @@ internal static class NativeObjMaterialWriter
             // A texture exported alongside is bound by its actual relative path. Otherwise the
             // source's own texture name is stated, which is what CDMW Full writes: the name is
             // what the material is for, and an importer that has the file under that name finds it.
-            var texture = MatchTexture(name, batch.MaterialName, companionTextures)
-                ?? TextureReference(batch.TextureName);
+            var texture = ResolveTexture(batch, companionTextures);
             if (texture is not null)
             {
                 builder.Append("map_Kd ").Append(texture).Append('\n');
@@ -90,62 +90,30 @@ internal static class NativeObjMaterialWriter
         {
             return null;
         }
+        if (normalized.Any(char.IsControl)) throw new InvalidDataException("Texture reference contains a control character.");
         return Path.HasExtension(normalized) ? normalized : normalized + ".dds";
     }
 
-    /// <summary>
-    /// Finds the exported texture that belongs to a material.
-    /// </summary>
-    /// <remarks>
-    /// A material and the texture authored for it are named the same thing in different dress --
-    /// <c>CD_PHW_00_Nude_00_0001</c> against <c>cd_phw_00_nude_00_0001.dds</c> -- so the comparison
-    /// drops case and every separator rather than trying to match them literally. A texture that
-    /// belongs to no material is simply not bound; it still ships beside the mesh.
-    /// </remarks>
-    private static string? MatchTexture(
-        string materialName,
-        string rawMaterialName,
-        IReadOnlyList<string> companionTextures)
+    internal static string? ResolveTexture(NativePreviewMeshBatch batch, IReadOnlyList<string> companionTextures)
     {
-        if (companionTextures.Count == 0)
+        var authored = TextureReference(batch.TextureName);
+        var textures = companionTextures.Select(static path => path.Replace('\\', '/'))
+            .Where(static path => path.IndexOfAny(['\r', '\n', '\0']) < 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (authored is not null)
         {
-            return null;
+            var pathMatches = textures.Where(path => path.Equals(authored, StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith("/" + authored.TrimStart('/'), StringComparison.OrdinalIgnoreCase)).ToArray();
+            if (pathMatches.Length == 1) return pathMatches[0];
+            // A qualified source path must never pick a same-named file from another folder.
+            if (authored.Contains('/')) return authored;
+            var matches = textures.Where(path => Path.GetFileName(path).Equals(authored, StringComparison.OrdinalIgnoreCase)).ToArray();
+            return matches.Length == 1 ? matches[0] : authored;
         }
-        var candidates = new[] { Normalize(materialName), Normalize(rawMaterialName) }
-            .Where(static alias => alias.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        if (candidates.Length == 0)
-        {
-            return null;
-        }
-        string? best = null;
-        foreach (var texture in companionTextures)
-        {
-            var stem = Normalize(Path.GetFileNameWithoutExtension(texture));
-            if (stem.Length == 0)
-            {
-                continue;
-            }
-            foreach (var alias in candidates)
-            {
-                if (stem.Equals(alias, StringComparison.Ordinal))
-                {
-                    return texture.Replace('\\', '/');
-                }
-                // A base map often carries a suffix the material name does not, such as a
-                // per-part `_01`. A prefix match is the weaker evidence, so it only stands in
-                // when nothing matches outright.
-                if (best is null && stem.StartsWith(alias, StringComparison.Ordinal))
-                {
-                    best = texture.Replace('\\', '/');
-                }
-            }
-        }
-        return best;
+        var material = Path.GetFileName(batch.MaterialName.Trim());
+        if (material.Length == 0) return null;
+        var aliases = new[] { material, material + "_d", material + "_diffuse", material + "_albedo", material + "_basecolor" };
+        var candidates = textures.Where(path => aliases.Contains(Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase)).ToArray();
+        return candidates.Length == 1 ? candidates[0] : null;
     }
-
-    private static string Normalize(string? value) => value is null
-        ? string.Empty
-        : new string(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 }

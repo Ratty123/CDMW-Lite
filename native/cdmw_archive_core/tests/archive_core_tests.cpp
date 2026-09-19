@@ -304,6 +304,31 @@ void test_partial_dds_pathc(const fs::path& root) {
     require(std::string(note.data()) == "PartialDDS+PATHC", "partial DDS note is wrong");
 }
 
+void test_partial_pam(const fs::path& root) {
+    const unsigned char compressed[] = {0x4f, 'A', 'B', 'C', 'D', 4, 0, 0xe4, 0x50, 'D', 'A', 'B', 'C', 'D'};
+    std::vector<std::uint8_t> payload(0x50, 0);
+    std::memcpy(payload.data(), "PAR ", 4);
+    write_u32_at(payload, 4, 0x1802);
+    write_u32_at(payload, 0x3c, 0x50);
+    write_u32_at(payload, 0x40, 256);
+    write_u32_at(payload, 0x44, sizeof(compressed));
+    payload.insert(payload.end(), std::begin(compressed), std::end(compressed));
+    payload.insert(payload.end(), {'t', 'a', 'i', 'l'});
+    const auto paz = root / "0.paz";
+    write_bytes(paz, payload);
+    const auto decoded = cdmw::archive::decode_entry("object/test.pam", {}, paz, 0, payload.size(), 0x50 + 256 + 4, 1);
+    require(decoded.bytes.size() == 0x50 + 256 + 4, "partial PAM decoded length is wrong");
+    require(decoded.bytes[0x44] == 0, "partial PAM retained its compressed-block flag");
+    require(std::string(decoded.bytes.end() - 4, decoded.bytes.end()) == "tail", "partial PAM lost its trailer");
+    for (size_t i = 0; i < 256; ++i) require(decoded.bytes[0x50 + i] == "ABCD"[i % 4], "partial PAM changed its geometry bytes");
+    write_u32_at(payload, 0x40, 257);
+    write_bytes(paz, payload);
+    bool rejected = false;
+    try { (void)cdmw::archive::decode_entry("object/test.pam", {}, paz, 0, payload.size(), 0x50 + 257 + 4, 1); }
+    catch (const std::exception&) { rejected = true; }
+    require(rejected, "partial PAM accepted a wrong decompressed length");
+}
+
 }  // namespace
 
 int main() {
@@ -317,6 +342,7 @@ int main() {
         test_index_deduplicates_source_paths(root / "deduplicated-source-paths");
         test_lz4_and_chacha(root / "codec");
         test_partial_dds_pathc(root / "partial-dds");
+        test_partial_pam(root / "partial-pam");
         fs::remove_all(root);
         std::cout << "cdmw archive core self-test: PASS\n";
         return 0;

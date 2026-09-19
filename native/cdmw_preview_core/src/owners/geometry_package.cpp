@@ -68,6 +68,7 @@ static void write_export_geometry_blob(const fs::path& path, const NativeSubmesh
 // One row per exported vertex, written beside the export geometry and in the same order, so a rig
 // built from it binds to the points that file actually holds. Six skeleton bone indices and six
 // weights, with 0xFFFF and a weight of zero standing for an influence the record does not use.
+// The manifest declares the row width so earlier six-lane packages remain distinguishable.
 //
 // The slots are resolved to bone indices here rather than published raw: a slot means nothing
 // without the palette that maps it, and a reader holding one without the other could only guess.

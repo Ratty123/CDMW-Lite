@@ -285,6 +285,7 @@ static void append_package_batch_json_head(PackageWriteState& state, const Packa
                 : std::string())
         << "\","
         << "\"skin_vertex_count\":" << (batch.has_skin_rows ? mesh.export_positions.size() : 0u) << ","
+        << "\"skin_influences\":" << kPacSkinInfluences << ","
         << "\"export_has_texture_coordinates\":" << (mesh.has_texture_coordinates ? "true" : "false") << ","
         << "\"vertex_file\":\"" << json_escape(batch.geometry_path.lexically_relative(state.package_dir).generic_string()) << "\","
         << "\"vertex_count\":" << batch.vertex_count << ","

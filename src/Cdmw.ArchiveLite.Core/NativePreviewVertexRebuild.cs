@@ -145,16 +145,17 @@ internal sealed class NativePreviewVertexRebuild
         var rows = await File.ReadAllBytesAsync(batch.SkinPath, cancellationToken).ConfigureAwait(false);
         var influences = NativePreviewMeshPackage.SkinInfluencesPerVertex;
         var joints = new ushort[checked(plan.VertexCount * influences)];
+        Array.Fill(joints, NativePreviewMeshPackage.UnusedSkinBone);
         var weights = new byte[joints.Length];
         for (var index = 0; index < plan.VertexCount; index++)
         {
             var source = plan.SourceVertexMap[index];
-            var offset = source * NativePreviewMeshPackage.SkinBytesPerVertex;
-            for (var influence = 0; influence < influences; influence++)
+            var offset = source * batch.SkinInfluences * 3;
+            for (var influence = 0; influence < batch.SkinInfluences; influence++)
             {
                 joints[(index * influences) + influence] = BinaryPrimitives.ReadUInt16LittleEndian(
                     rows.AsSpan(offset + (influence * sizeof(ushort)), sizeof(ushort)));
-                weights[(index * influences) + influence] = rows[offset + (influences * sizeof(ushort)) + influence];
+                weights[(index * influences) + influence] = rows[offset + (batch.SkinInfluences * sizeof(ushort)) + influence];
             }
         }
         return new NativePreviewVertexSkin(joints, weights);
@@ -324,6 +325,14 @@ internal sealed class NativePreviewVertexRebuild
             }
         }
 
+        // Exact export blobs retain unreferenced source vertices too. Rebuilding only the
+        // corners would discard those vertices and force a lossy preview-float fallback.
+        if (batch.ExportGeometryPath is not null)
+        {
+            if (sources.Any(source => source >= batch.ExportVertexCount))
+                throw new InvalidDataException($"Native preview batch {batch.Index} references a missing source vertex.");
+            return new VertexPlan(sources, batch.ExportVertexCount, Enumerable.Range(0, batch.ExportVertexCount).ToArray());
+        }
         var ordered = new HashSet<int>(sources).ToArray();
         Array.Sort(ordered);
         var rank = new Dictionary<int, int>(ordered.Length);

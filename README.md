@@ -17,7 +17,7 @@ The application is self-contained in this repository and keeps archive queries, 
 - Find known items by localized name and follow exact or related archive links.
 - Item Finder supports both `.pabgb`/`.pabgh` and `.staticinfobody`/`.staticinfoheader` table names, including compact prefab lists. Item-name caches from earlier versions rebuild automatically.
 - Preview text, XML, images, DDS textures, supported media including the sounds a Wwise `.bnk` embeds, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
-- Export a mesh as OBJ, GLB or FBX, byte-identical to what the full CDMW workbench writes. A skinned character carries its skeleton and its per-vertex weights into GLB and FBX, so it arrives posable rather than as a frozen shell.
+- Export a mesh as OBJ, GLB or FBX, preserving source coordinates, vertex order and material parts. A resolved skinned character carries its skeleton and all eight per-vertex influences into GLB and FBX.
 - Discover and export associated assets without altering game data.
 - Run as a portable Windows application or a single self-extracting executable.
 - Switch the interface between the fourteen languages Crimson Desert itself ships; every one but English is machine translated and unreviewed.
@@ -138,14 +138,16 @@ Preview output is checked against the assets themselves rather than by eye. [PRE
 
 ## Mesh export
 
-A mesh exports as OBJ, GLB or binary FBX. The vertices, their order and the part names are
-byte-identical to what the full CDMW workbench writes, so a mesh exported here and one exported
-there can be joined as shape keys without moving a vertex.
+A PAC, PAM, PAMLOD or PAT mesh exports as OBJ, GLB or binary FBX. Exports preserve source
+coordinates, vertex order (including unused vertices), and material parts. PAMLOD parts retain
+their individual materials and local face indices. GLB uses float coordinates; OBJ and FBX use
+the package's double-precision source geometry when available.
 
 | | OBJ | GLB | FBX |
 | --- | --- | --- | --- |
 | geometry, in the archive's own units and order | yes | yes | yes |
 | material names, and a material library | `.mtl` | material per part | material per part |
+| matching selected diffuse textures | relative MTL reference | not embedded | relative FBX reference |
 | armature and per-vertex weights | — | yes | yes |
 | bones written | — | those the mesh uses, plus their ancestors | the whole skeleton |
 | round-trip sidecar naming the source entry | `.obj.meta.json` | — | — |
@@ -159,6 +161,25 @@ is not the mesh's to state; it exports unrigged. So does a smooth-skinned mesh w
 no skeleton named by its own path accounts for, which is most NPC and monster gear. The preview
 package records which of those cases it found and why.
 
+PAC normals follow the game's signed-z reconstruction. Rigged exports normalize all eight
+influences together, including the two gated half-float palette slots; older six-influence
+preview packages remain readable. Newly built packages use a fresh cache version. Malformed
+declared geometry, identity or skin buffers fail export instead of silently losing data.
+
+An export selection is prepared in a staging directory, including selected referenced files,
+the OBJ material library and metadata. Failed preparation or cancellation leaves existing
+outputs intact. Publication restores prior outputs if a file replacement fails. Material
+references are relative to each mesh's own directory. An authored texture name wins over
+material-name guesses; ambiguous names and normal/surface-map prefixes are not used as diffuse
+fallbacks.
+
+The parity review used CDMW Full through `8527abd0`: PAC normal/eight-influence corrections
+(`fc0e3207`), PAMLOD materials and complete export publication (`67142896`), partial PAM decoding
+(`aeecff9f`), and native FBX texture/shape output (`ff67ac31`, `68b265a1`). Lite retains source-space
+OBJ output, matching Full's default after `8ec50f1b`. Full's DAE/glTF/FBX/OBJ replacement-import
+workflows and optional PABC/PAMT neutral-appearance reconstruction are separate authoring
+features; Lite does not acquire archive-writing or model-replacement authority from this port.
+
 `scripts/blender/` holds a headless script that imports an export, checks every vertex is weighted
 and sums to 1.0, poses a bone and asserts the vertices that moved are the ones near it. It is not
 part of the focused gate, since it needs Blender and licensed game assets.
@@ -169,7 +190,7 @@ These are asserted by the focused gate, not measured by hand. `scripts/test_arch
 
 | | |
 | --- | --- |
-| focused scenarios | 55, covering archive, preview, export, worker lifetime and cache eviction |
+| focused scenarios | 57, covering archive, preview, export, worker lifetime and cache eviction |
 | model preview, cold cache | ~100 ms |
 | model preview, warm cache | ~1 ms, and warm across sessions |
 | renderer | headless GPU soak, production D3D11 backend, windows stay hidden |

@@ -11,7 +11,11 @@ namespace Cdmw.ArchiveLite.Core;
 public sealed class NativeModelExportService(NativeModelPreviewService previews)
 {
     private static readonly TimeSpan NativeExportTimeout = TimeSpan.FromMinutes(5);
-    private static readonly JsonSerializerOptions CompactJson = new() { WriteIndented = false };
+    private static readonly JsonSerializerOptions CompactJson = new()
+    {
+        WriteIndented = false,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     public static bool SupportsFormat(ExportKind kind) => kind is ExportKind.Obj or ExportKind.Fbx or ExportKind.Glb;
 
@@ -87,8 +91,8 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
     /// Writes a mesh interchange file, binding any textures exported alongside it.
     /// </summary>
     /// <param name="companionTextures">
-    /// Paths, relative to the exported mesh, of textures already written beside it. Only OBJ can
-    /// name them, through its material library; the other formats carry no such reference.
+    /// Paths, relative to the exported mesh, of textures prepared beside it. OBJ and FBX
+    /// bind matching authored diffuse textures; GLB currently exports geometry and rig data.
     /// </param>
     public async Task ExportPackageAsync(
         string packageRoot,
@@ -159,10 +163,10 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             "cdmw-archive-lite-mesh-export",
             Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
         Directory.CreateDirectory(workRoot);
-        var stagedOutput = Path.Combine(
-            Path.GetDirectoryName(destination)!,
-            $".{Path.GetFileNameWithoutExtension(destination)}.{Guid.NewGuid():N}.tmp{FileExtension(kind)}");
-        var stagedManifest = Path.Combine(workRoot, "roundtrip.meta.json");
+        var publicationRoot = Path.Combine(Path.GetDirectoryName(destination)!, $".cdmw-export-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(publicationRoot);
+        var stagedOutput = Path.Combine(publicationRoot, Path.GetFileName(destination));
+        var stagedManifest = RoundtripManifestPath(stagedOutput);
         try
         {
             var totalWork = checked(package.TotalVertices * 2L);
@@ -178,6 +182,11 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 // sidecars for it would cost the export work whose result nothing reads.
                 kind == ExportKind.Fbx,
                 cancellationToken).ConfigureAwait(false);
+            if (kind == ExportKind.Fbx)
+            {
+                for (var index = 0; index < prepared.Count; index++)
+                    prepared[index].Payload["diffuse_texture"] = NativeObjMaterialWriter.ResolveTexture(package.Batches[index], companionTextures) ?? "";
+            }
 
             var jobPath = Path.Combine(workRoot, "job.json");
             var reportPath = Path.Combine(workRoot, "report.json");
@@ -240,25 +249,25 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
                 stagedOutput,
                 cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            File.Move(stagedOutput, destination, overwrite);
+            var outputs = new List<(string Staged, string Destination)> { (stagedOutput, destination) };
             if (kind == ExportKind.Obj)
             {
                 await NativeObjMaterialWriter.WriteAsync(
                     package,
-                    destination,
+                    stagedOutput,
                     companionTextures,
-                    overwrite,
+                    false,
                     cancellationToken).ConfigureAwait(false);
-                if (File.Exists(stagedManifest))
-                {
-                    File.Move(stagedManifest, RoundtripManifestPath(destination), overwrite);
-                }
+                outputs.Add((NativeObjMaterialWriter.DestinationFor(stagedOutput), NativeObjMaterialWriter.DestinationFor(destination)));
+                outputs.Add((stagedManifest, RoundtripManifestPath(destination)));
             }
+            NativeExportPublication.Publish(outputs, overwrite, cancellationToken);
             await ReportAsync(progress, totalWork, totalWork, "mesh_export_write", currentItem).ConfigureAwait(false);
         }
         finally
         {
             TryDeleteFile(stagedOutput);
+            TryDeleteOwnedDirectory(publicationRoot);
             TryDeleteOwnedDirectory(workRoot);
         }
     }
@@ -411,9 +420,11 @@ public sealed class NativeModelExportService(NativeModelPreviewService previews)
             for (var index = 0; index < count; index++)
             {
                 var value = source[written + index];
+                if (restore is not null) value = restore.Restore(value, (written + index) % components);
+                if (!double.IsFinite(value)) throw new InvalidDataException("Mesh export coordinate overflowed its source frame.");
                 BinaryPrimitives.WriteDoubleLittleEndian(
                     buffer.AsSpan(index * sizeof(double), sizeof(double)),
-                    restore is null ? value : restore.Restore(value, (written + index) % components));
+                    value);
             }
             await output.WriteAsync(buffer.AsMemory(0, count * sizeof(double)), cancellationToken).ConfigureAwait(false);
             written += count;

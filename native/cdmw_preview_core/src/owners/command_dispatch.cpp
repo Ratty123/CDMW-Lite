@@ -4,6 +4,7 @@ int run_cli(int argc, char** argv) {
     try {
         if (argc >= 2 && std::string(argv[1]) == "self-test") {
             run_material_contract_self_test();
+            run_interchange_decode_self_test();
             cdmw_native_diag::event("self_test_ok");
             std::cout << "{\"event\":\"self_test\",\"ok\":true,\"backend\":\"cdmw_preview_core_0.1\"}\n";
             return 0;

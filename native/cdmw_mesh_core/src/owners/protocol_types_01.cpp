@@ -554,6 +554,7 @@ struct FbxGeometrySubmeshResult {
 };
 
 struct FbxExportResult {
+    int morph_target_count = 0;
     std::string output_path;
     int submesh_count = 0;
     int vertex_count = 0;

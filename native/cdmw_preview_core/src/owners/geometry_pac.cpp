@@ -13,34 +13,24 @@ static double decode_pac_position_exact(std::uint16_t value, float min_value, fl
         + (static_cast<double>(value) / 32767.0) * static_cast<double>(extent);
 }
 
-// Un-normalized on purpose. The three components are what the packed record decodes to, and
-// normalizing them is a choice the renderer makes for its own shading, not something the source
-// said. An interchange file states what the record holds, as CDMW Full's does.
+// The shader stores normal x/y in bits 10..29 and reconstructs z, signed by bit 30.
+// Bits 0..9 belong to the tangent, and bit 31 is bitangent handedness.
 static ExportVec3 decode_pac_normal_exact(const std::vector<char>& data, size_t rec_off, int normal_offset) {
     if (normal_offset < 0 || rec_off + static_cast<size_t>(normal_offset) + 4 > data.size()) {
         return ExportVec3{0.0, 1.0, 0.0};
     }
     const std::uint32_t packed = read_u32(data, rec_off + static_cast<size_t>(normal_offset));
-    const std::uint32_t nx_raw = (packed >> 0) & 0x3FFu;
-    const std::uint32_t ny_raw = (packed >> 10) & 0x3FFu;
-    const std::uint32_t nz_raw = (packed >> 20) & 0x3FFu;
-    return ExportVec3{
-        static_cast<double>(ny_raw) / 511.5 - 1.0,
-        static_cast<double>(nz_raw) / 511.5 - 1.0,
-        static_cast<double>(nx_raw) / 511.5 - 1.0,
-    };
+    const double x = static_cast<double>((packed >> 10) & 0x3FFu) / 511.5 - 1.0;
+    const double y = static_cast<double>((packed >> 20) & 0x3FFu) / 511.5 - 1.0;
+    double z = std::sqrt(std::max(0.0, 1.0 - x * x - y * y));
+    if ((packed >> 30) & 1u) z = -z;
+    return ExportVec3{x, y, z};
 }
 
 static Vec3 decode_pac_normal(const std::vector<char>& data, size_t rec_off, int normal_offset = 16) {
-    if (normal_offset < 0 || rec_off + static_cast<size_t>(normal_offset) + 4 > data.size()) return Vec3{0.0f, 1.0f, 0.0f};
-    const std::uint32_t packed = read_u32(data, rec_off + static_cast<size_t>(normal_offset));
-    const std::uint32_t nx_raw = (packed >> 0) & 0x3FFu;
-    const std::uint32_t ny_raw = (packed >> 10) & 0x3FFu;
-    const std::uint32_t nz_raw = (packed >> 20) & 0x3FFu;
+    const ExportVec3 normal = decode_pac_normal_exact(data, rec_off, normal_offset);
     return vec_normalize(Vec3{
-        static_cast<float>(ny_raw) / 511.5f - 1.0f,
-        static_cast<float>(nz_raw) / 511.5f - 1.0f,
-        static_cast<float>(nx_raw) / 511.5f - 1.0f,
+        static_cast<float>(normal.x), static_cast<float>(normal.y), static_cast<float>(normal.z),
     });
 }
 
@@ -52,7 +42,7 @@ struct PacVertexLayout {
 };
 
 // Whether this layout leaves the skin field where the format puts it. Bytes 20 to 33 hold the
-// influences, so a layout that reads its texture coordinate or its normal out of those bytes is
+// primary influences, so a layout that reads its texture coordinate or its normal out of those bytes is
 // describing a different record and has no skin to offer -- decoding one anyway would invent a
 // binding out of UV halves.
 static bool pac_layout_carries_skin(const PacVertexLayout& layout) {
@@ -63,19 +53,31 @@ static bool pac_layout_carries_skin(const PacVertexLayout& layout) {
     return !overlaps(layout.uv_offset, 4) && !overlaps(layout.normal_offset, 4);
 }
 
-static NativeSkinInfluence decode_pac_skin(const std::vector<char>& data, size_t rec_off) {
+static NativeSkinInfluence decode_pac_skin(const std::vector<char>& data, size_t rec_off, int stride) {
     NativeSkinInfluence skin;
     const std::uint32_t groups[2] = {
         read_u32(data, rec_off + kPacSkinSlotOffset),
         read_u32(data, rec_off + kPacSkinSlotOffset + 4),
     };
-    for (int influence = 0; influence < kPacSkinInfluences; ++influence) {
+    for (int influence = 0; influence < kPacSkinPaletteInfluences; ++influence) {
         const std::uint32_t group = groups[influence / 3];
         const int shift = (influence % 3) * 10;
         skin.slots[static_cast<size_t>(influence)] =
             static_cast<std::uint16_t>((group >> shift) & kPacSkinSlotMask);
         skin.weights[static_cast<size_t>(influence)] =
             static_cast<std::uint8_t>(data[rec_off + kPacSkinWeightOffset + influence]);
+    }
+    // Two half-float palette slots are live only when byte 39's low six bits are not 63.
+    if (stride >= 40 && (static_cast<unsigned char>(data[rec_off + 39]) & 0x3fu) != 0x3fu) {
+        for (int extra = 0; extra < 2; ++extra) {
+            const auto encoded = read_u16(data, rec_off + 12 + extra * 2);
+            if ((encoded & 0x7c00u) == 0x7c00u) continue;
+            const float slot = half_to_float(encoded);
+            if (std::isfinite(slot) && slot >= 0.0f && slot <= kPacSkinSlotMask) {
+                skin.slots[6 + extra] = static_cast<std::uint16_t>(std::floor(slot + 0.5f));
+                skin.weights[6 + extra] = static_cast<std::uint8_t>(data[rec_off + 34 + extra]);
+            }
+        }
     }
     return skin;
 }
@@ -358,7 +360,8 @@ static NativeSubmesh decode_pac_submesh_vertices(
         });
         mesh.normals.push_back(decode_pac_normal(data, rec_off, layout.normal_offset));
         mesh.export_normals.push_back(decode_pac_normal_exact(data, rec_off, layout.normal_offset));
-        if (decode_skin) mesh.export_skin.push_back(decode_pac_skin(data, rec_off));
+        if (decode_skin) mesh.export_skin.push_back(decode_pac_skin(
+            data, rec_off, layout.uv_offset == 8 && layout.normal_offset == 16 ? layout.stride : kPacSkinRecordEnd));
     }
     // A record cut short by the end of the buffer leaves the arrays uneven, and a skin row that
     // does not pair with a vertex would bind the rig to the wrong points.

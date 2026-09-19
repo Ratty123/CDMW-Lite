@@ -45,6 +45,7 @@ set(PREVIEW_CORE_OWNER_SOURCES
     src/owners/name_index_service.cpp
     src/owners/material_parameter_self_tests.cpp
     src/owners/material_surface_self_tests.cpp
+    src/owners/interchange_self_tests.cpp
     src/owners/command_dispatch.cpp
 )
 

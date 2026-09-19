@@ -20,7 +20,7 @@ using ICSharpCode.AvalonEdit.Highlighting;
 
 namespace Cdmw.ArchiveLite.Tests;
 
-internal static class ArchiveLiteTestRunner
+internal static partial class ArchiveLiteTestRunner
 {
     public static async Task<int> RunAsync()
     {
@@ -57,6 +57,8 @@ internal static class ArchiveLiteTestRunner
             ("native model packages adapt safely and export Blender interchange formats", TestNativeModelPreviewPackageAsync),
             ("an exported mesh keeps the source's own vertices, order, and part names", TestMeshExportSourceVertexParityAsync),
             ("a skinned mesh exports as a rigged GLB and FBX, and a rigid one exports as it always did", TestRiggedGlbExportAsync),
+            ("all mesh exports retain corrected skin, material identity and complete output bundles", TestInterchangeParityAsync),
+            ("mesh export companions publish together and preserve prior outputs on failure", TestMeshBundlePublicationAsync),
             ("renderer warmup package is complete and loadable", TestRendererWarmupPackageAsync),
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
@@ -4343,6 +4345,9 @@ internal static class ArchiveLiteTestRunner
         using (var cacheManifest = JsonDocument.Parse(cacheManifestText))
         {
             var root = cacheManifest.RootElement;
+            Require(
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v21_interchange",
+                "the default preview reused geometry from before the interchange decoder fixes");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
                 root.GetProperty("dependencies").EnumerateArray().Any(dependency =>
@@ -4554,8 +4559,8 @@ internal static class ArchiveLiteTestRunner
         Require(
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v18_skinned\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v20_material_layers_skinned\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v21_interchange\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v21_material_layers_interchange\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");

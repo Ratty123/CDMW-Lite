@@ -155,6 +155,27 @@ std::vector<std::uint8_t> maybe_decompress_partial_par(
     const std::vector<std::uint8_t>& data,
     std::uint64_t original_size) {
     if (data.size() < 0x50 || std::memcmp(data.data(), "PAR ", 4) != 0) return {};
+    // PAM 0x1802 stores one compressed geometry block, not the PAR section table.
+    if (read_u32(data, 4) == 0x1802) {
+        const size_t offset = read_u32(data, 0x3c);
+        const size_t decoded_size = read_u32(data, 0x40);
+        const size_t compressed_size = read_u32(data, 0x44);
+        if (compressed_size == 0) return {};
+        if (offset < 0x50 || decoded_size == 0 || offset > data.size()
+            || compressed_size > data.size() - offset
+            || data.size() - compressed_size + decoded_size != original_size) {
+            throw std::runtime_error("Partial PAM geometry block has inconsistent sizes");
+        }
+        const auto start = data.begin() + offset;
+        const auto end = start + compressed_size;
+        const auto geometry = lz4_decompress(std::vector<std::uint8_t>(start, end), decoded_size);
+        if (geometry.size() != decoded_size) throw std::runtime_error("Partial PAM geometry size mismatch");
+        std::vector<std::uint8_t> rebuilt(data.begin(), start);
+        std::fill(rebuilt.begin() + 0x44, rebuilt.begin() + 0x48, std::uint8_t{0});
+        rebuilt.insert(rebuilt.end(), geometry.begin(), geometry.end());
+        rebuilt.insert(rebuilt.end(), end, data.end());
+        return rebuilt;
+    }
     struct Slot { std::uint32_t compressed; std::uint32_t decoded; size_t offset; };
     std::vector<Slot> slots;
     size_t source_offset = 0x50;

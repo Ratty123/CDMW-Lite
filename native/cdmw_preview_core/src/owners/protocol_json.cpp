@@ -543,19 +543,13 @@ struct PacDescriptor {
 //   bytes 24-27  u32 little-endian, three 10-bit palette slots (influences 3, 4, 5)
 //   bytes 28-33  six u8 weights, descending, summing to 255 give or take u8 rounding
 //
-// The top two bits of each u32 are unused. This is the same packing the vertex normal uses at
-// byte 16, which is what the layout was hiding behind: read as four u8 slots instead, the field
-// pairs a forehead bone with a forearm, because influence 1's index straddles bytes 21 and 22.
-//
-// Measured on cd_phw_00_nude_00_0001_damian.pac, 13,740 vertices over three submeshes: the six
-// weights sum to 255 +/- 2 on every record, they descend on every record, the influence counts
-// split 2145/2869/2851/2284/1830/1761 across one through six, every decoded slot lands inside the
-// file's 206-entry palette, and each vertex sits a median 0.054 from the weighted centroid of its
-// own bones on a 1.84-unit figure.
-constexpr int kPacSkinInfluences = 6;
+// Two more palette slots are stored as halves at bytes 12..15, weighted at 34..35, when
+// byte 39's low six bits are not 63. All eight weights are normalized by their combined total.
+constexpr int kPacSkinPaletteInfluences = 6;
+constexpr int kPacSkinInfluences = 8;
 constexpr int kPacSkinSlotOffset = 20;
 constexpr int kPacSkinWeightOffset = 28;
-constexpr int kPacSkinRecordEnd = kPacSkinWeightOffset + kPacSkinInfluences;
+constexpr int kPacSkinRecordEnd = kPacSkinWeightOffset + kPacSkinPaletteInfluences;
 constexpr std::uint16_t kPacSkinSlotMask = 0x3FF;
 
 // One vertex's binding as the record states it. A slot is not a skeleton bone index: it indexes

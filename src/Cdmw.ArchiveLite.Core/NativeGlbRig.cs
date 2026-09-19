@@ -18,7 +18,7 @@ namespace Cdmw.ArchiveLite.Core;
 /// </remarks>
 internal sealed class NativeGlbRig
 {
-    /// <summary>Six influences per vertex; a glTF attribute set holds four, so it takes two.</summary>
+    /// <summary>Eight influences per vertex; a glTF attribute set holds four, so it takes two.</summary>
     public const int AttributeSets = 2;
 
     private const int JointsPerSet = 4;

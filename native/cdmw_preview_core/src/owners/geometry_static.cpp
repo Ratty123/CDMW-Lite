@@ -676,59 +676,6 @@ static std::optional<std::tuple<size_t, int, size_t>> find_pamlod_group_layout(
     return std::nullopt;
 }
 
-// A LOD group's entries share one vertex buffer but each takes its own slice of it, so the group is
-// presented as a single submesh whose vertices are the slices laid end to end. Two things follow,
-// and both matter to an export.
-//
-// The slices are not disjoint in the source's numbering -- entry 0 and entry 3 can both use source
-// vertex 12 -- so the combined array holds a vertex per entry that reaches it, not one per distinct
-// source vertex. Numbering the combined array by source vertex would fold those together and
-// scramble what survived; the group's own position in the array is the identity that means
-// something here, so that is what is recorded.
-//
-// The group is named after the first entry's material, not its texture, and zero-padded, because
-// that is how CDMW Full names it.
-static NativeSubmesh combine_pamlod_group_meshes(const std::vector<NativeSubmesh>& parts, int lod_index) {
-    NativeSubmesh combined;
-    if (parts.empty()) return combined;
-    const std::string lod_label = lod_index < 10
-        ? "lod0" + std::to_string(lod_index)
-        : "lod" + std::to_string(lod_index);
-    const std::string material = parts.front().raw_material.empty()
-        ? "lod" + std::to_string(lod_index)
-        : parts.front().raw_material;
-    combined.name = lod_label + "_" + material;
-    combined.export_name = combined.name;
-    combined.material = material;
-    combined.texture = parts.front().texture;
-    combined.raw_material = parts.front().raw_material;
-    combined.has_texture_coordinates = parts.front().has_texture_coordinates;
-    combined.source_submesh_index = lod_index;
-    combined.source_local_submesh_index = lod_index;
-    combined.vertex_layout_name = parts.front().vertex_layout_name;
-    combined.vertex_stride = parts.front().vertex_stride;
-    combined.uv_offset = parts.front().uv_offset;
-    combined.normal_offset = parts.front().normal_offset;
-    std::uint32_t vertex_base = 0;
-    for (const NativeSubmesh& part : parts) {
-        combined.positions.insert(combined.positions.end(), part.positions.begin(), part.positions.end());
-        combined.uvs.insert(combined.uvs.end(), part.uvs.begin(), part.uvs.end());
-        combined.normals.insert(combined.normals.end(), part.normals.begin(), part.normals.end());
-        combined.export_positions.insert(combined.export_positions.end(), part.export_positions.begin(), part.export_positions.end());
-        combined.export_uvs.insert(combined.export_uvs.end(), part.export_uvs.begin(), part.export_uvs.end());
-        for (size_t local = 0; local < part.positions.size(); ++local) {
-            combined.source_vertex_indices.push_back(
-                static_cast<std::int32_t>(vertex_base + static_cast<std::uint32_t>(local)));
-        }
-        for (std::uint32_t index : part.indices) {
-            combined.indices.push_back(vertex_base + index);
-        }
-        vertex_base += static_cast<std::uint32_t>(part.positions.size());
-    }
-    evaluate_native_submesh_quality(combined);
-    return combined;
-}
-
 // The PAMLOD entry table as CDMW Full reads it.
 //
 // Lite had been walking the table at a fixed stride and searching a wide range of paddings for the
@@ -873,7 +820,7 @@ static std::optional<NativeMeshParseResult> parse_pamlod_submeshes_workbench(con
         group_pamlod_workbench_entries(entries, static_cast<int>(lod_count));
     if (groups.empty()) return std::nullopt;
 
-    std::vector<NativeSubmesh> levels;
+    std::vector<std::vector<NativeSubmesh>> levels;
     size_t cursor = static_cast<size_t>(geom_offset);
     for (size_t lod_index = 0; lod_index < groups.size(); ++lod_index) {
         const std::vector<PamlodWorkbenchEntry>& group = groups[lod_index];
@@ -894,9 +841,10 @@ static std::optional<NativeMeshParseResult> parse_pamlod_submeshes_workbench(con
         const size_t index_base = std::get<2>(*layout);
         const bool has_uv = stride >= 12;
 
-        NativeSubmesh mesh;
-        std::uint32_t vertex_offset = 0;
-        for (const PamlodWorkbenchEntry& entry : group) {
+        std::vector<NativeSubmesh> parts;
+        for (size_t entry_index = 0; entry_index < group.size(); ++entry_index) {
+            const PamlodWorkbenchEntry& entry = group[entry_index];
+            NativeSubmesh mesh;
             const size_t entry_vertex_base =
                 vertex_base + static_cast<size_t>(entry.vertex_element_offset) * static_cast<size_t>(stride);
             const size_t entry_index_base =
@@ -911,8 +859,7 @@ static std::optional<NativeMeshParseResult> parse_pamlod_submeshes_workbench(con
             }
             std::unordered_map<std::uint32_t, std::uint32_t> source_to_local;
             for (std::uint32_t source_index : unique_indices) {
-                source_to_local[source_index] =
-                    static_cast<std::uint32_t>(source_to_local.size()) + vertex_offset;
+                source_to_local[source_index] = static_cast<std::uint32_t>(source_to_local.size());
             }
             for (std::uint32_t source_index : unique_indices) {
                 const size_t offset =
@@ -953,41 +900,40 @@ static std::optional<NativeMeshParseResult> parse_pamlod_submeshes_workbench(con
                 mesh.indices.push_back(b->second);
                 mesh.indices.push_back(c->second);
             }
-            vertex_offset += static_cast<std::uint32_t>(unique_indices.size());
+            const std::string material = entry.material_name.empty()
+                ? "lod" + std::to_string(lod_index) + "_part" + std::to_string(entry_index)
+                : entry.material_name;
+            const std::string label = lod_index < 10
+                ? "lod0" + std::to_string(lod_index)
+                : "lod" + std::to_string(lod_index);
+            const std::string part_label = entry_index < 10 ? "0" + std::to_string(entry_index) : std::to_string(entry_index);
+            mesh.name = label + "_" + (group.size() > 1 ? part_label + "_" : "") + material;
+            mesh.export_name = mesh.name;
+            mesh.material = material;
+            mesh.raw_material = entry.material_name;
+            mesh.texture = entry.texture_name;
+            mesh.has_texture_coordinates = has_uv;
+            mesh.source_submesh_index = static_cast<int>(entry_index);
+            mesh.source_local_submesh_index = static_cast<int>(entry_index);
+            mesh.vertex_stride = stride;
+            mesh.uv_offset = has_uv ? 8 : -1;
+            mesh.normal_offset = -1;
+            mesh.vertex_layout_name = "pamlod_u16_bbox_half_uv";
+            for (size_t local = 0; local < mesh.positions.size(); ++local) {
+                mesh.source_vertex_indices.push_back(static_cast<std::int32_t>(local));
+            }
+            parts.push_back(std::move(mesh));
         }
-
-        const std::string material = group.front().material_name.empty()
-            ? "lod" + std::to_string(lod_index)
-            : group.front().material_name;
-        const std::string label = lod_index < 10
-            ? "lod0" + std::to_string(lod_index)
-            : "lod" + std::to_string(lod_index);
-        mesh.name = label + "_" + material;
-        mesh.export_name = mesh.name;
-        mesh.material = material;
-        mesh.raw_material = group.front().material_name;
-        mesh.texture = group.front().texture_name;
-        mesh.has_texture_coordinates = has_uv;
-        mesh.source_submesh_index = static_cast<int>(lod_index);
-        mesh.source_local_submesh_index = static_cast<int>(lod_index);
-        mesh.vertex_stride = stride;
-        mesh.uv_offset = has_uv ? 8 : -1;
-        mesh.normal_offset = -1;
-        mesh.vertex_layout_name = "pamlod_u16_bbox_half_uv";
-        for (size_t local = 0; local < mesh.positions.size(); ++local) {
-            mesh.source_vertex_indices.push_back(static_cast<std::int32_t>(local));
-        }
-        levels.push_back(std::move(mesh));
+        levels.push_back(std::move(parts));
         cursor = index_base + static_cast<size_t>(total_indices) * 2u;
     }
 
-    for (NativeSubmesh& level : levels) {
-        if (level.positions.empty() || level.indices.size() < 3u) continue;
-        std::vector<NativeSubmesh> selected;
-        selected.push_back(std::move(level));
-        complete_native_meshes_without_filtering(selected);
+    for (auto& level : levels) {
+        if (level.empty()) continue;
+        complete_native_meshes_without_filtering(level);
+        if (level.empty()) continue;
         return NativeMeshParseResult{
-            std::move(selected), "native_pamlod_lod0_workbench", static_cast<int>(groups.size())};
+            std::move(level), "native_pamlod_lod0_workbench", static_cast<int>(groups.size())};
     }
     return std::nullopt;
 }
@@ -1032,8 +978,7 @@ static NativeMeshParseResult parse_pamlod_submeshes(const std::vector<char>& dat
                 bbox_max
             ));
         }
-        std::vector<NativeSubmesh> meshes;
-        meshes.push_back(combine_pamlod_group_meshes(parts, lod_index));
+        std::vector<NativeSubmesh> meshes = std::move(parts);
         complete_native_meshes_without_filtering(meshes);
         if (!meshes.empty()) return NativeMeshParseResult{std::move(meshes), "native_pamlod_lod0", static_cast<int>(groups.size())};
         std::uint64_t total_indices = 0;

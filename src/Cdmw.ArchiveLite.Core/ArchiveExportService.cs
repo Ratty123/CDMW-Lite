@@ -12,10 +12,16 @@ public sealed class ArchiveExportService(
     private const int MaximumReturnedItems = 500;
     private const int MaximumReturnedItemBytes = 512 * 1024;
 
-    public async Task<ExportPlanResult> ExportAsync(
+    public Task<ExportPlanResult> ExportAsync(
         ExportPlanRequest request,
         Func<ProgressUpdate, Task>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) => ExportCoreAsync(request, progress, cancellationToken, null);
+
+    private async Task<ExportPlanResult> ExportCoreAsync(
+        ExportPlanRequest request,
+        Func<ProgressUpdate, Task>? progress,
+        CancellationToken cancellationToken,
+        string? finalRoot)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.Kind is not (ExportKind.RawEntries
@@ -87,6 +93,8 @@ public sealed class ArchiveExportService(
         {
             throw new InvalidDataException("Export destination must be outside the loose search source.");
         }
+        if (isMeshExport && finalRoot is null)
+            return await ExportMeshBundleAsync(request, destination, singleOutputPath, progress, cancellationToken).ConfigureAwait(false);
         Directory.CreateDirectory(destination);
         var requested = archiveEntries.Count + loosePaths.LongLength;
         long completed = 0;
@@ -178,7 +186,8 @@ public sealed class ArchiveExportService(
                 outputPaths,
                 progress,
                 companionTextures,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                finalRoot is null ? target : Path.Combine(finalRoot, Path.GetRelativePath(destination, target))).ConfigureAwait(false);
             RecordOutcome(outcome);
             completed++;
             if (outcome.Cancelled)
@@ -226,6 +235,78 @@ public sealed class ArchiveExportService(
         return new ExportPlanResult(requested, exported, skipped, failed, cancelled, manifestPath, items, outcomeCount > items.Count);
     }
 
+    private async Task<ExportPlanResult> ExportMeshBundleAsync(
+        ExportPlanRequest request,
+        string destination,
+        string? singleOutputPath,
+        Func<ProgressUpdate, Task>? progress,
+        CancellationToken cancellationToken)
+    {
+        var staging = Path.Combine(destination, $".cdmw-bundle-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(staging);
+        try
+        {
+            var stagedRequest = request with
+            {
+                Destination = staging,
+                SingleOutputPath = singleOutputPath is null ? null : Path.Combine(staging, Path.GetRelativePath(destination, singleOutputPath)),
+            };
+            var result = await ExportCoreAsync(stagedRequest, progress, cancellationToken, destination).ConfigureAwait(false);
+            ExportPlanResult Aborted(string reason) => result with
+            {
+                Exported = 0,
+                Failed = result.Failed + result.Exported,
+                ManifestPath = null,
+                Items = result.Items.Select(item => item.Status == "exported"
+                    ? item with { OutputPath = null, Status = "failed", Message = reason } : item).ToArray(),
+            };
+            if (result.Cancelled || result.Failed > 0 || result.Items.Any(item => item.Status == "failed"))
+                return Aborted("The export bundle was not published because a selected output could not be prepared.");
+            if (result.Exported == 0) return result with { ManifestPath = null };
+            var outputs = new List<(string Staged, string Destination)>();
+            try
+            {
+                foreach (var path in Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var target = ExportPathPolicy.ResolveContainedPath(destination,
+                        ExportPathPolicy.NormalizeVirtualPath(Path.GetRelativePath(staging, path).Replace('\\', '/')));
+                    ExportPathPolicy.PrepareContainedOutputPath(destination, target);
+                    if (!string.IsNullOrWhiteSpace(request.SessionId)) EnsureArchiveSourceIsNotTarget(sessions.GetRequired(request.SessionId), target);
+                    if (File.Exists(target) && request.CollisionPolicy == ExportCollisionPolicy.Skip)
+                    {
+                        // Reuse an existing companion only when it contains the same bytes.
+                        // Otherwise the new mesh would bind a stale texture or sidecar.
+                        await using var oldFile = File.OpenRead(target);
+                        await using var newFile = File.OpenRead(path);
+                        if (oldFile.Length == newFile.Length)
+                        {
+                            var oldHash = await System.Security.Cryptography.SHA256.HashDataAsync(oldFile, cancellationToken).ConfigureAwait(false);
+                            var newHash = await System.Security.Cryptography.SHA256.HashDataAsync(newFile, cancellationToken).ConfigureAwait(false);
+                            if (oldHash.SequenceEqual(newHash)) continue;
+                        }
+                    }
+                    outputs.Add((path, target));
+                }
+                NativeExportPublication.Publish(outputs, request.CollisionPolicy == ExportCollisionPolicy.Overwrite, cancellationToken);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return Aborted(exception.Message);
+            }
+            return result with
+            {
+                ManifestPath = result.ManifestPath is null ? null : Path.Combine(destination, Path.GetRelativePath(staging, result.ManifestPath)),
+            };
+        }
+        finally
+        {
+            try { Directory.Delete(staging, true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
     private static async Task PublishProgressAsync(
         Func<ProgressUpdate, Task>? progress,
         ProgressUpdate update)
@@ -241,9 +322,8 @@ public sealed class ArchiveExportService(
     /// Copies the chosen referenced entries into <c>referenced_files/</c> beside the export.
     /// </summary>
     /// <returns>
-    /// The texture paths among them, relative to the exported mesh, so the material library can
-    /// bind them. Anything that cannot be copied is recorded and skipped: a missing sidecar must
-    /// not cost the user the mesh they asked for.
+    /// Absolute staged texture paths. Each mesh rebases them against its own directory.
+    /// A failed companion is recorded so the bundle publisher can reject incomplete output.
     /// </returns>
     private async Task<IReadOnlyList<string>> CopyReferencedFilesAsync(
         ArchiveSession session,
@@ -255,11 +335,6 @@ public sealed class ArchiveExportService(
         CancellationToken cancellationToken)
     {
         const string referencedRootName = "referenced_files";
-        // The mesh can be written anywhere inside the destination, and the library names its
-        // textures relative to itself rather than to the export root.
-        var meshDirectory = singleOutputPath is null
-            ? destination
-            : Path.GetDirectoryName(singleOutputPath) ?? destination;
         var referencedRoot = Path.Combine(destination, referencedRootName);
         var textures = new List<string>();
         foreach (var entryId in request.ReferencedEntryIds!.Distinct())
@@ -270,7 +345,7 @@ public sealed class ArchiveExportService(
             {
                 entry = session.Index.ReadEntry(entryId);
             }
-            catch (Exception exception) when (exception is InvalidDataException or NativeArchiveException)
+            catch (Exception exception) when (exception is InvalidDataException or NativeArchiveException or ArgumentOutOfRangeException)
             {
                 items.Add(new ExportItemResult($"#{entryId}", null, "failed", exception.Message));
                 continue;
@@ -297,7 +372,7 @@ public sealed class ArchiveExportService(
                 items.Add(new ExportItemResult(entry.Path, $"{referencedRootName}/{relative}", "exported", null));
                 if (entry.Extension.Equals(".dds", StringComparison.OrdinalIgnoreCase))
                 {
-                    textures.Add(Path.GetRelativePath(meshDirectory, target).Replace('\\', '/'));
+                    textures.Add(target);
                 }
             }
             catch (Exception exception) when (exception is IOException
@@ -366,7 +441,8 @@ public sealed class ArchiveExportService(
         HashSet<string> outputPaths,
         Func<ProgressUpdate, Task>? progress,
         IReadOnlyList<string> companionTextures,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string collisionTarget)
     {
         var isMeshExport = NativeModelExportService.SupportsFormat(request.Kind);
         if (isMeshExport && !NativeModelPreviewService.Supports(entry.Extension))
@@ -376,7 +452,7 @@ public sealed class ArchiveExportService(
                 false,
                 false);
         }
-        var collision = CheckCollision(entry.Path, target, request.CollisionPolicy, outputPaths);
+        var collision = CheckCollision(entry.Path, collisionTarget, request.CollisionPolicy, outputPaths);
         if (collision is not null) return collision;
         try
         {
@@ -391,7 +467,7 @@ public sealed class ArchiveExportService(
                         target,
                         request.CollisionPolicy == ExportCollisionPolicy.Overwrite,
                         progress,
-                        companionTextures,
+                        companionTextures.Select(path => Path.GetRelativePath(Path.GetDirectoryName(target)!, path).Replace('\\', '/')).ToArray(),
                         cancellationToken).ConfigureAwait(false);
                 }
                 else
