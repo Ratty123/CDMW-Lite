@@ -10,18 +10,18 @@ static std::string extracted_dds_path_for_entry(
     }
     const std::string identity =
         "native_dds_v" + std::to_string(kNativeDdsExtractionVersion) + "|"
-        + ref.pamt_path.string() + "|" + ref.path + "|" + std::to_string(ref.offset) + "|"
+        + path_utf8(ref.pamt_path) + "|" + ref.path + "|" + std::to_string(ref.offset) + "|"
         + std::to_string(ref.comp_size) + "|" + std::to_string(ref.orig_size);
     const fs::path out_path = cache_root / "dds" / (hex64(fnv1a64(identity)) + "_" + safe_filename(ref.basename));
     const std::uint64_t expected_size = ref.orig_size > 0 ? ref.orig_size : ref.comp_size;
     if (expected_size > 0) {
         try {
-            if (fs::is_regular_file(out_path) && fs::file_size(out_path) == expected_size) {
-                std::ifstream cached(out_path, std::ios::binary);
+            if (fs::is_regular_file(native_file_path(out_path)) && fs::file_size(native_file_path(out_path)) == expected_size) {
+                std::ifstream cached(native_file_path(out_path), std::ios::binary);
                 char magic[4] = {};
                 cached.read(magic, sizeof(magic));
                 if (cached.gcount() == 4 && std::string(magic, magic + 4) == "DDS ") {
-                    return fs::absolute(out_path).string();
+                    return path_utf8(fs::absolute(out_path));
                 }
             }
         } catch (...) {
@@ -43,14 +43,14 @@ static std::string extracted_dds_path_for_entry(
         notes.push_back("DDS sparse padded:" + ref.basename);
     }
     try {
-        if (!fs::is_regular_file(out_path) || fs::file_size(out_path) != data.size()) {
+        if (!fs::is_regular_file(native_file_path(out_path)) || fs::file_size(native_file_path(out_path)) != data.size()) {
             write_binary(out_path, data);
         }
     } catch (const std::exception& exc) {
         notes.push_back("DDS cache write failed:" + ref.basename + ":" + exc.what());
         return "";
     }
-    return fs::absolute(out_path).string();
+    return path_utf8(fs::absolute(out_path));
 }
 
 struct DdsHeaderInfo {
@@ -70,7 +70,7 @@ static DdsHeaderInfo inspect_dds_header_file(const std::string& path) {
     auto cached = cache.find(path);
     if (cached != cache.end()) return cached->second;
     DdsHeaderInfo info;
-    std::ifstream in(fs::path(path), std::ios::binary);
+    std::ifstream in(native_file_path(utf8_path(path)), std::ios::binary);
     if (!in) return info;
     std::vector<char> header(148, 0);
     in.read(header.data(), static_cast<std::streamsize>(header.size()));
@@ -168,7 +168,7 @@ static DdsChannelStatistics inspect_dds_channel_statistics(const std::string& pa
         if (cache.size() < 4096) cache.emplace(path, stats);
         return stats;
     }
-    std::ifstream in(fs::path(path), std::ios::binary);
+    std::ifstream in(native_file_path(utf8_path(path)), std::ios::binary);
     if (!in) return stats;
     in.seekg(128, std::ios::beg);
     const size_t block_stride = bc3 ? 16u : 8u;
@@ -378,6 +378,30 @@ static bool material_keys_match_for_identity(const std::string& candidate_key, c
     return cover_score >= 100;
 }
 
+// Wrapper order says which of a model's materials a submesh uses. It is not a
+// claim that a material's own maps belong to one submesh only: a model can bind
+// the same material to several submeshes, and only the one whose local index
+// happened to equal the wrapper index kept its textures.
+//
+// Sharing a material name is not enough on its own to make two wrappers'
+// textures interchangeable. On cd_m0041_00_woodenowl_00_0001 the Eye and Body
+// submeshes both declare CD_M0041_00_WoodenOwl_0001 yet bind blackoil and the
+// owl's own atlas respectively, so the Eye's texture must not reach the Body.
+// The candidate also has to *be* the mesh's material, which is what makes
+// cd_phm_02_acc_0032 shared by two sword accessory submeshes safe to reuse.
+static bool binding_texture_family_is_mesh_material(
+    const TextureBinding& binding,
+    const NativeSubmesh& mesh
+) {
+    const std::string mesh_key = normalized_material_key(mesh.material);
+    if (mesh_key.empty()) return false;
+    const std::string binding_key = normalized_material_key(binding.material_name);
+    if (binding_key.empty() || !material_keys_match_for_identity(binding_key, mesh_key)) return false;
+    const std::string texture_family_key = normalized_texture_family_key(
+        binding.texture_name.empty() ? binding.archive_path : binding.texture_name);
+    return material_keys_match_for_identity(texture_family_key, mesh_key);
+}
+
 static std::string material_component_key_from_path(const std::string& path) {
     std::string key = normalized_material_key(stem_from_path(path));
     bool stripped = true;
@@ -394,6 +418,11 @@ static std::string material_component_key_from_path(const std::string& path) {
     return key;
 }
 
+static std::string material_component_scope_id_for_mesh(const NativeSubmesh& mesh) {
+    return lower_copy(native_archive_path(mesh.source_model_path))
+        + "#model_property=" + std::to_string(mesh.model_property_index);
+}
+
 static bool material_sidecar_matches_mesh_source(const TextureBinding& binding, const NativeSubmesh& mesh) {
     if (binding.sidecar_path.empty() || mesh.source_model_path.empty()) return true;
     const std::string sidecar_key = material_component_key_from_path(binding.sidecar_path);
@@ -403,14 +432,31 @@ static bool material_sidecar_matches_mesh_source(const TextureBinding& binding, 
 }
 
 static bool material_binding_matches_mesh_source(const TextureBinding& binding, const NativeSubmesh& mesh) {
-    if (!material_sidecar_matches_mesh_source(binding, mesh)) return false;
+    const std::string binding_component_scope = lower_copy(binding.component_scope_id);
+    if (!binding_component_scope.empty()
+        && !binding_component_scope.starts_with("sidecar:")
+        && binding_component_scope != material_component_scope_id_for_mesh(mesh)) {
+        return false;
+    }
+    if (binding_component_scope.starts_with("sidecar:")
+        && lower_copy(binding.sidecar_kind) == ".pac_xml") {
+        // This PAC sidecar has no corresponding loaded component. A companion
+        // such as *_sub02 may explicitly share a material, but a fuzzy prefix
+        // (vest vs vest_fur) must not dye or shade the selected model instead.
+        const std::string declared = normalized_material_key(binding.material_name);
+        if (declared.empty()
+            || (declared != normalized_material_key(mesh.material)
+                && declared != normalized_material_key(mesh.name))) return false;
+    }
+    const bool exact_shared_material = binding_texture_family_is_mesh_material(binding, mesh);
+    if (!material_sidecar_matches_mesh_source(binding, mesh) && !exact_shared_material) return false;
     if (binding.source_authority != "embedded_mesh" || binding.linked_mesh_path.empty() || mesh.source_model_path.empty()) {
         return true;
     }
     const std::string binding_key = material_component_key_from_path(binding.linked_mesh_path);
     const std::string mesh_source_key = material_component_key_from_path(mesh.source_model_path);
     if (binding_key.empty() || mesh_source_key.empty()) return true;
-    return binding_key == mesh_source_key || material_keys_overlap(binding_key, mesh_source_key);
+    return binding_key == mesh_source_key || material_keys_overlap(binding_key, mesh_source_key) || exact_shared_material;
 }
 
 static int material_identity_text_match_score(const TextureBinding& binding, const NativeSubmesh& mesh) {
@@ -468,11 +514,23 @@ static int material_identity_match_score(const TextureBinding& binding, const Na
             return 220 + std::min(std::max(text_score, 0), 180);
         }
         const std::string mesh_submesh_key = normalized_material_key(mesh.name);
+        const std::string mesh_material_key = normalized_material_key(mesh.material);
         const std::string binding_key = normalized_material_key(binding.material_name);
         const std::string texture_family_key = normalized_texture_family_key(binding.texture_name.empty() ? binding.archive_path : binding.texture_name);
+        const bool texture_family_matches_mesh_material = binding_texture_family_is_mesh_material(binding, mesh);
+        const bool conflicting_specific_part =
+            material_identity_has_conflicting_specific_part(binding_key, mesh_material_key, mesh_submesh_key)
+            || material_identity_has_conflicting_specific_part(texture_family_key, mesh_material_key, mesh_submesh_key);
+        if (conflicting_specific_part && !texture_family_matches_mesh_material) {
+            return 0;
+        }
+        // A shared material is not a cross-wrapper leak. Without this a second
+        // submesh bound to the same material scored zero identity and lost its
+        // albedo, because its own name never overlaps the material's name.
         const bool submesh_specific_match =
             material_keys_overlap(binding_key, mesh_submesh_key)
-            || material_keys_overlap(texture_family_key, mesh_submesh_key);
+            || material_keys_overlap(texture_family_key, mesh_submesh_key)
+            || texture_family_matches_mesh_material;
         return submesh_specific_match && text_score >= 120 ? std::min(text_score, 220) : 0;
     }
     return text_score;

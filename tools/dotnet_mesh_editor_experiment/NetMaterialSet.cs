@@ -295,7 +295,7 @@ internal sealed partial class NetMaterialSet
             }
             var tint = layer.TryGetProperty("tint", out var tintValue) && tintValue.ValueKind == JsonValueKind.Array
                 ? tintValue.EnumerateArray()
-                    .Take(3)
+                    .Take(4)
                     .Select(value => value.ValueKind == JsonValueKind.Number && value.TryGetSingle(out var number)
                         && float.IsFinite(number) ? Math.Clamp(number, 0.0f, 2.0f) : 1.0f)
                     .ToArray()
@@ -304,12 +304,21 @@ internal sealed partial class NetMaterialSet
                 JsonString(layer, "layer_role"),
                 JsonString(layer, "mask_channel"),
                 Math.Clamp(JsonFloat(layer, "weight", 1.0f), 0.0f, 1.0f),
-                tint.Length == 3 ? tint[0] : 1.0f,
-                tint.Length == 3 ? tint[1] : 1.0f,
-                tint.Length == 3 ? tint[2] : 1.0f,
+                tint.Length >= 3 ? tint[0] : 1.0f,
+                tint.Length >= 3 ? tint[1] : 1.0f,
+                tint.Length >= 3 ? tint[2] : 1.0f,
                 JsonString(layer, "diffuse_resource_id"),
                 JsonString(layer, "mask_resource_id"),
-                JsonString(layer, "material_resource_id")));
+                JsonString(layer, "material_resource_id"),
+                tint.Length >= 4 ? Math.Clamp(tint[3], 0.0f, 1.0f) : 1.0f,
+                JsonString(layer, "normal_resource_id"),
+                JsonString(layer, "height_resource_id"),
+                JsonString(layer, "shader_family"),
+                JsonString(layer, "shader_rule"),
+                JsonFloat(layer, "roughness_hint", 0.0f),
+                JsonFloat(layer, "metalness_hint", 0.0f),
+                JsonFloat(layer, "specular_hint", 0.0f),
+                JsonFloat(layer, "detail_scale", 0.0f)));
         }
         return result;
     }
@@ -360,12 +369,23 @@ internal sealed record NetMaterialLayerBinding(
     float TintB,
     string DiffuseResourceId,
     string MaskResourceId,
-    string MaterialResourceId = "")
+    string MaterialResourceId = "",
+    float TintA = 1.0f,
+    string NormalResourceId = "",
+    string HeightResourceId = "",
+    string ShaderFamily = "",
+    string ShaderRule = "",
+    float RoughnessHint = 0.0f,
+    float MetalnessHint = 0.0f,
+    float SpecularHint = 0.0f,
+    float DetailScale = 0.0f)
 {
     public IEnumerable<string> ResourceIds()
     {
         if (!string.IsNullOrWhiteSpace(DiffuseResourceId)) yield return DiffuseResourceId;
         if (!string.IsNullOrWhiteSpace(MaskResourceId)) yield return MaskResourceId;
         if (!string.IsNullOrWhiteSpace(MaterialResourceId)) yield return MaterialResourceId;
+        if (!string.IsNullOrWhiteSpace(NormalResourceId)) yield return NormalResourceId;
+        if (!string.IsNullOrWhiteSpace(HeightResourceId)) yield return HeightResourceId;
     }
 }

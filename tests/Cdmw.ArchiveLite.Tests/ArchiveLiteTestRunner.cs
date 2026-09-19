@@ -3183,8 +3183,11 @@ internal static class ArchiveLiteTestRunner
                             native_material_hints = new
                             {
                                 roughness = 0.4f,
-                                metalness = 0.8f,
+                                roughness_authored = true,
+                                metalness = 0.0f,
+                                metalness_authored = true,
                                 specular = 0.5f,
+                                specular_authored = false,
                             },
                             material_category = "skin",
                             material_category_confidence = 0.9f,
@@ -3243,9 +3246,25 @@ internal static class ArchiveLiteTestRunner
                                     mask_channel = "r",
                                     blend_order = "base_then_detail",
                                     diffuse_source = "textures/detail-layer.dds",
+                                    normal_source = "textures/specular.dds",
+                                    material_source = "textures/material.dds",
+                                    height_source = "textures/base.dds",
                                     mask_source = "textures/detail-mask.dds",
                                     weight = 0.65f,
-                                    tint = new[] { 1.0f, 0.8f, 0.6f, 1.0f },
+                                    tint = new[] { 1.0f, 0.8f, 0.6f, 0.25f },
+                                },
+                                new
+                                {
+                                    layer_role = "color_seed", mask_channel = "g",
+                                    mask_source = "textures/detail-mask.dds", weight = 1.0f,
+                                    tint = new[] { 0.2f, 0.7f, 0.1f, 0.0f },
+                                    owner_wrapper_item_id = "owner-42", component_scope_id = "body#0",
+                                    material_wrapper_index = 2,
+                                },
+                                new
+                                {
+                                    layer_role = "detail", normal_source = "textures/specular.dds",
+                                    mask_source = "textures/detail-mask.dds", weight = 0.0f,
                                 },
                             },
                         },
@@ -3259,7 +3278,7 @@ internal static class ArchiveLiteTestRunner
             Require(File.Exists(Path.Combine(root, "net_materials.json")), "renderer materials sidecar was not created");
             Require(File.Exists(Path.Combine(root, "dotnet_scene.json")), "renderer scene sidecar was not created");
             Require(File.Exists(Path.Combine(root, "mesh.cdmeta.json")), "renderer metadata sidecar was not created");
-            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v6.json")), "renderer adapter version marker was not created");
+            Require(File.Exists(Path.Combine(root, "archive_lite_adapter_v7.json")), "renderer adapter version marker was not created");
             using (var scene = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "dotnet_scene.json")).ConfigureAwait(false)))
             {
                 Require(!scene.RootElement.GetProperty("grid").GetProperty("visible").GetBoolean(), "read-only preview scene exposed the grid");
@@ -3323,7 +3342,7 @@ internal static class ArchiveLiteTestRunner
                     "the Full-compatible bridge did not emit deduplicated resident texture resources");
                 var materialLayers = submesh.GetProperty("material_layers");
                 Require(
-                    materialLayers.GetArrayLength() == 2
+                    materialLayers.GetArrayLength() == 4
                     && materialLayers[0].GetProperty("layer_role").GetString() == "base"
                     && materialLayers[1].GetProperty("layer_role").GetString() == "detail"
                     && materialLayers[1].GetProperty("mask_channel").GetString() == "r"
@@ -3331,8 +3350,18 @@ internal static class ArchiveLiteTestRunner
                     && !string.IsNullOrWhiteSpace(materialLayers[1].GetProperty("diffuse_resource_id").GetString())
                     && !string.IsNullOrWhiteSpace(materialLayers[1].GetProperty("mask_resource_id").GetString())
                     && submesh.GetProperty("material_layer_compiler").GetString()
-                        == "archive_lite_managed_albedo_layer_compiler_v1",
+                        == "archive_lite_managed_material_compiler_v2",
                     "the adapter did not preserve Full's ordered masked material-layer contract");
+                Require(materialLayers[1].GetProperty("tint")[3].GetSingle() == 0.25f
+                    && !string.IsNullOrWhiteSpace(materialLayers[1].GetProperty("normal_resource_id").GetString())
+                    && !string.IsNullOrWhiteSpace(materialLayers[1].GetProperty("height_resource_id").GetString())
+                    && materialLayers[2].GetProperty("diffuse_resource_id").GetString() == ""
+                    && materialLayers[2].GetProperty("owner_wrapper_item_id").GetString() == "owner-42"
+                    && materialLayers[2].GetProperty("material_wrapper_index").GetInt32() == 2
+                    && materialLayers[2].GetProperty("tint")[3].GetSingle() == 0.0f
+                    && materialLayers[3].GetProperty("diffuse_resource_id").GetString() == ""
+                    && !string.IsNullOrWhiteSpace(materialLayers[3].GetProperty("normal_resource_id").GetString()),
+                    "palette/support-only layers, tint strength, or material owner identity was dropped");
                 var components = submesh.GetProperty("channel_components");
                 Require(
                     components.GetProperty("occlusion").GetString() == "r"
@@ -3343,8 +3372,8 @@ internal static class ArchiveLiteTestRunner
                 Require(
                     parameters.GetProperty("base_tint_strength").GetSingle() == 0.0f
                     && parameters.GetProperty("roughness_hint").GetSingle() == 0.4f
-                    && parameters.GetProperty("metalness_hint").GetSingle() == 0.8f
-                    && parameters.GetProperty("specular_hint").GetSingle() == 0.5f
+                    && parameters.GetProperty("metalness_hint").GetSingle() == 0.0f
+                    && !parameters.TryGetProperty("specular_hint", out _)
                     && !parameters.TryGetProperty("roughness", out _),
                     "native material hints were replaced by the flat fallback tint/scalar policy");
                 Require(
@@ -3363,6 +3392,23 @@ internal static class ArchiveLiteTestRunner
                 "ParsePackedComponents",
                 BindingFlags.NonPublic | BindingFlags.Static)
                 ?? throw new MissingMethodException("packed material parser is missing");
+            var hairTintReader = typeof(NativePreviewPackageAdapter).GetMethod(
+                "ReadAuthoredHairTint", BindingFlags.NonPublic | BindingFlags.Static)!;
+            using (var hair = JsonDocument.Parse("""
+                {"shader_family":"SkinnedMeshHair",
+                 "material_layers":[{"layer_role":"base","owner_wrapper_item_id":"hair-owner",
+                   "component_scope_id":"head","material_wrapper_index":2}],
+                 "dds_textures":{"material_inputs":[
+                   {"owner_wrapper_item_id":"other-owner","component_scope_id":"head","material_wrapper_index":2,
+                    "material_parameters":[{"parameter_name":"_hairDyeingColor","color_value":[1,0,0]}]},
+                   {"owner_wrapper_item_id":"hair-owner","component_scope_id":"head","material_wrapper_index":2,
+                    "material_parameters":[{"parameter_name":"_hairDyeingColor","color_value":[0.5,0.4,0.2]}]}]}}
+                """))
+            {
+                var tint = (float[]?)hairTintReader.Invoke(null, [hair.RootElement]);
+                Require(tint is { Length: 3 } && tint[0] == 0.5f && tint[1] == 0.4f && tint[2] == 0.2f,
+                    "hair dye came from a different material owner");
+            }
             var packedComponents = (Dictionary<string, string>)(packedParser.Invoke(
                 null,
                 ["r=occlusion,g=roughness,b=metalness,a=specular_response"])
@@ -4297,9 +4343,6 @@ internal static class ArchiveLiteTestRunner
         using (var cacheManifest = JsonDocument.Parse(cacheManifestText))
         {
             var root = cacheManifest.RootElement;
-            Require(
-                root.GetProperty("version").GetString() == "archive_lite_native_model_v18_skinned",
-                "the default texture-free preview changed its established cache version");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
                 root.GetProperty("dependencies").EnumerateArray().Any(dependency =>
@@ -4359,7 +4402,7 @@ internal static class ArchiveLiteTestRunner
         Console.WriteLine(
             $"INFO: native model cache cold={coldTimer.Elapsed.TotalMilliseconds:N1}ms cross-session-warm={warmTimer.Elapsed.TotalMilliseconds:N1}ms");
 
-        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v6.json");
+        var adapterMarker = Path.Combine(destination, "archive_lite_adapter_v7.json");
         File.Delete(adapterMarker);
         var migrationProgress = new List<ProgressUpdate>();
         var migrated = await previews.BuildAsync(
@@ -4512,7 +4555,7 @@ internal static class ArchiveLiteTestRunner
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
             && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v18_skinned\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v19_textured_skinned\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v20_material_layers_skinned\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");
@@ -4636,6 +4679,20 @@ internal static class ArchiveLiteTestRunner
             var stdoutText = await stdout.ConfigureAwait(false);
             var stderrText = await stderr.ConfigureAwait(false);
             Require(process.ExitCode == 0, $"native dependency-trace probe failed: {stderrText}{stdoutText}");
+            using var packageManifest = JsonDocument.Parse(
+                await File.ReadAllTextAsync(Path.Combine(outputRoot, "manifest.json")).ConfigureAwait(false));
+            foreach (var batch in packageManifest.RootElement.GetProperty("batches").EnumerateArray())
+            {
+                Require(batch.EnumerateObject().GroupBy(property => property.Name).All(group => group.Count() == 1),
+                    "native material metadata contains duplicate properties that overwrite authored values");
+                var hints = batch.GetProperty("native_material_hints");
+                foreach (var scalar in new[] { "roughness", "metalness", "specular", "height_scale" })
+                {
+                    Require(hints.TryGetProperty(scalar + "_authored", out var authored)
+                        && authored.ValueKind is JsonValueKind.True or JsonValueKind.False,
+                        "native material metadata lost authored scalar presence");
+                }
+            }
             using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(false));
             var root = report.RootElement;
             Require(root.GetProperty("cache_dependency_schema").GetInt32() == 1, "native report omitted the cache dependency schema");
@@ -6016,7 +6073,7 @@ internal static class ArchiveLiteTestRunner
                         && renderer.GetProperty("existing_texture_files").GetInt32() == 3
                         && renderer.GetProperty("dds_resources").GetInt32() == 5
                         && renderer.GetProperty("native_dds_resources").GetInt32() == 5
-                        && renderer.GetProperty("managed_material_layer_composites").GetInt64() == 1
+                        && renderer.GetProperty("managed_material_layer_composites").GetInt64() == 4
                         && renderer.GetProperty("texture_load_failures").GetInt32() == 0,
                         $"resident Vortice renderer did not load the synthetic Full-compatible DDS material graph: {renderer.GetRawText()}");
                 }

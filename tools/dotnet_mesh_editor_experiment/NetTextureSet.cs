@@ -57,6 +57,8 @@ internal sealed partial class NetTextureSet : IDisposable
         {
             _ = SynthesizedBaseReferenceForSubmesh(materials, submeshIndex);
             _ = SynthesizedSurfaceReferenceForSubmesh(materials, submeshIndex);
+            _ = SynthesizedSupportReferenceForSubmesh(materials, submeshIndex, "normal");
+            _ = SynthesizedSupportReferenceForSubmesh(materials, submeshIndex, "height");
         }
     }
 

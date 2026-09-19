@@ -150,4 +150,6 @@ internal struct D3D11CameraConstants
     // anisotropic along the strand rather than an isotropic blob. y: shift of the
     // secondary highlight. z/w spare. Mirrors MaterialHairAnisotropy in the HLSL.
     public Vector4 MaterialHairAnisotropy;
+    // x: a decoded layer surface map is bound (G roughness, B metal, A specular).
+    public Vector4 MaterialLayerPolicy;
 }

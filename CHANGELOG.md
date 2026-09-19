@@ -6,6 +6,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- Model previews preserve authored dye colours and strength, including zero strength, and keep each material's layers attached to its own part. Unloaded equipment variants no longer colour similarly named parts. Masked normal, height and surface-response layers now reach the renderer alongside albedo; technical DDS channels stay linear and cutout alpha survives resampling.
+- Material selection and shader-family decoding now use the improved native material graph: palettes, detail, grime and damage layers retain their source parameters, masks and ownership. Authored zero scalar values remain distinct from category defaults, and hair uses its own declared dye colour.
 - Item Finder recognizes the updated `.staticinfobody`/`.staticinfoheader` tables as well as `.pabgb`/`.pabgh`, pairs each table with its own header, and reads both compact and marked prefab lists. Model references stay within their item row; incomplete lists and unrelated integer lists cannot supply exact model links. Existing item-name caches rebuild automatically.
 - Item table discovery matches the complete filename, so similarly named tables cannot hide ItemInfo. The updated table extensions also support metadata preview and associated-asset discovery.
 - Layered model textures retain colour, mask, roughness and metalness detail up to 2048 pixels instead of being capped at 512. Composite size follows the largest active source or mask, so a small base swatch no longer shrinks detailed layers. Resampling preserves opaque edges and the base texture's cutout alpha.

@@ -1,6 +1,7 @@
+using System.Drawing;
 using System.Security.Cryptography;
 using System.Text;
-using System.Globalization;
+using System.Text.Json;
 
 namespace Cdmw.MeshEditorExperiment;
 
@@ -13,202 +14,82 @@ internal sealed partial class NetTextureSet
         get { lock (_gate) return _materialLayerCompositeCount; }
     }
 
-    // Composited roughness/metal for a submesh whose surface response exists only
-    // per colour layer. Returns Empty when the submesh binds its own surface map,
-    // which stays authoritative, or when no layer carries one.
-    public NetMaterialTextureReference SynthesizedSurfaceReferenceForSubmesh(
-        NetMaterialSet materials,
-        int submeshIndex)
-    {
-        if (!materials.TextureReferenceForSubmesh(submeshIndex, "roughness").IsEmpty
-            || !materials.TextureReferenceForSubmesh(submeshIndex, "metallic").IsEmpty)
-        {
-            return NetMaterialTextureReference.Empty;
-        }
-        var layers = materials.MaterialLayersForSubmesh(submeshIndex);
-        if (!layers.Any(layer => !string.IsNullOrWhiteSpace(layer.MaterialResourceId)))
-        {
-            return NetMaterialTextureReference.Empty;
-        }
+    public NetMaterialTextureReference SynthesizedBaseReferenceForSubmesh(NetMaterialSet materials, int submeshIndex) =>
+        SynthesizeLayers(materials, submeshIndex, "diffuse");
 
-        var layerReferences = layers.Select(layer => (
-            Binding: layer,
-            Material: materials.TextureReferenceForResource(
-                layer.MaterialResourceId,
-                "layer_material",
-                "linear"),
-            Mask: materials.TextureReferenceForResource(
-                layer.MaskResourceId,
-                "layer_mask",
-                "linear")))
-            .ToArray();
-        var signatureText = string.Join(
-            "|",
-            materials.Signature,
-            submeshIndex,
-            "surface",
-            string.Join(";", layerReferences.Select(item => string.Join(
-                ",",
-                item.Binding.LayerRole,
-                item.Binding.MaskChannel,
-                item.Binding.Weight.ToString("R", CultureInfo.InvariantCulture),
-                item.Binding.MaterialResourceId,
-                item.Binding.MaskResourceId,
-                item.Material.SourceCacheKey,
-                item.Mask.SourceCacheKey))));
-        var fingerprint = "managed-surface-layer-" + Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(signatureText))).ToLowerInvariant();
-        var resourceId = $"material-surface-layer:{fingerprint}";
-        var path = layerReferences
-            .Select(item => item.Material)
-            .FirstOrDefault(reference => !reference.IsEmpty).Path;
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return NetMaterialTextureReference.Empty;
-        }
-        var reference = new NetMaterialTextureReference(
-            resourceId,
-            path,
-            fingerprint,
-            "roughness",
-            "linear",
-            path,
-            "archive_lite_managed_surface_layer_compiler_v1");
+    public NetMaterialTextureReference SynthesizedSurfaceReferenceForSubmesh(NetMaterialSet materials, int submeshIndex) =>
+        SynthesizeLayers(materials, submeshIndex, "material");
 
-        lock (_gate)
-        {
-            if (_decodedByFingerprint.ContainsKey(reference.SourceCacheKey))
-            {
-                return reference;
-            }
-            var sources = new List<NetMaterialLayerSurfaceSource>();
-            foreach (var item in layerReferences)
-            {
-                if (item.Material.IsEmpty)
-                {
-                    continue;
-                }
-                var material = BitmapForReference(item.Material);
-                if (material is null)
-                {
-                    continue;
-                }
-                var mask = item.Mask.IsEmpty ? null : BitmapForReference(item.Mask);
-                if (!string.IsNullOrWhiteSpace(item.Binding.MaskResourceId) && mask is null)
-                {
-                    continue;
-                }
-                sources.Add(new NetMaterialLayerSurfaceSource(item.Binding, material, mask));
-            }
-            if (sources.Count == 0)
-            {
-                return NetMaterialTextureReference.Empty;
-            }
-            var compiled = NetMaterialLayerCompiler.CompileSurface(null, sources);
-            if (compiled is null)
-            {
-                return NetMaterialTextureReference.Empty;
-            }
-            _decodedByFingerprint[reference.SourceCacheKey] = compiled;
-            _lastGoodResourceKeys[resourceId] = reference.SourceCacheKey;
-            _materialLayerCompositeCount++;
-            return reference;
-        }
-    }
+    public NetMaterialTextureReference SynthesizedSupportReferenceForSubmesh(NetMaterialSet materials, int submeshIndex, string map) =>
+        SynthesizeLayers(materials, submeshIndex, map);
 
-    public NetMaterialTextureReference SynthesizedBaseReferenceForSubmesh(
-        NetMaterialSet materials,
-        int submeshIndex)
+    private NetMaterialTextureReference SynthesizeLayers(NetMaterialSet materials, int submeshIndex, string map)
     {
         var layers = materials.MaterialLayersForSubmesh(submeshIndex);
-        if (layers.Count == 0 || !layers.Any(layer =>
-            !string.Equals(layer.LayerRole, "base", StringComparison.OrdinalIgnoreCase)))
+        string ResourceId(NetMaterialLayerBinding layer) => map switch
         {
-            return NetMaterialTextureReference.Empty;
-        }
+            "diffuse" => layer.DiffuseResourceId,
+            "normal" => layer.NormalResourceId,
+            "height" => layer.HeightResourceId,
+            _ => layer.MaterialResourceId,
+        };
+        var colorSpace = map == "diffuse" ? "srgb" : "linear";
+        var baseReference = map switch
+        {
+            "diffuse" => materials.TextureReferenceForSubmesh(submeshIndex, "base", "albedo", "diffuse"),
+            "material" => materials.TextureReferenceForSubmesh(submeshIndex, "roughness", "metallic"),
+            _ => materials.TextureReferenceForSubmesh(submeshIndex, map),
+        };
+        var hasContribution = layers.Any(layer =>
+            map == "diffuse" && layer.LayerRole == "color_seed"
+            || !string.IsNullOrWhiteSpace(ResourceId(layer))
+                && (map == "material" || layer.LayerRole != "base" || baseReference.IsEmpty));
+        if (!hasContribution) return NetMaterialTextureReference.Empty;
 
-        var baseReference = materials.TextureReferenceForSubmesh(submeshIndex, "base", "albedo", "diffuse");
-        var layerReferences = layers.Select(layer => (
+        var references = layers.Select(layer => (
             Binding: layer,
-            Diffuse: materials.TextureReferenceForResource(
-                layer.DiffuseResourceId,
-                "layer_diffuse",
-                "srgb"),
-            Mask: materials.TextureReferenceForResource(
-                layer.MaskResourceId,
-                "layer_mask",
-                "linear")))
-            .ToArray();
-        var signatureText = string.Join(
-            "|",
-            materials.Signature,
-            submeshIndex,
-            baseReference.SourceCacheKey,
-            string.Join(";", layerReferences.Select(item => string.Join(
-                ",",
-                item.Binding.LayerRole,
-                item.Binding.MaskChannel,
-                item.Binding.Weight.ToString("R", CultureInfo.InvariantCulture),
-                item.Binding.TintR.ToString("R", CultureInfo.InvariantCulture),
-                item.Binding.TintG.ToString("R", CultureInfo.InvariantCulture),
-                item.Binding.TintB.ToString("R", CultureInfo.InvariantCulture),
-                item.Binding.DiffuseResourceId,
-                item.Binding.MaskResourceId,
-                item.Diffuse.SourceCacheKey,
-                item.Mask.SourceCacheKey))));
-        var fingerprint = "managed-layer-" + Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(signatureText))).ToLowerInvariant();
+            Map: materials.TextureReferenceForResource(ResourceId(layer), "layer_" + map, colorSpace),
+            Mask: materials.TextureReferenceForResource(layer.MaskResourceId, "layer_mask", "linear"))).ToArray();
+        var parameters = materials.ParametersForSubmesh(submeshIndex);
+        var signature = string.Join("|", "material-composer-v2", materials.Signature, submeshIndex, map,
+            baseReference.SourceCacheKey, JsonSerializer.Serialize(layers), parameters.BaseTintColor,
+            string.Join(";", references.Select(item => item.Map.SourceCacheKey + "," + item.Mask.SourceCacheKey)));
+        var fingerprint = "managed-layer-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature))).ToLowerInvariant();
         var resourceId = $"material-layer:{fingerprint}";
-        var path = baseReference.IsEmpty
-            ? layerReferences.Select(item => item.Diffuse)
-                .FirstOrDefault(reference => !reference.IsEmpty).Path
-            : baseReference.Path;
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return NetMaterialTextureReference.Empty;
-        }
-        var reference = new NetMaterialTextureReference(
-            resourceId,
-            path,
-            fingerprint,
-            "base",
-            "srgb",
-            path,
-            "archive_lite_managed_albedo_layer_compiler_v1");
-
+        var path = !baseReference.IsEmpty ? baseReference.Path
+            : references.SelectMany(item => new[] { item.Map, item.Mask }).FirstOrDefault(item => !item.IsEmpty).Path;
+        if (string.IsNullOrWhiteSpace(path)) return NetMaterialTextureReference.Empty;
+        var reference = new NetMaterialTextureReference(resourceId, path, fingerprint,
+            map == "diffuse" ? "base" : map == "material" ? "roughness" : map,
+            colorSpace, path, "archive_lite_managed_material_compiler_v2");
         lock (_gate)
         {
-            if (_decodedByFingerprint.ContainsKey(reference.SourceCacheKey))
-            {
-                return reference;
-            }
+            if (_decodedByFingerprint.ContainsKey(reference.SourceCacheKey)) return reference;
             var baseBitmap = baseReference.IsEmpty ? null : BitmapForReference(baseReference);
-            var sources = new List<NetMaterialLayerSource>();
-            foreach (var item in layerReferences)
+            var colors = new List<NetMaterialLayerSource>();
+            var support = new List<NetMaterialLayerSurfaceSource>();
+            foreach (var item in references)
             {
-                var layer = item.Binding;
-                var diffuse = BitmapForReference(item.Diffuse);
-                if (diffuse is null)
-                {
-                    continue;
-                }
+                var bitmap = item.Map.IsEmpty ? null : BitmapForReference(item.Map);
                 var mask = item.Mask.IsEmpty ? null : BitmapForReference(item.Mask);
-                if (!string.IsNullOrWhiteSpace(layer.MaskResourceId) && mask is null)
-                {
-                    continue;
-                }
-                sources.Add(new NetMaterialLayerSource(layer, diffuse, mask));
+                // Failed masks must not turn local detail into full coverage.
+                if (!string.IsNullOrWhiteSpace(item.Binding.MaskResourceId) && mask is null) continue;
+                if (item.Binding.LayerRole == "base" && bitmap is not null) baseBitmap = bitmap;
+                if (map == "diffuse" && (bitmap is not null || item.Binding.LayerRole is "base" or "color_seed"))
+                    colors.Add(new NetMaterialLayerSource(item.Binding, bitmap, mask));
+                else if (bitmap is not null)
+                    support.Add(new NetMaterialLayerSurfaceSource(item.Binding, bitmap, mask));
             }
-            if (!sources.Any(source =>
-                !string.Equals(source.Binding.LayerRole, "base", StringComparison.OrdinalIgnoreCase)))
+            var tint = parameters.BaseTintColor ?? new System.Numerics.Vector3(0.62f);
+            var fallback = Color.FromArgb((int)(Math.Clamp(tint.X, 0, 1) * 255),
+                (int)(Math.Clamp(tint.Y, 0, 1) * 255), (int)(Math.Clamp(tint.Z, 0, 1) * 255));
+            var compiled = map switch
             {
-                return NetMaterialTextureReference.Empty;
-            }
-            var compiled = NetMaterialLayerCompiler.Compile(baseBitmap, sources);
-            if (compiled is null)
-            {
-                return NetMaterialTextureReference.Empty;
-            }
+                "diffuse" => NetMaterialLayerCompiler.Compile(baseBitmap, colors, fallback),
+                "material" => NetMaterialLayerCompiler.CompileSurface(baseBitmap, support),
+                _ => NetMaterialLayerCompiler.CompileSupport(baseBitmap, support, map == "normal"),
+            };
+            if (compiled is null) return NetMaterialTextureReference.Empty;
             _decodedByFingerprint[reference.SourceCacheKey] = compiled;
             _lastGoodResourceKeys[resourceId] = reference.SourceCacheKey;
             _materialLayerCompositeCount++;

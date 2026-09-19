@@ -3,6 +3,7 @@ int run_cli(int argc, char** argv) {
     cdmw_native_diag::init("cdmw-preview-core", common_args.crash_dir, common_args.diagnostic_log);
     try {
         if (argc >= 2 && std::string(argv[1]) == "self-test") {
+            run_material_contract_self_test();
             cdmw_native_diag::event("self_test_ok");
             std::cout << "{\"event\":\"self_test\",\"ok\":true,\"backend\":\"cdmw_preview_core_0.1\"}\n";
             return 0;

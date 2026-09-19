@@ -14,7 +14,7 @@ public sealed class NativeModelPreviewService
     // rebuilt. These strings key the cache: leave them alone after changing what the core writes
     // and a stale package is served instead, which reads as the change having had no effect.
     private const string PackageVersion = "archive_lite_native_model_v18_skinned";
-    private const string TexturedPackageVersion = "archive_lite_native_model_v19_textured_skinned";
+    private const string TexturedPackageVersion = "archive_lite_native_model_v20_material_layers_skinned";
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan ColdBuildCoalesceDelay = TimeSpan.FromMilliseconds(35);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _buildGates = new(StringComparer.Ordinal);
@@ -238,7 +238,7 @@ public sealed class NativeModelPreviewService
                 ["d3d11_package"] = true,
                 ["material_index"] = false,
                 ["material_graph"] = false,
-                ["material_graph_version"] = 3,
+                ["material_graph_version"] = 4,
                 ["python_fallback_allowed"] = false,
                 ["native_material_runtime"] = false,
             },
@@ -490,8 +490,8 @@ public sealed class NativeModelPreviewService
 
 public static class NativePreviewPackageAdapter
 {
-    private const string AdapterMetadataName = "archive_lite_adapter_v6.json";
-    private const int AdapterSchemaVersion = 6;
+    private const string AdapterMetadataName = "archive_lite_adapter_v7.json";
+    private const int AdapterSchemaVersion = 7;
     private const int SupportedSchemaVersion = 8;
     private const int BytesPerVertex = 23 * sizeof(float);
     private const int MaximumVertices = 8_000_000;
@@ -592,8 +592,7 @@ public static class NativePreviewPackageAdapter
             // their own masks. Declare the layout that composite will carry -- the
             // same G roughness / B metal the source layers use -- so the renderer
             // samples it exactly as it samples a directly bound map.
-            if (!channels.ContainsKey("roughness")
-                && materialLayers.Any(layer =>
+            if (materialLayers.Any(layer =>
                     layer.GetValueOrDefault("material_resource_id") is string id && id.Length > 0))
             {
                 channelResolution.Components["roughness"] = "g";
@@ -664,7 +663,7 @@ public static class NativePreviewPackageAdapter
                         layer.GetValueOrDefault("layer_role") as string,
                         "base",
                         StringComparison.OrdinalIgnoreCase))
-                    ? "archive_lite_managed_albedo_layer_compiler_v1"
+                    ? "archive_lite_managed_material_compiler_v2"
                     : "none",
                 ["parameters"] = BuildInitialParameters(batch, channels, channelResolution.Formats, color, category),
             });
@@ -829,11 +828,6 @@ public static class NativePreviewPackageAdapter
                 continue;
             }
 
-            var diffusePath = ResolveTextureSource(packageRoot, ReadString(layer, "diffuse_source"));
-            if (string.IsNullOrWhiteSpace(diffusePath))
-            {
-                continue;
-            }
             var layerRole = ReadString(layer, "layer_role", "layer");
             var rawMaskPath = ReadString(layer, "mask_source");
             var maskPath = ResolveTextureSource(packageRoot, rawMaskPath);
@@ -845,14 +839,18 @@ public static class NativePreviewPackageAdapter
                 // full-surface replacement. Full skips unreadable masked layers.
                 continue;
             }
-            var diffuseResourceId = await RegisterResourceAsync(
-                submeshIndex,
-                diffusePath,
-                "layer_diffuse",
-                "srgb",
-                resources,
-                fingerprints,
-                cancellationToken).ConfigureAwait(false);
+            async Task<string> RegisterLayerMap(string map, string colorSpace)
+            {
+                var path = ResolveTextureSource(packageRoot, ReadString(layer, map + "_source"));
+                return string.IsNullOrWhiteSpace(path) ? string.Empty
+                    : await RegisterResourceAsync(submeshIndex, path, "layer_" + map, colorSpace,
+                        resources, fingerprints, cancellationToken).ConfigureAwait(false);
+            }
+            // Palette seeds and support-only layers are valid without albedo.
+            // Preserve every declared channel even when two roles share a DDS.
+            var diffuseResourceId = await RegisterLayerMap("diffuse", "srgb").ConfigureAwait(false);
+            var normalResourceId = await RegisterLayerMap("normal", "linear").ConfigureAwait(false);
+            var heightResourceId = await RegisterLayerMap("height", "linear").ConfigureAwait(false);
             var maskResourceId = string.IsNullOrWhiteSpace(maskPath)
                 ? string.Empty
                 : await RegisterResourceAsync(
@@ -885,9 +883,20 @@ public static class NativePreviewPackageAdapter
                 ["blend_order"] = ReadString(layer, "blend_order", "base_then_layer"),
                 ["source_parameter"] = ReadString(layer, "source_parameter"),
                 ["mask_parameter"] = ReadString(layer, "mask_parameter"),
+                ["shader_family"] = ReadString(layer, "shader_family"),
+                ["shader_rule"] = ReadString(layer, "shader_rule"),
+                ["component_scope_id"] = ReadString(layer, "component_scope_id"),
+                ["owner_wrapper_item_id"] = ReadString(layer, "owner_wrapper_item_id"),
+                ["material_wrapper_index"] = ReadInt(layer, "material_wrapper_index", -1),
                 ["weight"] = Math.Clamp(ReadFloat(layer, "weight", 1.0f), 0.0f, 1.0f),
-                ["tint"] = ReadFloatArray(layer, "tint", [1.0f, 1.0f, 1.0f]),
+                ["detail_scale"] = ReadFloat(layer, "detail_scale", 0.0f),
+                ["roughness_hint"] = ReadFloat(layer, "roughness_hint", 0.0f),
+                ["metalness_hint"] = ReadFloat(layer, "metalness_hint", 0.0f),
+                ["specular_hint"] = ReadFloat(layer, "specular_hint", 0.0f),
+                ["tint"] = ReadFloatArray(layer, "tint", [1.0f, 1.0f, 1.0f, 1.0f]),
                 ["diffuse_resource_id"] = diffuseResourceId,
+                ["normal_resource_id"] = normalResourceId,
+                ["height_resource_id"] = heightResourceId,
                 ["mask_resource_id"] = maskResourceId,
                 ["material_resource_id"] = materialResourceId,
             });
@@ -1181,6 +1190,8 @@ public static class NativePreviewPackageAdapter
                 result["specular"] = specular.Value;
             }
         }
+        var hairTint = ReadAuthoredHairTint(batch);
+        if (hairTint is not null) result["texture_tint"] = hairTint;
         var emissiveIntensity = ReadOptionalFloat(batch, "emissive_intensity", 0.0f, 32.0f);
         if (emissiveIntensity is > 0.0f || channels.ContainsKey("emissive"))
         {
@@ -1196,12 +1207,47 @@ public static class NativePreviewPackageAdapter
         return result;
     }
 
+    private static float[]? ReadAuthoredHairTint(JsonElement batch)
+    {
+        if (NormalizeShaderFamily(ReadString(batch, "shader_family")) != "hair"
+            || !batch.TryGetProperty("material_layers", out var layers)
+            || layers.ValueKind != JsonValueKind.Array) return null;
+        var owner = layers.EnumerateArray().FirstOrDefault(layer =>
+            layer.ValueKind == JsonValueKind.Object && ReadString(layer, "layer_role") == "base");
+        if (owner.ValueKind != JsonValueKind.Object) return null;
+        var ownerId = ReadString(owner, "owner_wrapper_item_id");
+        if (ownerId.Length == 0) return null;
+        foreach (var input in ReadMaterialInputs(batch))
+        {
+            if (ReadString(input, "owner_wrapper_item_id") != ownerId
+                || ReadString(input, "component_scope_id") != ReadString(owner, "component_scope_id")
+                || ReadInt(input, "material_wrapper_index", -1) != ReadInt(owner, "material_wrapper_index", -1)
+                || !input.TryGetProperty("material_parameters", out var parameters)
+                || parameters.ValueKind != JsonValueKind.Array) continue;
+            foreach (var parameter in parameters.EnumerateArray())
+            {
+                if (parameter.ValueKind != JsonValueKind.Object
+                    || !string.Equals(CompactIdentifier(ReadString(parameter, "parameter_name")),
+                        "hairdyeingcolor", StringComparison.OrdinalIgnoreCase)
+                    || !parameter.TryGetProperty("color_value", out var color)
+                    || color.ValueKind != JsonValueKind.Array || color.GetArrayLength() < 3) continue;
+                return ReadFloatArray(parameter, "color_value", [1.0f, 1.0f, 1.0f])
+                    .Select(value => Math.Clamp(value, 0.0f, 1.35f)).ToArray();
+            }
+        }
+        return null;
+    }
+
     private static void CopyHint(
         JsonElement source,
         string sourceName,
         IDictionary<string, object?> destination,
         string destinationName)
     {
+        // Category fallbacks are not authored scalar overrides. In particular,
+        // a guessed metalness must not override cloth and metal regions in a map.
+        if (source.TryGetProperty(sourceName + "_authored", out var authored)
+            && authored.ValueKind == JsonValueKind.False) return;
         var value = ReadOptionalFloat(source, sourceName, 0.0f, 1.0f);
         if (value is not null)
         {
@@ -1425,10 +1471,12 @@ public static class NativePreviewPackageAdapter
             return fallback;
         }
         var result = value.EnumerateArray()
-            .Take(3)
-            .Select(item => item.TryGetSingle(out var number) && float.IsFinite(number) ? number : 0.0f)
+            .Take(fallback.Length)
+            .Select((item, index) => item.ValueKind == JsonValueKind.Number
+                && item.TryGetSingle(out var number) && float.IsFinite(number) ? number : fallback[index])
             .ToArray();
-        return result.Length == 3 ? result : fallback;
+        if (result.Length == 3 && fallback.Length == 4) return [.. result, fallback[3]];
+        return result.Length == fallback.Length ? result : fallback;
     }
 
     private static string ReadString(JsonElement element, string name, string fallback = "")

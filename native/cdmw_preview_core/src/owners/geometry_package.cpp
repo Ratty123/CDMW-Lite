@@ -582,11 +582,16 @@ static std::string dds_entry_json(const TextureBinding* binding, const std::stri
         << "\"source_path\":\"" << json_escape(binding->source_path) << "\","
         << "\"archive_path\":\"" << json_escape(binding->archive_path) << "\","
         << "\"parameter_name\":\"" << json_escape(binding->parameter_name) << "\","
+        << "\"declared_texture_path\":\"" << json_escape(binding->declared_texture_path) << "\","
+        << "\"source_resolution\":\"" << json_escape(binding->source_resolution) << "\","
+        << "\"source_resolution_detail\":\"" << json_escape(binding->source_resolution_detail) << "\","
+        << "\"declared_source_missing\":" << (binding->declared_source_missing ? "true" : "false") << ","
         << "\"semantic_type\":\"" << json_escape(binding->semantic_type) << "\","
         << "\"semantic_subtype\":\"" << json_escape(binding->semantic_subtype) << "\","
         << "\"shader_family\":\"" << json_escape(binding->shader_family) << "\","
         << "\"shader_rule\":\"" << json_escape(binding->shader_rule) << "\","
         << "\"sidecar_path\":\"" << json_escape(binding->sidecar_path) << "\","
+        << "\"component_scope_id\":\"" << json_escape(binding->component_scope_id) << "\","
         << "\"sidecar_kind\":\"" << json_escape(binding->sidecar_kind) << "\","
         << "\"linked_mesh_path\":\"" << json_escape(binding->linked_mesh_path) << "\","
         << "\"packed_channels\":\"" << json_escape(binding->packed_channels) << "\","
@@ -597,6 +602,7 @@ static std::string dds_entry_json(const TextureBinding* binding, const std::stri
         << "\"metalness_hint\":" << binding->metalness_hint << ","
         << "\"specular_hint\":" << binding->specular_hint << ","
         << "\"height_scale_hint\":" << binding->height_scale_hint << ","
+        << "\"detail_scale\":" << binding->detail_scale << ","
         << "\"emissive_intensity_hint\":" << binding->emissive_intensity_hint << ","
         << "\"tint_color\":[" << binding->tint_color[0] << "," << binding->tint_color[1] << "," << binding->tint_color[2] << "," << binding->tint_color[3] << "],"
         << "\"width\":" << binding->dds_width << ","
@@ -614,10 +620,58 @@ static std::string batch_stem(size_t batch_index) {
     return out.str();
 }
 
+static int binding_owner_submesh_local_index(
+    const std::vector<NativeSubmesh>& submeshes,
+    const TextureBinding& binding
+) {
+    const std::string binding_material_key = normalized_material_key(binding.material_name);
+    if (!binding_material_key.empty()) {
+        int declared_material_consumers = 0;
+        for (const NativeSubmesh& candidate : submeshes) {
+            if (candidate.source_local_submesh_index < 0
+                || !material_binding_matches_mesh_source(binding, candidate)) {
+                continue;
+            }
+            const bool declared_match =
+                normalized_material_key(candidate.material) == binding_material_key
+                || normalized_material_key(candidate.name) == binding_material_key;
+            if (declared_match && ++declared_material_consumers > 1) {
+                // A material explicitly declared by several submeshes is shared,
+                // even when authoritative wrapper order gives one of them a
+                // higher identity score.
+                return -1;
+            }
+        }
+    }
+
+    int owner_slot_index = -1;
+    int best_score = 0;
+    bool tied = false;
+    const int threshold = normalized_material_key(binding.material_name).empty() ? 42 : 120;
+    for (const NativeSubmesh& candidate : submeshes) {
+        if (candidate.source_local_submesh_index < 0
+            || !material_binding_matches_mesh_source(binding, candidate)) {
+            continue;
+        }
+        const int score = material_identity_match_score(binding, candidate);
+        if (score > best_score) {
+            best_score = score;
+            owner_slot_index = candidate.source_local_submesh_index;
+            tied = false;
+        } else if (score == best_score && score > 0
+            && owner_slot_index != candidate.source_local_submesh_index) {
+            tied = true;
+        }
+    }
+    return !tied && best_score >= threshold ? owner_slot_index : -1;
+}
+
 static std::vector<const TextureBinding*> relevant_bindings_for_mesh(
     const std::vector<TextureBinding>& bindings,
+    const std::vector<NativeSubmesh>& submeshes,
     const NativeSubmesh& mesh,
-    const std::vector<const TextureBinding*>& selected_slots
+    const std::vector<const TextureBinding*>& selected_slots,
+    const std::unordered_map<const TextureBinding*, int>* owner_slots = nullptr
 ) {
     std::vector<const TextureBinding*> result;
     std::set<const TextureBinding*> seen;
@@ -634,6 +688,10 @@ static std::vector<const TextureBinding*> relevant_bindings_for_mesh(
         if (scoped_materials.size() <= 1) {
             for (const TextureBinding& binding : bindings) {
                 if (!material_binding_matches_mesh_source(binding, mesh)) continue;
+                if (binding.material_wrapper_order_authoritative) {
+                    const int threshold = normalized_material_key(binding.material_name).empty() ? 42 : 120;
+                    if (material_identity_match_score(binding, mesh) < threshold) continue;
+                }
                 add(&binding);
             }
             return result;
@@ -647,6 +705,14 @@ static std::vector<const TextureBinding*> relevant_bindings_for_mesh(
     for (const TextureBinding& binding : bindings) {
         if (binding.source_path.empty()) continue;
         if (!material_binding_matches_mesh_source(binding, mesh)) continue;
+        const int owner_slot_index = owner_slots != nullptr
+            ? owner_slots->at(&binding)
+            : binding_owner_submesh_local_index(submeshes, binding);
+        if (owner_slot_index >= 0
+            && mesh.source_local_submesh_index >= 0
+            && owner_slot_index != mesh.source_local_submesh_index) {
+            continue;
+        }
         const int score = material_identity_match_score(binding, mesh);
         const int threshold = normalized_material_key(binding.material_name).empty() ? 42 : 120;
         if (score >= threshold) add(&binding);

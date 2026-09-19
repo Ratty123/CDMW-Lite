@@ -49,6 +49,7 @@ cbuffer CameraConstants : register(b0)
     // x: a strand-direction (flow) map is bound. y: shift of the secondary
     // highlight along the strand. z/w spare.
     float4 MaterialHairAnisotropy;
+    float4 MaterialLayerPolicy;
 };
 
 Texture2D BaseTexture : register(t0);
@@ -868,7 +869,8 @@ float4 PSMain(VSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target
     {
         // A source specular map shapes the metal highlight only; its influence
         // fades out with the metal fraction so a dielectric cannot inherit it.
-        float3 mappedSpecular = SpecularTexture.Sample(MaterialSampler, uv).rgb
+        float4 specularSample = SpecularTexture.Sample(MaterialSampler, uv);
+        float3 mappedSpecular = (MaterialLayerPolicy.x > 0.5f ? specularSample.aaa : specularSample.rgb)
             * familySpecularScale;
         specularColor = lerp(
             specularColor,

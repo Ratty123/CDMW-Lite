@@ -4,98 +4,113 @@ struct NativeMaterialHints {
     float metalness = 0.0f;
     float specular = 0.45f;
     float height_scale = 0.35f;
+    bool roughness_authored = false;
+    bool metalness_authored = false;
+    bool specular_authored = false;
+    bool height_scale_authored = false;
+    bool anisotropy_authored = false;
+};
+
+struct SurfaceProfile {
+    std::string family = "generic";
+    int family_code = 0;
+    std::string finish = "unspecified";
+    std::string structure = "unspecified";
+    std::string coating = "none";
+    float confidence = 0.35f;
+    std::string evidence;
+    float fallback_roughness = 0.45f;
+    float fallback_metalness = 0.0f;
+    float fallback_specular = 0.20f;
+    float fallback_height_scale = 0.0f;
+    float fallback_anisotropy = 0.0f;
+    bool roughness_authored = false;
+    bool metalness_authored = false;
+    bool specular_authored = false;
+    bool height_scale_authored = false;
+    bool anisotropy_authored = false;
+    bool roughness_fallback_applied = false;
+    bool metalness_fallback_applied = false;
+    bool specular_fallback_applied = false;
+    bool height_scale_fallback_applied = false;
+    bool anisotropy_fallback_applied = false;
 };
 
 static NativeMaterialHints clamp_material_hints_for_category(NativeMaterialHints hints, const std::string& category) {
     const std::string normalized = lower_copy(category);
     if (normalized == "cloth") {
-        hints.metalness = 0.0f;
-        hints.specular = std::min(hints.specular, 0.28f);
-        hints.roughness = std::max(hints.roughness, 0.48f);
+        if (!hints.metalness_authored) hints.metalness = 0.0f;
+        if (!hints.specular_authored) hints.specular = std::min(hints.specular, 0.28f);
+        if (!hints.roughness_authored) hints.roughness = std::max(hints.roughness, 0.48f);
     } else if (normalized == "leather") {
-        hints.metalness = 0.0f;
-        hints.specular = std::min(hints.specular, 0.36f);
-        hints.roughness = std::max(hints.roughness, 0.38f);
+        if (!hints.metalness_authored) hints.metalness = 0.0f;
+        if (!hints.specular_authored) hints.specular = std::min(hints.specular, 0.36f);
+        if (!hints.roughness_authored) hints.roughness = std::max(hints.roughness, 0.38f);
     } else if (normalized == "wood") {
-        hints.metalness = 0.0f;
-        hints.specular = std::min(hints.specular, 0.30f);
-        hints.roughness = std::max(hints.roughness, 0.44f);
+        if (!hints.metalness_authored) hints.metalness = 0.0f;
+        if (!hints.specular_authored) hints.specular = std::min(hints.specular, 0.30f);
+        if (!hints.roughness_authored) hints.roughness = std::max(hints.roughness, 0.44f);
     } else if (normalized == "skin") {
-        hints.metalness = 0.0f;
-        hints.specular = std::min(hints.specular, 0.34f);
-        hints.roughness = std::max(hints.roughness, 0.30f);
+        if (!hints.metalness_authored) hints.metalness = 0.0f;
+        if (!hints.specular_authored) hints.specular = std::min(hints.specular, 0.34f);
+        if (!hints.roughness_authored) hints.roughness = std::max(hints.roughness, 0.30f);
     } else if (normalized == "hair") {
-        hints.metalness = 0.0f;
-        hints.specular = std::min(hints.specular, 0.46f);
-        hints.roughness = std::max(hints.roughness, 0.36f);
-    } else if (normalized == "stone") {
-        hints.metalness = 0.0f;
-        hints.specular = std::min(hints.specular, 0.24f);
-        hints.roughness = std::max(hints.roughness, 0.58f);
+        if (!hints.metalness_authored) hints.metalness = 0.0f;
+        if (!hints.specular_authored) hints.specular = std::min(hints.specular, 0.46f);
+        if (!hints.roughness_authored) hints.roughness = std::max(hints.roughness, 0.36f);
+    } else if (normalized == "stone" || normalized == "bone"
+        || normalized == "organic" || normalized == "foliage") {
+        if (!hints.metalness_authored) hints.metalness = 0.0f;
+        if (!hints.specular_authored) hints.specular = std::min(hints.specular, 0.26f);
+        if (!hints.roughness_authored) hints.roughness = std::max(hints.roughness, 0.42f);
     } else if (normalized == "tooth") {
-        hints.metalness = 0.0f;
-        hints.specular = std::min(hints.specular, 0.26f);
-        hints.roughness = std::max(hints.roughness, 0.42f);
+        if (!hints.metalness_authored) hints.metalness = 0.0f;
+        if (!hints.specular_authored) hints.specular = std::min(hints.specular, 0.26f);
+        if (!hints.roughness_authored) hints.roughness = std::max(hints.roughness, 0.42f);
     }
     return hints;
 }
 
 static NativeMaterialHints material_hints_for_bindings(const std::vector<const TextureBinding*>& bindings) {
     NativeMaterialHints hints;
-    bool has_skin = false;
-    bool has_hair = false;
-    bool has_standard_v2 = false;
-    bool has_static_multi = false;
-    bool has_specular = false;
-    bool has_material_mask = false;
-    bool has_height = false;
-    bool has_metal = false;
     float roughness_hint = 0.0f;
     float metalness_hint = 0.0f;
     float specular_hint = 0.0f;
     float height_scale_hint = 0.0f;
     for (const TextureBinding* binding : bindings) {
         if (binding == nullptr) continue;
-        const std::string rule = lower_copy(binding->shader_rule);
         const std::string packed = lower_copy(binding->packed_channels + " " + binding->parameter_name);
-        has_skin = has_skin || rule == "skin";
-        has_hair = has_hair || rule == "hair";
-        has_standard_v2 = has_standard_v2 || rule == "standard_v2";
-        has_static_multi = has_static_multi || rule == "static_multitextured";
-        has_specular = has_specular || binding->role == "specular";
-        has_material_mask = has_material_mask || binding->role == "material" || binding->role == "detail";
-        has_height = has_height || binding->role == "height";
-        has_metal = has_metal || packed.find("metal") != std::string::npos;
+        const bool response_map = !binding_is_layer_selector_mask(*binding)
+            && (binding->role == "material" || binding->role == "specular");
+        hints.roughness_authored = hints.roughness_authored
+            || binding->roughness_hint_present
+            || (response_map && (binding->role == "specular" || packed.find("rough") != std::string::npos));
+        hints.metalness_authored = hints.metalness_authored
+            || binding->metalness_hint_present
+            || (response_map && packed.find("metal") != std::string::npos);
+        hints.specular_authored = hints.specular_authored
+            || binding->specular_hint_present || binding->role == "specular";
+        hints.height_scale_authored = hints.height_scale_authored
+            || binding->height_scale_hint_present;
+        hints.anisotropy_authored = hints.anisotropy_authored
+            || binding->role == "flow"
+            || lower_copy(binding->semantic_type).find("anisotrop") != std::string::npos
+            || lower_copy(binding->semantic_subtype).find("anisotrop") != std::string::npos;
+        for (const MaterialParameterRecord& parameter : binding->material_parameters) {
+            if (normalized_key(parameter.name).find("anisotrop") != std::string::npos) {
+                hints.anisotropy_authored = true;
+                break;
+            }
+        }
         roughness_hint = std::max(roughness_hint, binding->roughness_hint);
         metalness_hint = std::max(metalness_hint, binding->metalness_hint);
         specular_hint = std::max(specular_hint, binding->specular_hint);
         height_scale_hint = std::max(height_scale_hint, binding->height_scale_hint);
     }
-    if (has_skin) {
-        hints.roughness = 0.56f;
-        hints.specular = 0.28f;
-        hints.height_scale = 0.18f;
-    } else if (has_hair) {
-        hints.roughness = 0.38f;
-        hints.specular = 0.58f;
-        hints.height_scale = 0.14f;
-    } else if (has_standard_v2) {
-        hints.roughness = has_material_mask ? 0.42f : 0.50f;
-        hints.specular = has_specular ? 0.56f : 0.38f;
-        hints.metalness = has_metal ? 0.10f : 0.0f;
-        hints.height_scale = has_height ? 0.34f : 0.0f;
-    } else if (has_static_multi) {
-        hints.roughness = 0.58f;
-        hints.specular = has_specular ? 0.30f : 0.18f;
-        hints.height_scale = has_height ? 0.24f : 0.0f;
-    } else {
-        hints.specular = has_specular ? 0.42f : 0.20f;
-        hints.height_scale = has_height ? 0.28f : 0.0f;
-    }
-    if (roughness_hint > 0.0f) hints.roughness = std::clamp(roughness_hint, 0.04f, 0.96f);
-    if (metalness_hint > 0.0f) hints.metalness = std::clamp(metalness_hint, 0.0f, 1.0f);
-    if (specular_hint > 0.0f) hints.specular = std::clamp(specular_hint, 0.0f, 1.0f);
-    if (height_scale_hint > 0.0f) hints.height_scale = std::clamp(height_scale_hint, 0.0f, 1.0f);
+    if (hints.roughness_authored) hints.roughness = std::clamp(roughness_hint, 0.0f, 1.0f);
+    if (hints.metalness_authored) hints.metalness = std::clamp(metalness_hint, 0.0f, 1.0f);
+    if (hints.specular_authored) hints.specular = std::clamp(specular_hint, 0.0f, 1.0f);
+    if (hints.height_scale_authored) hints.height_scale = std::clamp(height_scale_hint, 0.0f, 1.0f);
     return hints;
 }
 
@@ -140,7 +155,26 @@ static bool shader_rule_holds_layer_albedo(const std::vector<const TextureBindin
     return false;
 }
 
-static bool shader_rule_supports_conservative_layer_stack(const std::vector<const TextureBinding*>& bindings) {
+static bool exact_authored_layer_binding_matches_mesh(
+    const TextureBinding& binding,
+    const NativeSubmesh& mesh
+) {
+    if (binding.source_authority != "exact_sidecar"
+        || binding.material_output_quality != "exact"
+        || !binding.material_wrapper_order_authoritative
+        || binding.material_wrapper_index < 0
+        || binding.sidecar_path.empty()
+        || !material_binding_matches_mesh_source(binding, mesh)) {
+        return false;
+    }
+    return mesh.source_local_submesh_index < 0
+        || binding.material_wrapper_index == mesh.source_local_submesh_index;
+}
+
+static bool shader_rule_supports_conservative_layer_stack(
+    const std::vector<const TextureBinding*>& bindings,
+    const NativeSubmesh& mesh
+) {
     for (const TextureBinding* binding : bindings) {
         if (binding == nullptr) continue;
         const std::string rule = lower_copy(binding->shader_rule + " " + binding->shader_family);
@@ -161,6 +195,20 @@ static bool shader_rule_supports_conservative_layer_stack(const std::vector<cons
                 || binding->layer_role == "layer"
                 || binding->role == "detail"
             )
+        ) {
+            return true;
+        }
+        const std::string parameter = normalized_key(binding->parameter_name);
+        const std::string layer_role = lower_copy(binding->layer_role);
+        if (
+            rule.find("emissive") != std::string::npos
+            && exact_authored_layer_binding_matches_mesh(*binding, mesh)
+            && binding->role == "base"
+            && (layer_role == "detail" || layer_role == "grime"
+                || layer_role == "damage" || layer_role == "layer")
+            && (parameter.find("detaildiffuse") != std::string::npos
+                || parameter.find("grimediffuse") != std::string::npos
+                || parameter.find("dyediffuse") != std::string::npos)
         ) {
             return true;
         }
@@ -334,9 +382,8 @@ static bool texture_family_key_is_specific_material_response(const std::string& 
 
 static bool binding_has_authoritative_model_family_material_response(const TextureBinding* binding, const NativeSubmesh& mesh) {
     if (binding == nullptr) return false;
+    if (binding_is_layer_selector_mask(*binding)) return false;
     const std::string role = lower_copy(binding->role);
-    const std::string parameter_key = normalized_key(binding->parameter_name);
-    const std::string path_text = lower_copy(binding->archive_path + " " + binding->texture_name);
     const std::string packed = lower_copy(binding->packed_channels);
     const bool sidecar_authoritative =
         binding->source_authority == "exact_sidecar"
@@ -351,10 +398,6 @@ static bool binding_has_authoritative_model_family_material_response(const Textu
         || role == "roughness"
         || role == "metalness"
         || binding_has_explicit_metalness_slot(binding)
-        || (
-            parameter_key == "colorblendingmasktexture"
-            && path_text.find("_ma") != std::string::npos
-        )
         || (
             packed.find("r=occlusion") != std::string::npos
             && packed.find("g=roughness") != std::string::npos
@@ -381,6 +424,7 @@ static bool binding_has_authoritative_model_family_material_response(const Textu
 
 static bool binding_has_authoritative_equipment_material_response(const TextureBinding* binding, const NativeSubmesh& mesh) {
     if (binding == nullptr) return false;
+    if (binding_is_layer_selector_mask(*binding)) return false;
     if (!material_binding_matches_mesh_source(*binding, mesh)) return false;
     const std::string role = lower_copy(binding->role);
     const std::string parameter_key = normalized_key(binding->parameter_name);
@@ -398,7 +442,6 @@ static bool binding_has_authoritative_equipment_material_response(const TextureB
         || role == "roughness"
         || role == "metalness"
         || binding_has_explicit_metalness_slot(binding)
-        || path_text.find("_ma.dds") != std::string::npos
         || path_text.find("_sp.dds") != std::string::npos;
     if (!material_response) return false;
     const std::string texture_family_key = normalized_texture_family_key(
@@ -453,6 +496,7 @@ static constexpr float kDecodedMetalAbsentCoverage = 0.06f;
 
 static bool binding_declares_readable_surface_response(const TextureBinding* binding) {
     if (binding == nullptr || binding->source_path.empty()) return false;
+    if (binding_is_layer_selector_mask(*binding)) return false;
     if (binding->packed_channels.find("b=metalness") == std::string::npos) return false;
     // A shipped placeholder describes no asset. cd_temp_* stands in for unfinished
     // work and would otherwise be read as a real measurement.
@@ -466,7 +510,8 @@ static DecodedSurfaceEvidence decoded_surface_evidence(
     const TextureBinding* surface
 ) {
     // The submesh's own selected surface map answers for the whole submesh.
-    if (binding_declares_readable_surface_response(surface)) {
+    if (binding_declares_readable_surface_response(surface)
+        && lower_copy(surface->packed_channels).find("layer:") == std::string::npos) {
         const DdsChannelStatistics stats = inspect_dds_channel_statistics(surface->source_path);
         if (stats.valid) {
             DecodedSurfaceEvidence result;
@@ -483,10 +528,21 @@ static DecodedSurfaceEvidence decoded_surface_evidence(
     // matters: an unweighted maximum let one metallic grime layer from the shared
     // tiling library declare a whole garment metal.
     DdsChannelStatistics mask;
-    if (surface != nullptr
-        && !surface->source_path.empty()
-        && surface->packed_channels.rfind("layer:color_blending_mask", 0) == 0) {
-        mask = inspect_dds_channel_statistics(surface->source_path);
+    const TextureBinding* selector_mask = surface != nullptr
+            && binding_is_layer_selector_mask(*surface)
+        ? surface
+        : nullptr;
+    if (selector_mask == nullptr) {
+        const auto found = std::find_if(bindings.begin(), bindings.end(), [](const TextureBinding* binding) {
+            return binding != nullptr
+                && !binding->source_path.empty()
+                && binding_is_layer_selector_mask(*binding)
+                && lower_copy(binding->packed_channels).find("layer:color_blending_mask") != std::string::npos;
+        });
+        if (found != bindings.end()) selector_mask = *found;
+    }
+    if (selector_mask != nullptr) {
+        mask = inspect_dds_channel_statistics(selector_mask->source_path);
     }
     DecodedSurfaceEvidence result;
     int readable = 0;
@@ -546,6 +602,9 @@ struct MaterialCategoryEvidence {
     bool stone = false;
     bool eye = false;
     bool tooth = false;
+    bool bone = false;
+    bool organic = false;
+    bool foliage = false;
     bool hair_shader = false;
     bool equipment_surface = false;
     bool actual_hair = false;
@@ -578,7 +637,9 @@ static MaterialCategoryEvidence collect_material_category_evidence(
     }
     for (const TextureBinding* binding : bindings) {
         if (binding == nullptr) continue;
-        result.all += " " + lower_copy(binding->archive_path + " " + binding->texture_name + " " + binding->parameter_name + " " + binding->shader_rule + " " + binding->shader_family);
+        result.all += " " + lower_copy(binding->archive_path + " " + binding->texture_name + " "
+            + binding->parameter_name + " " + binding->shader_rule + " " + binding->shader_family
+            + " " + binding->material_parameter_names);
     }
     for (const MaterialLayer& layer : layers) {
         result.all += " " + lower_copy(layer.diffuse_archive_path + " " + layer.source_parameter + " " + layer.layer_role);
@@ -606,6 +667,11 @@ static MaterialCategoryEvidence collect_material_category_evidence(
     result.stone = evidence_has_any_token(result.all, {"stone", "rock", "ceramic"});
     result.eye = evidence_contains_eye_surface_token(result.identity);
     result.tooth = evidence_has_any_token(result.identity, {"tooth", "teeth"});
+    result.bone = evidence_has_any_token(result.identity, {"bone", "skull", "horn", "antler", "ivory"});
+    result.organic = evidence_has_any_token(
+        result.identity, {"organic", "flesh", "muscle", "organ", "tentacle", "membrane", "chitin"});
+    result.foliage = evidence_has_any_token(
+        result.identity, {"foliage", "leaf", "leaves", "grass", "moss", "plant", "flower"});
     // The declared family of the albedo this part actually shows, not of every
     // binding pooled onto it. A jacket that carries a fur collar contributes a
     // SkinnedMeshFur binding to the pool, and reading the pool made the cloth body
@@ -621,9 +687,20 @@ static MaterialCategoryEvidence collect_material_category_evidence(
         || evidence_has_any_token(result.identity, {"skin", "nude", "body", "hand"});
     result.head_skin = evidence_contains_token(result.identity, "head") && !result.hair_shader && !result.actual_hair;
     result.strong_nonmetal = result.cloth_like || result.leather || result.wood || result.glass || result.gem
-        || result.stone || result.eye || result.tooth || result.strong_skin || result.head_skin
+        || result.stone || result.eye || result.tooth || result.bone || result.organic || result.foliage
+        || result.strong_skin || result.head_skin
         || result.hair_shader || result.actual_hair;
     return result;
+}
+
+static bool decoded_surface_promotes_metal(
+    const DecodedSurfaceEvidence& decoded,
+    const MaterialCategoryEvidence& evidence
+) {
+    return decoded.decoded
+        && decoded.metal_coverage >= kDecodedMetalDominantCoverage
+        && !evidence.strong_skin
+        && !evidence.head_skin;
 }
 
 static bool material_category_has_metal(
@@ -655,7 +732,9 @@ static bool material_category_has_metal(
         "cloth", "fabric", "uw", "underwear", "vest", "leather", "hide", "strap", "belt", "grip",
         "wrap", "wood", "stick", "shaft", "haft", "glass", "crystal", "gem", "jewel", "stone",
         "rock", "tooth", "teeth", "skin", "nude", "body", "hand", "hair", "fur", "brow",
-        "eyebrow", "lash", "eyelash"})
+        "eyebrow", "lash", "eyelash", "bone", "skull", "horn", "antler", "ivory", "organic",
+        "flesh", "muscle", "organ", "tentacle", "membrane", "chitin", "foliage", "leaf", "leaves",
+        "grass", "moss", "plant", "flower"})
         || evidence_contains_eye_surface_token(evidence.local)
         || evidence.apparel_cloth_path;
     const bool shield_handle_response = local_handle
@@ -665,7 +744,8 @@ static bool material_category_has_metal(
         && material_response_metal
         && !local_nonmetal_except_handle
         && !evidence.leather_material && !evidence.cloth_like && !evidence.wood && !evidence.stone
-        && !evidence.eye && !evidence.tooth && !evidence.strong_skin && !evidence.head_skin && !evidence.actual_hair;
+        && !evidence.eye && !evidence.tooth && !evidence.bone && !evidence.organic && !evidence.foliage
+        && !evidence.strong_skin && !evidence.head_skin && !evidence.actual_hair;
     const bool local_strong_nonmetal = local_nonmetal_except_handle || (local_handle && !shield_handle_response);
     const bool local_surface_nonmetal = (mesh_local_surface_has_strong_nonmetal_token(mesh) && !shield_handle_response)
         || evidence_has_any_token(evidence.local, {
@@ -677,7 +757,8 @@ static bool material_category_has_metal(
     const bool armor_response = evidence.equipment_surface
         && has_authoritative_equipment_material_response(bindings, mesh)
         && !local_surface_nonmetal && !evidence.strong_skin && !evidence.head_skin && !evidence.wood
-        && !evidence.stone && !evidence.eye && !evidence.tooth;
+        && !evidence.stone && !evidence.eye && !evidence.tooth && !evidence.bone
+        && !evidence.organic && !evidence.foliage;
     const bool weapon_response = mesh_has_crimson_weapon_surface(mesh)
         && has_authoritative_model_family_material_response(bindings, mesh)
         && (!local_strong_nonmetal || shield_handle_response)
@@ -695,7 +776,7 @@ static bool material_category_has_metal(
         // its own metal because the shader honours the per-texel map, so a part
         // that is mostly leather stays leather rather than being called metal by
         // the equipment slot it happens to occupy.
-        if (decoded.metal_coverage >= kDecodedMetalDominantCoverage) return true;
+        if (decoded_surface_promotes_metal(decoded, evidence)) return true;
         return local_metal || (strong_structural && !evidence.strong_nonmetal);
     }
     return local_metal || armor_response || weapon_response
@@ -714,6 +795,9 @@ static std::string material_category_for_bindings(
     const MaterialCategoryEvidence evidence = collect_material_category_evidence(bindings, mesh, base, layers);
     if (evidence.eye) return "eye";
     if (evidence.tooth) return "tooth";
+    if (evidence.bone) return "bone";
+    if (evidence.organic) return "organic";
+    if (evidence.foliage) return "foliage";
     if ((evidence.hair_shader || evidence.actual_hair) && (evidence.actual_hair || !evidence.strong_skin)) return "hair";
     if (material_category_has_metal(bindings, mesh, evidence, surface)) return "metal";
     if (evidence.cloth_like) return "cloth";
@@ -727,4 +811,160 @@ static std::string material_category_for_bindings(
         && evidence.all.find("shield") != std::string::npos) return "wood";
     if (evidence.strong_skin || evidence.head_skin) return "skin";
     return "generic";
+}
+
+static int native_material_category_code(const std::string& category) {
+    const std::string value = lower_copy(category);
+    if (value == "metal") return 1;
+    if (value == "leather") return 2;
+    if (value == "wood") return 3;
+    if (value == "cloth") return 4;
+    if (value == "skin") return 5;
+    if (value == "hair") return 6;
+    if (value == "glass") return 7;
+    if (value == "gem") return 8;
+    if (value == "stone") return 9;
+    if (value == "eye") return 10;
+    if (value == "tooth") return 11;
+    if (value == "bone") return 12;
+    if (value == "organic") return 13;
+    if (value == "foliage") return 14;
+    return 0;
+}
+
+static SurfaceProfile surface_profile_for_bindings(
+    const std::string& category,
+    const std::string& category_reason,
+    float category_confidence,
+    const std::vector<const TextureBinding*>& bindings,
+    const NativeSubmesh& mesh,
+    const TextureBinding* base,
+    const std::vector<MaterialLayer>& layers,
+    const NativeMaterialHints& authored_hints
+) {
+    const MaterialCategoryEvidence source = collect_material_category_evidence(
+        bindings, mesh, base, layers);
+    SurfaceProfile profile;
+    profile.family = category;
+    profile.family_code = native_material_category_code(category);
+    profile.confidence = std::clamp(category_confidence, 0.0f, 1.0f);
+    profile.roughness_authored = authored_hints.roughness_authored;
+    profile.metalness_authored = authored_hints.metalness_authored;
+    profile.specular_authored = authored_hints.specular_authored;
+    profile.height_scale_authored = authored_hints.height_scale_authored;
+    profile.anisotropy_authored = authored_hints.anisotropy_authored;
+
+    const bool polished_token = evidence_has_any_token(
+        source.all, {"polished", "gloss", "glossy", "mirror"});
+    const bool satin_token = evidence_has_any_token(source.all, {"satin", "semigloss", "semi_gloss"});
+    const bool matte_token = evidence_has_any_token(source.all, {"matte", "matt"});
+    const bool rough_token = evidence_has_any_token(source.all, {"rough", "weathered", "rust", "grime"});
+    if (polished_token) profile.finish = "polished";
+    else if (satin_token) profile.finish = "satin";
+    else if (matte_token) profile.finish = "matte";
+    else if (rough_token) profile.finish = "rough";
+    else if (category == "glass" || category == "gem" || category == "eye") profile.finish = "polished";
+    else if (category == "metal" || category == "skin" || category == "hair" || category == "tooth"
+        || category == "organic") profile.finish = "satin";
+    else if (category == "leather" || category == "wood" || category == "bone") profile.finish = "matte";
+    else if (category == "cloth" || category == "stone" || category == "foliage") profile.finish = "rough";
+
+    if (category == "cloth") profile.structure = "woven";
+    else if (category == "hair" || category == "foliage") profile.structure = "fibrous";
+    else if (category == "wood" || category == "leather") profile.structure = "grained";
+    else if (category == "skin" || category == "stone" || category == "bone") profile.structure = "porous";
+    else if (category == "gem") profile.structure = "crystalline";
+    else if (category == "organic") profile.structure = "shell";
+    else if (category != "generic") profile.structure = "smooth";
+
+    if (evidence_has_any_token(source.all, {"clearcoat", "clear_coat"})) profile.coating = "clearcoat";
+    else if (evidence_has_any_token(source.all, {"lacquer", "lacquered"})) profile.coating = "lacquered";
+    else if (evidence_has_any_token(source.all, {"paint", "painted", "coating"})) profile.coating = "painted";
+
+    if (category == "metal") {
+        profile.fallback_roughness = 0.30f;
+        profile.fallback_metalness = 0.68f;
+        profile.fallback_specular = 0.68f;
+    } else if (category == "leather") {
+        profile.fallback_roughness = 0.66f;
+        profile.fallback_specular = 0.22f;
+    } else if (category == "wood") {
+        profile.fallback_roughness = 0.72f;
+        profile.fallback_specular = 0.18f;
+    } else if (category == "cloth") {
+        profile.fallback_roughness = 0.84f;
+        profile.fallback_specular = 0.055f;
+    } else if (category == "skin") {
+        profile.fallback_roughness = 0.56f;
+        profile.fallback_specular = 0.20f;
+    } else if (category == "hair") {
+        profile.fallback_roughness = 0.58f;
+        profile.fallback_specular = 0.22f;
+        profile.fallback_anisotropy = 0.65f;
+    } else if (category == "glass") {
+        profile.fallback_roughness = 0.30f;
+        profile.fallback_specular = 0.42f;
+    } else if (category == "gem") {
+        profile.fallback_roughness = 0.26f;
+        profile.fallback_specular = 0.48f;
+    } else if (category == "stone") {
+        profile.fallback_roughness = 0.82f;
+        profile.fallback_specular = 0.10f;
+    } else if (category == "eye") {
+        profile.fallback_roughness = 0.30f;
+        profile.fallback_specular = 0.44f;
+    } else if (category == "tooth") {
+        profile.fallback_roughness = 0.58f;
+        profile.fallback_specular = 0.18f;
+    } else if (category == "bone") {
+        profile.fallback_roughness = 0.68f;
+        profile.fallback_specular = 0.16f;
+    } else if (category == "organic") {
+        profile.fallback_roughness = 0.62f;
+        profile.fallback_specular = 0.18f;
+    } else if (category == "foliage") {
+        profile.fallback_roughness = 0.82f;
+        profile.fallback_specular = 0.08f;
+        profile.fallback_anisotropy = 0.35f;
+    }
+
+    if (profile.finish == "polished") profile.fallback_roughness = std::min(profile.fallback_roughness, 0.24f);
+    else if (profile.finish == "satin") profile.fallback_roughness = std::clamp(profile.fallback_roughness, 0.34f, 0.62f);
+    else if (profile.finish == "matte") profile.fallback_roughness = std::max(profile.fallback_roughness, 0.62f);
+    else if (profile.finish == "rough") profile.fallback_roughness = std::max(profile.fallback_roughness, 0.78f);
+    if (profile.coating == "clearcoat") {
+        profile.fallback_roughness = std::min(profile.fallback_roughness, 0.18f);
+        profile.fallback_specular = std::max(profile.fallback_specular, 0.45f);
+    } else if (profile.coating == "lacquered") {
+        profile.fallback_roughness = std::min(profile.fallback_roughness, 0.22f);
+        profile.fallback_specular = std::max(profile.fallback_specular, 0.42f);
+    }
+    const bool explicit_profile_token = polished_token || satin_token || matte_token || rough_token
+        || profile.coating != "none";
+    if (explicit_profile_token) profile.confidence = std::min(1.0f, profile.confidence + 0.05f);
+    profile.evidence = category_reason
+        + (explicit_profile_token ? ";surface_profile=source_parameter_or_shader_token"
+            : ";surface_profile=family_fallback");
+    return profile;
+}
+
+static NativeMaterialHints resolve_surface_profile_fallbacks(
+    NativeMaterialHints hints,
+    SurfaceProfile& profile
+) {
+    if (!hints.roughness_authored) {
+        hints.roughness = profile.fallback_roughness;
+        profile.roughness_fallback_applied = true;
+    }
+    if (!hints.metalness_authored) {
+        hints.metalness = profile.fallback_metalness;
+        profile.metalness_fallback_applied = true;
+    }
+    if (!hints.specular_authored) {
+        hints.specular = profile.fallback_specular;
+        profile.specular_fallback_applied = true;
+    }
+    profile.anisotropy_fallback_applied = !profile.anisotropy_authored
+        && profile.fallback_anisotropy > 0.0f;
+    return hints;
 }

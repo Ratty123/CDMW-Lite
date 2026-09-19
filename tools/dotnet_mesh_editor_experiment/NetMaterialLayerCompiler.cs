@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
@@ -7,7 +6,7 @@ namespace Cdmw.MeshEditorExperiment;
 
 internal sealed record NetMaterialLayerSource(
     NetMaterialLayerBinding Binding,
-    Bitmap Diffuse,
+    Bitmap? Diffuse,
     Bitmap? Mask);
 
 internal sealed record NetMaterialLayerSurfaceSource(
@@ -15,117 +14,9 @@ internal sealed record NetMaterialLayerSurfaceSource(
     Bitmap Material,
     Bitmap? Mask);
 
-internal static class NetMaterialLayerCompiler
+internal static partial class NetMaterialLayerCompiler
 {
     private const int MaximumDimension = 2048;
-
-    public static Bitmap? Compile(Bitmap? baseBitmap, IReadOnlyList<NetMaterialLayerSource> layers)
-    {
-        var firstLayer = layers.FirstOrDefault(layer => layer.Diffuse.Width > 0 && layer.Diffuse.Height > 0);
-        var source = baseBitmap ?? firstLayer?.Diffuse;
-        if (source is null || source.Width <= 0 || source.Height <= 0)
-        {
-            return null;
-        }
-
-        var (width, height) = CompositeSize(source, layers
-            .Where(layer => ReferenceEquals(layer, firstLayer) && baseBitmap is null || IsActiveLayer(layer.Binding))
-            .SelectMany(layer => new[] { layer.Diffuse, layer.Mask }));
-        var target = ScaleToBgra(source, width, height);
-        var targetPixels = ReadBgra(target);
-        var layerSeed = baseBitmap is null ? firstLayer : null;
-        if (layerSeed is not null)
-        {
-            ApplyTint(targetPixels, layerSeed.Binding);
-        }
-        foreach (var layer in layers)
-        {
-            if (string.Equals(layer.Binding.LayerRole, "base", StringComparison.OrdinalIgnoreCase)
-                || ReferenceEquals(layer, layerSeed)
-                || layer.Binding.Weight <= 0.001f)
-            {
-                continue;
-            }
-            using var diffuse = ScaleToBgra(layer.Diffuse, width, height);
-            using var mask = layer.Mask is null ? null : ScaleToBgra(layer.Mask, width, height);
-            var diffusePixels = ReadBgra(diffuse);
-            var maskPixels = mask is null ? null : ReadBgra(mask);
-            var maskOffset = LayerChannelOffset(layer.Binding.MaskChannel);
-            var weight = Math.Clamp(layer.Binding.Weight, 0.0f, 1.0f);
-            var tintB = Math.Clamp(layer.Binding.TintB, 0.0f, 2.0f);
-            var tintG = Math.Clamp(layer.Binding.TintG, 0.0f, 2.0f);
-            var tintR = Math.Clamp(layer.Binding.TintR, 0.0f, 2.0f);
-            for (var offset = 0; offset < targetPixels.Length; offset += 4)
-            {
-                var alpha = weight * (maskPixels is null ? 1.0f : maskPixels[offset + maskOffset] / 255.0f);
-                if (alpha <= 0.0001f)
-                {
-                    continue;
-                }
-                targetPixels[offset] = Blend(targetPixels[offset], diffusePixels[offset] * tintB, alpha);
-                targetPixels[offset + 1] = Blend(targetPixels[offset + 1], diffusePixels[offset + 1] * tintG, alpha);
-                targetPixels[offset + 2] = Blend(targetPixels[offset + 2], diffusePixels[offset + 2] * tintR, alpha);
-            }
-        }
-        WriteBgra(target, targetPixels);
-        return target;
-    }
-
-    // The surface companion of Compile. Crimson gives every colour layer its own
-    // packed surface map, and the mask that chooses which layer's colour owns a
-    // texel chooses that layer's roughness and metal too. Compositing through the
-    // same mask keeps the two in step; averaging the layers instead would pin the
-    // whole surface near one constant and describe no material that is present.
-    //
-    // No tint is applied: a tint recolours albedo, and multiplying it into a
-    // roughness or metal channel would invent surface properties the source
-    // never authored.
-    public static Bitmap? CompileSurface(
-        Bitmap? baseMaterial,
-        IReadOnlyList<NetMaterialLayerSurfaceSource> layers)
-    {
-        var firstLayer = layers.FirstOrDefault(layer => layer.Material.Width > 0 && layer.Material.Height > 0);
-        var source = baseMaterial ?? firstLayer?.Material;
-        if (source is null || source.Width <= 0 || source.Height <= 0)
-        {
-            return null;
-        }
-
-        var (width, height) = CompositeSize(source, layers
-            .Where(layer => ReferenceEquals(layer, firstLayer) && baseMaterial is null || IsActiveLayer(layer.Binding))
-            .SelectMany(layer => new[] { layer.Material, layer.Mask }));
-        var target = ScaleToBgra(source, width, height);
-        var targetPixels = ReadBgra(target);
-        var layerSeed = baseMaterial is null ? firstLayer : null;
-        foreach (var layer in layers)
-        {
-            if (string.Equals(layer.Binding.LayerRole, "base", StringComparison.OrdinalIgnoreCase)
-                || ReferenceEquals(layer, layerSeed)
-                || layer.Binding.Weight <= 0.001f)
-            {
-                continue;
-            }
-            using var material = ScaleToBgra(layer.Material, width, height);
-            using var mask = layer.Mask is null ? null : ScaleToBgra(layer.Mask, width, height);
-            var materialPixels = ReadBgra(material);
-            var maskPixels = mask is null ? null : ReadBgra(mask);
-            var maskOffset = LayerChannelOffset(layer.Binding.MaskChannel);
-            var weight = Math.Clamp(layer.Binding.Weight, 0.0f, 1.0f);
-            for (var offset = 0; offset < targetPixels.Length; offset += 4)
-            {
-                var alpha = weight * (maskPixels is null ? 1.0f : maskPixels[offset + maskOffset] / 255.0f);
-                if (alpha <= 0.0001f)
-                {
-                    continue;
-                }
-                targetPixels[offset] = Blend(targetPixels[offset], materialPixels[offset], alpha);
-                targetPixels[offset + 1] = Blend(targetPixels[offset + 1], materialPixels[offset + 1], alpha);
-                targetPixels[offset + 2] = Blend(targetPixels[offset + 2], materialPixels[offset + 2], alpha);
-            }
-        }
-        WriteBgra(target, targetPixels);
-        return target;
-    }
 
     private static bool IsActiveLayer(NetMaterialLayerBinding binding) =>
         !string.Equals(binding.LayerRole, "base", StringComparison.OrdinalIgnoreCase)
@@ -152,24 +43,6 @@ internal static class NetMaterialLayerCompiler
         return (Math.Max(1, (int)Math.Round(largest.Width * scale)),
             Math.Max(1, (int)Math.Round(largest.Height * scale)));
     }
-
-    private static void ApplyTint(byte[] pixels, NetMaterialLayerBinding binding)
-    {
-        var tintB = Math.Clamp(binding.TintB, 0.0f, 2.0f);
-        var tintG = Math.Clamp(binding.TintG, 0.0f, 2.0f);
-        var tintR = Math.Clamp(binding.TintR, 0.0f, 2.0f);
-        for (var offset = 0; offset < pixels.Length; offset += 4)
-        {
-            pixels[offset] = Scale(pixels[offset], tintB);
-            pixels[offset + 1] = Scale(pixels[offset + 1], tintG);
-            pixels[offset + 2] = Scale(pixels[offset + 2], tintR);
-        }
-    }
-
-    private static byte Scale(byte value, float factor) => (byte)Math.Clamp(
-        (int)Math.Round(value * factor),
-        0,
-        255);
 
     public static bool PreservesSourceOrientation()
     {
@@ -258,17 +131,39 @@ internal static class NetMaterialLayerCompiler
             return source.Clone(new Rectangle(0, 0, width, height), PixelFormat.Format32bppArgb);
         }
         var result = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using var graphics = Graphics.FromImage(result);
-        graphics.CompositingMode = CompositingMode.SourceCopy;
-        graphics.CompositingQuality = CompositingQuality.HighQuality;
-        graphics.InterpolationMode = InterpolationMode.HighQualityBilinear;
-        graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        // Clamp samples to the edge instead of blending the border with the
-        // transparent area outside the bitmap during resampling.
-        using var attributes = new ImageAttributes();
-        attributes.SetWrapMode(WrapMode.TileFlipXY);
-        graphics.DrawImage(source, new Rectangle(0, 0, width, height),
-            0, 0, source.Width, source.Height, GraphicsUnit.Pixel, attributes);
+        var input = ReadBgra(source);
+        var output = new byte[checked(width * height * 4)];
+        var horizontal = new (int Left, int Right, float Weight)[width];
+        var scaleX = source.Width / (float)width;
+        var scaleY = source.Height / (float)height;
+        for (var x = 0; x < width; x++)
+        {
+            var position = Math.Clamp((x + 0.5f) * scaleX - 0.5f, 0, source.Width - 1);
+            var left = (int)position;
+            horizontal[x] = (left * 4, Math.Min(left + 1, source.Width - 1) * 4, position - left);
+        }
+        // DDS channels are independent data. GDI's premultiplied-alpha scaling
+        // changes RGB when alpha stores cutout coverage or packed specularity.
+        for (var y = 0; y < height; y++)
+        {
+            var position = Math.Clamp((y + 0.5f) * scaleY - 0.5f, 0, source.Height - 1);
+            var top = (int)position;
+            var weightY = position - top;
+            var row0 = top * source.Width * 4;
+            var row1 = Math.Min(top + 1, source.Height - 1) * source.Width * 4;
+            for (var x = 0; x < width; x++)
+            {
+                var (left, right, weightX) = horizontal[x];
+                for (var channel = 0; channel < 4; channel++)
+                {
+                    var upper = input[row0 + left + channel] * (1 - weightX) + input[row0 + right + channel] * weightX;
+                    var lower = input[row1 + left + channel] * (1 - weightX) + input[row1 + right + channel] * weightX;
+                    output[(y * width + x) * 4 + channel] = (byte)MathF.Round(upper * (1 - weightY) + lower * weightY,
+                        MidpointRounding.AwayFromZero);
+                }
+            }
+        }
+        WriteBgra(result, output);
         return result;
     }
 

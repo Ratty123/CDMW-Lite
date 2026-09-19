@@ -4,6 +4,39 @@ Findings from auditing the model preview against the shipped archive. Recorded s
 that settled questions are not reopened and refuted explanations are not chased
 again.
 
+## Material fidelity update, 2026-09-19
+
+The native material graph now transports exact parameter declarations, component
+scope, wrapper ownership, palette colours and scalar presence. The managed
+renderer composes simultaneous RGB dye channels, masked detail/grime/damage,
+normal and height layers, and shader-specific roughness/metalness/specular maps.
+Dye alpha is strength, including zero; resampling keeps DDS channels independent
+instead of premultiplying RGB by alpha. Technical maps explicitly use linear
+sampling even when their DDS header says sRGB. Hair dye is read from the base
+material's exact owner.
+
+Comparisons used ten game assets: four swords, two shields, two upper-body armour
+meshes, one axe and one hair mesh. Native declarations and DDS payloads were
+checked against CDMW Full, with lit and raw-albedo captures from Lite. The audit
+artifacts are in the ignored `artifacts/material-fidelity-20260919` directory.
+The final run covered 50 parts and 60 Lite captures. All 3,160 declared material
+parameters were conserved, no declared textures were unresolved, and all 694
+shared DDS comparisons matched byte-for-byte. The six recorded source archive
+ranges and their archive sizes/timestamps remained unchanged.
+This is sample coverage; the historical corpus counts below are not coverage of
+this new compositor. The two renderers also use different lighting pipelines.
+
+Full's output is a comparison reference, not authority over the selected asset's
+own declarations. Its fuzzy sidecar matching can apply a sibling sword variant's
+gold layers, or a fur companion's hair dye to a vest. Lite requires an unloaded
+PAC sidecar to declare the exact mesh/material identity before it contributes.
+Explicit shared materials remain supported, including shared weapon accessories
+and hair. Regression coverage checks both the accepted and rejected cases.
+
+The audit's `unlit` option now selects the base-colour debug pass, which bypasses
+tone mapping. Older captures used disabled lighting but still applied grading;
+their brightness measurements are not directly comparable to this raw pass.
+
 ## How a preview is checked against its source
 
 Two references exist, and they answer different questions.
@@ -115,7 +148,12 @@ comfortable a conclusion. Some of that tail was a defect: 4% of assets rendered
 below half the brightness their own albedo carries, and correcting the metal
 compensation below halved it.
 
-## Open — diagnosed, not fixed
+## Earlier overlay diagnosis
+
+The observations below predate the material graph update. The worked garment
+now retains its authored layered pattern and detail in the rendered comparison.
+The earlier population has not been rerun, so the old counts describe the earlier
+implementation and do not establish remaining failures in the new one.
 
 **A colourless overlay can take a part's albedo from a coloured layer.** An `_o`
 overlay is a wear or paint wash laid over a colour, and the ones shipped here are

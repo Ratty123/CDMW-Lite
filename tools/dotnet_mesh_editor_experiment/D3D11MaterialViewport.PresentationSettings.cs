@@ -215,6 +215,12 @@ internal sealed partial class D3D11MaterialViewport
                 materialSpecularHint),
         };
         ApplyMaterialSurfaceConstants(ref constants, parameters, materialSubmeshIndex);
+        constants.MaterialLayerPolicy = new Vector4(materials.CompiledSurface ? 1.0f : 0.0f, 0, 0, 0);
+        if (materials.CompiledSurface)
+        {
+            constants.MaterialChannelSelectors.X = 1;
+            constants.MaterialChannelSelectors.Y = 2;
+        }
         ApplyPresentationConstants(ref constants, settings, batch, materials, materialSubmeshIndex);
         return constants;
     }

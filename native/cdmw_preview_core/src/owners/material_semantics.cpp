@@ -93,11 +93,23 @@ static bool placeholder_layer_mask_path(const std::string& raw_path) {
     return false;
 }
 
+// These keys are evaluated for every texture candidate and mesh. Filtering the
+// already-lowercased bytes is equivalent to [^a-z0-9]+ without compiling and
+// running a regex for each comparison.
+static std::string compact_material_ascii_key(const std::string& lower_text) {
+    std::string result;
+    result.reserve(lower_text.size());
+    for (char ch : lower_text) {
+        if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) result.push_back(ch);
+    }
+    return result;
+}
+
 static bool technical_for_visible_base(const std::string& parameter_name, const std::string& raw_path, const std::string& role) {
     const std::string hint = lower_copy(parameter_name);
     const std::string path = lower_copy(raw_path);
-    const std::string compact_hint = std::regex_replace(hint, std::regex("[^a-z0-9]+"), "");
-    const std::string compact_path = std::regex_replace(path, std::regex("[^a-z0-9]+"), "");
+    const std::string compact_hint = compact_material_ascii_key(hint);
+    const std::string compact_path = compact_material_ascii_key(path);
     if (role_is_technical_for_base(role)) return true;
     if (compact_hint.find("ssdm") != std::string::npos || compact_hint.find("direction") != std::string::npos) return true;
     if (compact_hint.find("normal") != std::string::npos || compact_hint.find("height") != std::string::npos) return true;
@@ -150,7 +162,7 @@ static bool technical_for_visible_base(const std::string& parameter_name, const 
 }
 
 static bool parameter_is_authoritative_visible_base(const std::string& parameter_name) {
-    const std::string hint = std::regex_replace(lower_copy(parameter_name), std::regex("[^a-z0-9]+"), "");
+    const std::string hint = compact_material_ascii_key(lower_copy(parameter_name));
     if (
         hint.find("grime") != std::string::npos
         || hint.find("detail") != std::string::npos
@@ -171,7 +183,7 @@ static bool parameter_is_authoritative_visible_base(const std::string& parameter
 
 static std::string visible_class_for_binding(const std::string& parameter_name, const std::string& raw_path, const std::string& role) {
     if (technical_for_visible_base(parameter_name, raw_path, role)) return "technical";
-    const std::string hint = std::regex_replace(lower_copy(parameter_name), std::regex("[^a-z0-9]+"), "");
+    const std::string hint = compact_material_ascii_key(lower_copy(parameter_name));
     if (hint.find("overlaycolor") != std::string::npos || low_authority_base_path(raw_path)) {
         return "visible_generic";
     }
@@ -203,8 +215,8 @@ static int visible_class_priority(const std::string& visible_class) {
 
 static std::string package_label_for_ref(const ArchiveEntryRef& ref) {
     if (ref.pamt_path.empty()) return "";
-    std::string parent = ref.pamt_path.parent_path().filename().string();
-    std::string name = ref.pamt_path.filename().string();
+    std::string parent = path_utf8(ref.pamt_path.parent_path().filename());
+    std::string name = path_utf8(ref.pamt_path.filename());
     return parent.empty() ? name : (parent + "/" + name);
 }
 
@@ -257,6 +269,15 @@ struct SidecarTextureRef {
     std::string parameter_name;
     std::string material_name;
     std::string shader_family;
+    std::string owner_wrapper_item_id;
+    int material_wrapper_index = -1;
+    std::vector<MaterialParameterRecord> material_parameters;
+};
+
+struct MaterialWrapperDeclaration {
+    std::string material_name;
+    std::string shader_family;
+    std::string owner_wrapper_item_id;
     int material_wrapper_index = -1;
     std::vector<MaterialParameterRecord> material_parameters;
 };
@@ -322,9 +343,82 @@ static std::array<float, 4> color_parameter_value(const std::string& raw_value) 
     return color;
 }
 
+static std::string integer_parameter_value(const std::string& raw_value, bool* ok = nullptr) {
+    if (ok) *ok = false;
+    if (raw_value.empty()) return "";
+    try {
+        size_t consumed = 0;
+        if (raw_value.front() == '-') {
+            const long long value = std::stoll(raw_value, &consumed, 0);
+            if (consumed != raw_value.size()) return "";
+            if (ok) *ok = true;
+            return std::to_string(value);
+        }
+        const unsigned long long value = std::stoull(raw_value, &consumed, 0);
+        if (consumed != raw_value.size()) return "";
+        if (ok) *ok = true;
+        return std::to_string(value);
+    } catch (...) {
+        return "";
+    }
+}
+
+static bool color_parameter_value_has_visible_alpha(const std::string& raw_value) {
+    std::string text = raw_value;
+    if (!text.empty() && text.front() == '#') text.erase(text.begin());
+    if (text.size() != 6 && text.size() != 8) return false;
+    if (!std::all_of(text.begin(), text.end(), [](unsigned char ch) {
+        return std::isxdigit(ch) != 0;
+    })) return false;
+    if (text.size() == 6) return true;
+    try {
+        return std::stoi(text.substr(6, 2), nullptr, 16) > 0;
+    } catch (...) {
+        return false;
+    }
+}
+
+static bool preview_relevant_material_parameter(const MaterialParameterRecord& parameter) {
+    const std::string key = normalized_key(parameter.name);
+    if (key.empty()) return false;
+    if (parameter.kind == "color") {
+        return key.find("color") != std::string::npos
+            || key.find("tint") != std::string::npos
+            || key.find("dyeing") != std::string::npos;
+    }
+    if (key.find("dyeing") != std::string::npos
+        || key.find("grime") != std::string::npos
+        || key.find("opacity") != std::string::npos
+        || key.find("alpha") != std::string::npos) return true;
+    if (parameter.kind == "bitflag32" || parameter.kind == "uint"
+        || parameter.kind == "int" || parameter.kind == "bool") {
+        return key.find("color") != std::string::npos;
+    }
+    return key.find("roughness") != std::string::npos
+        || key.find("metallic") != std::string::npos
+        || key.find("metalness") != std::string::npos
+        || key.find("specular") != std::string::npos
+        || key.find("brightness") != std::string::npos
+        || key.find("height") != std::string::npos
+        || key.find("displacement") != std::string::npos
+        || key.find("emissive") != std::string::npos
+        || key.find("cloth") != std::string::npos
+        || key.find("sheen") != std::string::npos;
+}
+
+static std::vector<MaterialParameterRecord> filtered_preview_material_parameters(
+    const std::vector<MaterialParameterRecord>& parameters
+) {
+    // Graph v4 is conservation-first: diagnostics and future renderer versions
+    // need every declared parameter, including values that do not affect the
+    // current shader. Never silently filter or cap the source vector here.
+    return parameters;
+}
+
 static std::vector<MaterialParameterRecord> extract_material_parameters(const std::string& scope_text) {
     std::vector<MaterialParameterRecord> records;
     const std::vector<std::pair<std::string, std::string>> parameter_tags = {
+        {"MaterialParameterTexture", "texture"},
         {"MaterialParameterFloat", "float"},
         {"MaterialParameterColor", "color"},
         {"MaterialParameterByte4", "byte4"},
@@ -342,9 +436,36 @@ static std::vector<MaterialParameterRecord> extract_material_parameters(const st
             record.name = xml_attr_value_from_map(attrs, {"_name", "StringItemID", "Name"});
             record.value = xml_attr_value_from_map(attrs, {"_value", "Value", "DefaultValue"});
             if (record.name.empty()) continue;
-            bool has_numeric = false;
-            record.numeric_value = numeric_parameter_value(record.value, &has_numeric);
-            record.has_numeric = has_numeric;
+            if (kind == "texture") {
+                record.texture_path = xml_attr_value_from_map(attrs, {"Value", "_path"});
+                if (record.texture_path.empty()) {
+                    for (const std::string& resource_tag : collect_xml_tag_blocks(
+                             tag, "ResourceReferencePath_ITexture")) {
+                        record.texture_path = xml_attr_value_from_map(
+                            xml_attribute_map(resource_tag), {"_path", "Value"});
+                        if (!record.texture_path.empty()) break;
+                    }
+                }
+            }
+            record.tag_name = tag_name;
+            record.string_item_id = xml_attr_value_from_map(attrs, {"StringItemID"});
+            record.item_id = xml_attr_value_from_map(attrs, {"ItemID"});
+            const std::string index_text = xml_attr_value_from_map(attrs, {"Index", "_index"});
+            if (!index_text.empty()) {
+                try {
+                    size_t consumed = 0;
+                    const long index = std::stol(index_text, &consumed, 10);
+                    if (consumed == index_text.size()) record.index = static_cast<int>(index);
+                } catch (...) {
+                }
+            }
+            const bool integer_kind = kind == "byte4" || kind == "bitflag32"
+                || kind == "uint" || kind == "int" || kind == "bool";
+            if (integer_kind) {
+                record.integer_value = integer_parameter_value(record.value, &record.has_integer);
+            } else {
+                record.numeric_value = numeric_parameter_value(record.value, &record.has_numeric);
+            }
             records.push_back(record);
         }
     }
@@ -378,6 +499,7 @@ static bool material_parameters_enable_flag(
     if (value.empty()) return true;
     if (value == "true" || value == "yes" || value == "on") return true;
     if (value == "false" || value == "no" || value == "off") return false;
+    if (parameter->has_integer) return parameter->integer_value != "0";
     if (parameter->has_numeric) return std::abs(parameter->numeric_value) > 0.0001f;
     return value != "0";
 }
@@ -403,6 +525,15 @@ static float scalar_parameter_hint(
         return std::max({channels[0], channels[1], channels[2], channels[3], fallback});
     }
     return parameter->has_numeric ? parameter->numeric_value : fallback;
+}
+
+static bool material_parameter_has_scalar(
+    const std::vector<MaterialParameterRecord>& parameters,
+    std::initializer_list<const char*> names
+) {
+    const MaterialParameterRecord* parameter = find_material_parameter(parameters, names);
+    return parameter != nullptr && (
+        parameter->has_numeric || parameter->has_integer || parameter->kind == "byte4");
 }
 
 static std::string joined_parameter_names(const std::vector<MaterialParameterRecord>& parameters, size_t limit = 16) {

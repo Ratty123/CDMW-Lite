@@ -1,6 +1,6 @@
 constexpr int kNativePackageSchemaVersion = 8;
-constexpr int kNativeMaterialGraphVersion = 3;
-constexpr int kNativeMaterialSemanticsVersion = 6;
+constexpr int kNativeMaterialGraphVersion = 4;
+constexpr int kNativeMaterialSemanticsVersion = 10;
 constexpr int kNativeDdsExtractionVersion = 2;
 
 std::string json_escape(const std::string& value) {
@@ -635,6 +635,8 @@ struct NativeSubmesh {
     int source_local_submesh_index = -1;
     int source_component_index = 0;
     bool source_prefab_component = false;
+    bool source_context_component = false;
+    int model_property_index = 0;
     std::string vertex_layout_name;
     int vertex_stride = 40;
     int uv_offset = 8;
@@ -702,18 +704,72 @@ struct NativeClothRuntimeBatch {
     int constraint_count = 0;
 };
 
+struct MaterialParameterRecord {
+    std::string kind;
+    std::string name;
+    std::string value;
+    float numeric_value = 0.0f;
+    bool has_numeric = false;
+    // Integer PAC fields are source identifiers/bit patterns, not floats. Keep
+    // their canonical decimal representation so Byte4/BitFlag32/UInt values
+    // survive JSON transport without f32 rounding (notably 0xFFFFFFFF).
+    std::string integer_value;
+    bool has_integer = false;
+    std::string tag_name;
+    std::string string_item_id;
+    std::string item_id;
+    int index = -1;
+    std::string texture_path;
+};
+
+struct NativeMaterialConservationRow {
+    std::string sidecar_path;
+    std::vector<std::string> representation_sidecar_paths;
+    std::string component_scope_id;
+    std::string material_name;
+    std::string shader_family;
+    std::string owner_wrapper_item_id;
+    int material_wrapper_index = -1;
+    int owner_slot_index = -1;
+    MaterialParameterRecord parameter;
+    std::string role;
+    std::string layer_role;
+    std::string layer_channel;
+    std::string resolved_source_path;
+    std::string resolved_archive_path;
+    std::string source_resolution;
+    std::string source_resolution_detail;
+    std::string semantic_type;
+    std::string semantic_subtype;
+    std::string packed_channels;
+    std::string srgb_mode;
+    std::string sidecar_kind;
+    bool declared_source_missing = false;
+    bool logical_graph_edge = false;
+    bool texture_resolved = false;
+    std::string status = "transported";
+    std::string finding;
+};
+
 struct TextureBinding {
     std::string role;
     std::string source_path;
     std::string archive_path;
     std::string texture_name;
     std::string parameter_name;
+    std::string declared_texture_path;
+    std::string source_resolution = "declared_exact";
+    std::string source_resolution_detail;
+    bool declared_source_missing = false;
     std::string semantic_type;
     std::string semantic_subtype;
     std::string shader_family;
     std::string shader_rule;
     std::string material_name;
+    std::string owner_wrapper_item_id;
     std::string sidecar_path;
+    std::vector<std::string> representation_sidecar_paths;
+    std::string component_scope_id;
     std::string sidecar_kind;
     std::string linked_mesh_path;
     std::string packed_channels;
@@ -729,6 +785,7 @@ struct TextureBinding {
     std::string evidence_grade = "corpus_inferred";
     std::string blend_flags;
     std::string material_parameter_names;
+    std::vector<MaterialParameterRecord> material_parameters;
     std::string pbd_simulation_material_name;
     std::string pbd_simulation_kind;
     std::string pbd_material_name;
@@ -737,31 +794,35 @@ struct TextureBinding {
     int material_wrapper_count = 0;
     bool material_wrapper_order_authoritative = false;
     bool alpha_test_enabled = false;
-    float layer_weight = 0.0f;
+    float layer_weight = 0.0f, detail_scale = 0.0f;
     float roughness_hint = 0.0f;
     float metalness_hint = 0.0f;
     float specular_hint = 0.0f;
     float height_scale_hint = 0.0f;
+    bool roughness_hint_present = false;
+    bool metalness_hint_present = false;
+    bool specular_hint_present = false;
+    bool height_scale_hint_present = false;
     float emissive_intensity_hint = 0.0f;
     // Neutral unless the material authors an emissive colour. An `_emi` map
     // already carries the colour it emits, so a non-neutral default would tint
     // every glow in the game the same shade.
     std::array<float, 3> emissive_color{1.0f, 1.0f, 1.0f};
     std::array<float, 4> tint_color{1.0f, 1.0f, 1.0f, 1.0f};
+    std::array<std::array<float, 4>, 3> color_blending_tints{{
+        {1.0f, 1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f, 1.0f},
+    }};
     int dds_width = 0;
     int dds_height = 0;
     std::string dds_format = "";
 };
 
-struct MaterialParameterRecord {
-    std::string kind;
-    std::string name;
-    std::string value;
-    float numeric_value = 0.0f;
-    bool has_numeric = false;
-};
-
 struct MaterialLayer {
+    std::string component_scope_id;
+    std::string owner_wrapper_item_id;
+    int material_wrapper_index = -1;
     std::string layer_role;
     std::string layer_channel = "r";
     std::string shader_family;
@@ -783,7 +844,7 @@ struct MaterialLayer {
     std::string roughness_hint_source;
     std::string metallic_hint_source;
     std::string specular_hint_source;
-    float weight = 0.0f;
+    float weight = 0.0f, detail_scale = 0.0f;
     float roughness_hint = 0.0f;
     float metalness_hint = 0.0f;
     float specular_hint = 0.0f;
@@ -847,6 +908,9 @@ struct NativePackage {
     std::vector<std::string> rejected_texture_examples;
     std::vector<NativeAssetFamilyRow> asset_family_rows;
     int asset_family_reference_count = 0;
+    bool material_conservation_ok = true;
+    std::vector<NativeMaterialConservationRow> material_conservation_rows;
+    std::vector<std::string> material_conservation_findings;
     NativePackageSkeleton skeleton;
 };
 

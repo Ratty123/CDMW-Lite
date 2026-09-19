@@ -28,9 +28,9 @@ internal static class MaterialLayerQualityProof
         using var surface = NetMaterialLayerCompiler.CompileSurface(seedSurface,
             [new NetMaterialLayerSurfaceSource(binding with { TintB = 0 }, layerSurface, mask)]);
         var surfaceDetail = surface is { Width: 1024, Height: 512 }
-            && surface.GetPixel(0, 0).B == 255 && surface.GetPixel(0, 0).G == 0
+            && surface.GetPixel(0, 0).B == 235 && surface.GetPixel(0, 0).G == 10
             && surface.GetPixel(1, 0).G == 255 && surface.GetPixel(1, 0).B == 0
-            && surface.GetPixel(1022, 511).B == 255 && surface.GetPixel(1023, 511).G == 255;
+            && surface.GetPixel(1022, 511).B == 235 && surface.GetPixel(1023, 511).G == 255;
 
         using var fineOverlay = Stripes(2048, 32, Color.Blue, Color.Green);
         using var overlayComposite = NetMaterialLayerCompiler.Compile(baseColor,
@@ -55,6 +55,33 @@ internal static class MaterialLayerQualityProof
         using var smallSurface = NetMaterialLayerCompiler.CompileSurface(seedSurface,
             [new NetMaterialLayerSurfaceSource(binding with { Weight = 0 }, large, mask)]);
 
+        using var neutral = Solid(4, 4, Color.FromArgb(173, 128, 128, 128));
+        using var selector = Stripes(4, 4, Color.FromArgb(255, 255, 255, 0), Color.Black);
+        var red = binding with { LayerRole = "color_seed", TintR = 1, TintG = 0, TintB = 0, DiffuseResourceId = "" };
+        var blue = red with { MaskChannel = "g", TintR = 0, TintB = 1 };
+        using var palette = NetMaterialLayerCompiler.Compile(neutral,
+            [new(red, null, selector), new(blue, null, selector)]);
+        using var reversedPalette = NetMaterialLayerCompiler.Compile(neutral,
+            [new(blue, null, selector), new(red, null, selector)]);
+        using var disabledPalette = NetMaterialLayerCompiler.Compile(neutral,
+            [new(red with { TintA = 0 }, null, selector)]);
+        using var untintedDetail = NetMaterialLayerCompiler.Compile(neutral,
+            [new(binding with { TintR = 0.1f, TintG = 0.2f, TintB = 0.3f, TintA = 0 }, overlay, selector)]);
+        using var grimedPalette = NetMaterialLayerCompiler.Compile(neutral,
+            [new(red, null, selector), new(binding with { LayerRole = "grime" }, overlay, selector)]);
+        using var flatNormal = Solid(4, 4, Color.FromArgb(128, 128, 255));
+        using var slopedNormal = Solid(4, 4, Color.FromArgb(204, 128, 230));
+        using var composedNormal = NetMaterialLayerCompiler.CompileSupport(flatNormal,
+            [new(binding, slopedNormal, selector)], normal: true);
+        using var composedHeight = NetMaterialLayerCompiler.CompileSupport(neutral,
+            [new(binding, overlay, selector)], normal: false);
+        using var skinSurface = NetMaterialLayerCompiler.CompileSurface(null,
+            [new(binding with { ShaderRule = "skin" }, layerSurface, null)]);
+        using var alphaData = Solid(2, 1, Color.Blue);
+        alphaData.SetPixel(0, 0, Color.FromArgb(0, 255, 0, 0));
+        using var largerMask = Solid(3, 1, Color.Black);
+        using var independentlyScaled = NetMaterialLayerCompiler.Compile(alphaData, [new(binding, alphaData, largerMask)]);
+
         return new Dictionary<string, bool>
         {
             ["fine_selector_survives_small_base_swatch"] = maskDetail,
@@ -67,6 +94,25 @@ internal static class MaterialLayerQualityProof
                 && smallSurface is { Width: 4, Height: 4 },
             ["source_orientation_is_preserved"] = NetMaterialLayerCompiler.PreservesSourceOrientation(),
             ["surface_layers_follow_mask"] = NetMaterialLayerCompiler.CompositesSurfaceThroughMask(),
+            ["overlapping_palette_channels_blend_together"] = palette is not null
+                && palette.GetPixel(0, 0) == Color.FromArgb(173, 128, 0, 128)
+                && palette.GetPixel(1, 0) == neutral.GetPixel(1, 0),
+            ["palette_order_does_not_change_color"] = palette is not null && reversedPalette is not null
+                && palette.GetPixel(0, 0) == reversedPalette.GetPixel(0, 0),
+            ["zero_palette_and_detail_strength_preserve_albedo"] = disabledPalette?.GetPixel(0, 0) == neutral.GetPixel(0, 0)
+                && untintedDetail?.GetPixel(0, 0) == neutral.GetPixel(0, 0),
+            ["grime_keeps_authored_dye_hue"] = grimedPalette is not null
+                && grimedPalette.GetPixel(0, 0).R > 210 && grimedPalette.GetPixel(0, 0).B == 0,
+            ["normal_and_height_follow_selector"] = composedNormal is not null && composedHeight is not null
+                && composedNormal.GetPixel(0, 0).R > 195 && composedNormal.GetPixel(1, 0).R == 128
+                && composedHeight.GetPixel(0, 0).R == 0 && composedHeight.GetPixel(1, 0).R == 128,
+            ["skin_packed_response_does_not_become_metal"] = skinSurface is not null
+                && skinSurface.GetPixel(0, 0).B == 0 && skinSurface.GetPixel(0, 0).A is >= 75 and <= 77,
+            ["technical_dds_stays_linear_despite_srgb_header"] = !D3D11MaterialViewport.TextureUsesSrgb("linear", true)
+                && D3D11MaterialViewport.TextureUsesSrgb("srgb", false)
+                && D3D11MaterialViewport.TextureUsesSrgb("auto", true),
+            ["resampling_does_not_premultiply_dds_channels"] = independentlyScaled?.GetPixel(1, 0)
+                == Color.FromArgb(128, 128, 0, 128),
         };
     }
 

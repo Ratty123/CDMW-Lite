@@ -313,6 +313,9 @@ internal static class VisualAuditBatch
                 {
                     DisableLighting = _unlit,
                 });
+                // Bypass exposure/tone mapping as well as lights when comparing
+                // authored albedo. DisableLighting alone still grades the image.
+                viewport.MaterialDebugMode = _unlit ? 1 : 0;
                 _form.Controls.Add(viewport);
                 try
                 {

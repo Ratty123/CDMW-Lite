@@ -57,7 +57,7 @@ static void prepare_package_batch_runtime(PackageWriteState& state, PackageBatch
         : (batch.is_eye_surface ? 0.05f
             : (batch.is_tear_shell ? 0.35f : (batch.has_alpha_test ? 0.08f : 0.0f)));
     batch.material_hints = material_hints_for_bindings(batch.bindings);
-    if (batch.base != nullptr) return;
+    if (batch.base != nullptr || batch.primary_visible_layer != nullptr) return;
     for (const TextureBinding* binding : batch.bindings) {
         if (binding == nullptr) continue;
         const auto tint = binding->tint_color;
@@ -102,7 +102,8 @@ static void prepare_package_batch_material(PackageWriteState& state, PackageBatc
         batch.height,
         batch.specular,
         batch.material_hints,
-        state.job.visible_texture_mode);
+        state.job.visible_texture_mode,
+        batch.primary_visible_layer);
     if (!batch.held_layer_albedo && !batch.visible_layer_tint_applied) {
         std::array<float, 4> sidecar_tint{1.0f, 1.0f, 1.0f, 1.0f};
         if (preview_sidecar_tint_for_surface(batch.base, mesh, batch.material_layers, &sidecar_tint)) {
@@ -127,8 +128,23 @@ static void prepare_package_batch_material(PackageWriteState& state, PackageBatc
         batch.material_category, batch.bindings, mesh, batch.base, batch.material_layers, selected_surface);
     batch.material_category_confidence = material_category_confidence(
         batch.material_category, batch.bindings, batch.base);
+    batch.surface_profile = surface_profile_for_bindings(
+        batch.material_category,
+        batch.material_category_reason,
+        batch.material_category_confidence,
+        batch.bindings,
+        mesh,
+        batch.base,
+        batch.material_layers,
+        batch.material_hints);
+    // The finalized profile may raise confidence when an authored finish,
+    // structure, or coating token exists. Publish one confidence value across
+    // the material slot and Rust profile contracts.
+    batch.material_category_confidence = batch.surface_profile.confidence;
     batch.effective_material_hints = clamp_material_hints_for_category(
         batch.material_hints, batch.material_category);
+    batch.effective_material_hints = resolve_surface_profile_fallbacks(
+        batch.effective_material_hints, batch.surface_profile);
     batch.base_tint_only_fallback = batch.base_wrong_family_layer
         && mesh_local_surface_has_strong_nonmetal_token(mesh)
         && batch.material_category != "metal"
@@ -173,17 +189,23 @@ static void prepare_package_batch_material(PackageWriteState& state, PackageBatc
         || batch.material_response.find("metallic") != std::string::npos
         || batch.material_response.find("promoted") != std::string::npos;
     batch.metalness_hint = batch.material_category == "metal"
+        && !batch.effective_material_hints.metalness_authored
         ? std::max(batch.effective_material_hints.metalness, strong_metal_response ? 0.68f : 0.56f)
         : batch.effective_material_hints.metalness;
     batch.specular_hint = batch.material_category == "metal"
+        && !batch.effective_material_hints.specular_authored
         ? std::max(batch.effective_material_hints.specular, strong_metal_response ? 0.68f : 0.56f)
         : batch.effective_material_hints.specular;
     batch.roughness_hint = batch.material_category == "metal"
+        && !batch.effective_material_hints.roughness_authored
         ? std::min(batch.effective_material_hints.roughness, strong_metal_response ? 0.24f : 0.32f)
         : batch.effective_material_hints.roughness;
-    batch.base_tint_strength = batch.base_tint_only_fallback ? 0.0f : native_preview_base_tint_strength(
-        batch.base, batch.color, batch.material_layers, batch.visible_layer_tint_applied,
-        batch.force_nonmetal_equipment_layer_tint);
+    batch.base_tint_strength = batch.base_tint_only_fallback
+        || material_layers_have_color_seed(batch.material_layers)
+        ? 0.0f
+        : native_preview_base_tint_strength(
+            batch.base, batch.color, batch.material_layers, batch.visible_layer_tint_applied,
+            batch.force_nonmetal_equipment_layer_tint);
     batch.preview_emissive = emissive_binding_is_safe_for_preview(
         batch.emissive, mesh, batch.material_category) ? batch.emissive : nullptr;
     if (batch.emissive != nullptr && batch.preview_emissive == nullptr
@@ -193,7 +215,7 @@ static void prepare_package_batch_material(PackageWriteState& state, PackageBatc
             + ": generic emissive/effect texture suppressed for non-emissive material preview");
     }
     for (const MaterialLayer& layer : batch.material_layers) {
-        if (layer.layer_role == "base" || layer.diffuse_source.empty()) continue;
+        if (layer.layer_role == "base" || layer.layer_role == "color_seed" || layer.diffuse_source.empty()) continue;
         batch.primary_layer = &layer;
         break;
     }
@@ -217,6 +239,7 @@ static void record_package_batch_selection(PackageWriteState& state, const Packa
     state.package.selected_texture_examples.push_back(
         "batch " + std::to_string(batch.index) + " " + mesh.material
         + ": base=" + package_texture_label(batch.base)
+        + ", primary_layer=" + package_texture_label(batch.primary_visible_layer)
         + ", normal=" + package_texture_label(batch.normal)
         + ", material=" + package_texture_label(batch.material)
         + ", height=" + package_texture_label(batch.height)
