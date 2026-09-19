@@ -10,7 +10,7 @@ public sealed class ArchiveItemNameIndexService(
     NativeArchiveCore native,
     ArchiveWorkPriority? workPriority = null)
 {
-    private const int CacheSchemaVersion = 6;
+    private const int CacheSchemaVersion = 7;
     private const int NativeCatalogSchemaVersion = 4;
     private const int MaximumDiagnosticCharacters = 64 * 1024;
     private static readonly TimeSpan IndexerTimeout = TimeSpan.FromMinutes(3);
@@ -212,21 +212,21 @@ public sealed class ArchiveItemNameIndexService(
         var packageGroup = Path.GetFileName(Path.GetDirectoryName(entry.SourcePamt))?.ToLowerInvariant() ?? string.Empty;
         if (packageGroup == "0008")
         {
-            if (sources.ItemInfo is null && lowerPath.Contains("iteminfo.pabgb", StringComparison.Ordinal))
+            if (sources.ItemInfo is null && basename is "iteminfo.pabgb" or "iteminfo.staticinfobody")
             {
                 sources.ItemInfo = entry;
             }
-            else if (sources.StringInfo is null && basename == "stringinfo.pabgb")
+            else if (sources.StringInfo is null && basename is "stringinfo.pabgb" or "stringinfo.staticinfobody")
             {
                 sources.StringInfo = entry;
             }
-            else if (sources.EquipTypeInfo is null && basename == "equiptypeinfo.pabgb")
+            else if (sources.EquipTypeInfo is null && basename is "equiptypeinfo.pabgb" or "equiptypeinfo.staticinfobody")
             {
                 sources.EquipTypeInfo = entry;
             }
-            else if (lowerPath.EndsWith(".pabgh", StringComparison.Ordinal))
+            else if (Path.GetExtension(basename) is ".pabgh" or ".staticinfoheader")
             {
-                // Each table blob ships beside a same-named .pabgh row directory holding one entry
+                // Each table blob ships beside a same-named row directory holding one entry
                 // per row. Collected by path here and paired with its blob once the pass is over,
                 // because either half can appear first and several tables share a name suffix.
                 sources.RowDirectories[lowerPath] = entry;
@@ -388,7 +388,7 @@ public sealed class ArchiveItemNameIndexService(
     /// <summary>
     /// Two things can leave a catalog short of what the archive holds, and both have to reach the
     /// caller rather than pass for a complete result. The indexer reads item records out of the
-    /// .pabgh row directory, and without one it falls back to scanning for a byte pattern that only
+    /// .pabgh/.staticinfoheader row directory, and without one it falls back to scanning for a byte pattern that only
     /// a minority of records present. Separately, a string table whose records do not agree with
     /// the count in its footer is rejected whole, because a partial read of it would silently drop
     /// names rather than fail.
@@ -694,14 +694,17 @@ public sealed class ArchiveItemNameIndexService(
         public Dictionary<string, ArchiveEntryDto> Localizations { get; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, ArchiveEntryDto> RowDirectories { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>The .pabgh directory stored beside <paramref name="blob"/>, if the archive has one.</summary>
+        /// <summary>The matching row directory beside <paramref name="blob"/>, if the archive has one.</summary>
         public ArchiveEntryDto? RowDirectoryFor(ArchiveEntryDto? blob)
         {
             if (blob is null)
             {
                 return null;
             }
-            var header = Path.ChangeExtension(blob.Path.Replace('\\', '/'), ".pabgh").ToLowerInvariant();
+            var headerExtension = Path.GetExtension(blob.Path).Equals(".staticinfobody", StringComparison.OrdinalIgnoreCase)
+                ? ".staticinfoheader"
+                : ".pabgh";
+            var header = Path.ChangeExtension(blob.Path.Replace('\\', '/'), headerExtension).ToLowerInvariant();
             return RowDirectories.GetValueOrDefault(header);
         }
     }

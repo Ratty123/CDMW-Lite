@@ -37,10 +37,12 @@ internal static class MaterialResourcePolicyProbe
                 ["diagnostic"] = "symbolic material name is not a concrete required resource",
             };
             var residentParameterRefresh = EvaluateResidentParameterRefresh(root);
+            var layerQuality = MaterialLayerQualityProof.Run();
             var ok = required.GetValueOrDefault("ready_allowed") is false
                 && optional.GetValueOrDefault("ready_allowed") is true
                 && optional.GetValueOrDefault("fallback_policy") as string == "flat_normal"
-                && residentParameterRefresh.GetValueOrDefault("ok") is true;
+                && residentParameterRefresh.GetValueOrDefault("ok") is true
+                && layerQuality.Values.All(value => value);
             var report = new Dictionary<string, object?>
             {
                 ["schema"] = "cdmw_material_resource_policy_runtime_v1",
@@ -49,6 +51,7 @@ internal static class MaterialResourcePolicyProbe
                 ["optional_failure"] = optional,
                 ["symbolic_resource"] = symbolic,
                 ["resident_parameter_refresh"] = residentParameterRefresh,
+                ["material_layer_quality"] = layerQuality,
             };
             File.WriteAllText(
                 reportPath,

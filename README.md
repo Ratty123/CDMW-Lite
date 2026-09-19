@@ -15,6 +15,7 @@ The application is self-contained in this repository and keeps archive queries, 
 - Browse large archives through a folder tree or a flat list, with an optional category navigator, paging, filters, sorting, and persistent indexes.
 - Search text across archives or loose folders with cancellation, result limits, and in-file navigation.
 - Find known items by localized name and follow exact or related archive links.
+- Item Finder supports both `.pabgb`/`.pabgh` and `.staticinfobody`/`.staticinfoheader` table names, including compact prefab lists. Item-name caches from earlier versions rebuild automatically.
 - Preview text, XML, images, DDS textures, supported media including the sounds a Wwise `.bnk` embeds, archive metadata, and read-only PAC/PAM/PAMLOD/PAT geometry.
 - Export a mesh as OBJ, GLB or FBX, byte-identical to what the full CDMW workbench writes. A skinned character carries its skeleton and its per-vertex weights into GLB and FBX, so it arrives posable rather than as a frozen shell.
 - Discover and export associated assets without altering game data.
@@ -113,6 +114,8 @@ flowchart LR
 
 `.pac` geometry, the `.pac_xml` material sidecar, and the `.dds` textures it names go to the preview core, which assigns each binding a role, selects a slot per submesh, and resolves colour layers. The adapter turns that into channels, packed components, and layer bindings; the renderer samples them.
 
+Blended colour and surface maps use the largest active source texture or selector mask, capped at 2048 pixels with its aspect ratio preserved. Small base swatches do not reduce detailed overlays to swatch size. The compositor keeps the base alpha and samples image edges without introducing transparent borders; direct DDS textures retain their source resolution and mip chains.
+
 | suffix | role | notes |
 | --- | --- | --- |
 | `X.dds` | albedo | the part's own colour |
@@ -166,7 +169,7 @@ These are asserted by the focused gate, not measured by hand. `scripts/test_arch
 
 | | |
 | --- | --- |
-| focused scenarios | 53, covering archive, preview, export, worker lifetime and cache eviction |
+| focused scenarios | 55, covering archive, preview, export, worker lifetime and cache eviction |
 | model preview, cold cache | ~100 ms |
 | model preview, warm cache | ~1 ms, and warm across sessions |
 | renderer | headless GPU soak, production D3D11 backend, windows stay hidden |

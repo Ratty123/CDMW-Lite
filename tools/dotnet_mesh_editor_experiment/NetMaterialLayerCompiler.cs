@@ -17,7 +17,7 @@ internal sealed record NetMaterialLayerSurfaceSource(
 
 internal static class NetMaterialLayerCompiler
 {
-    private const int MaximumDimension = 512;
+    private const int MaximumDimension = 2048;
 
     public static Bitmap? Compile(Bitmap? baseBitmap, IReadOnlyList<NetMaterialLayerSource> layers)
     {
@@ -28,9 +28,9 @@ internal static class NetMaterialLayerCompiler
             return null;
         }
 
-        var scale = Math.Min(1.0, MaximumDimension / (double)Math.Max(source.Width, source.Height));
-        var width = Math.Max(1, (int)Math.Round(source.Width * scale));
-        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+        var (width, height) = CompositeSize(source, layers
+            .Where(layer => ReferenceEquals(layer, firstLayer) && baseBitmap is null || IsActiveLayer(layer.Binding))
+            .SelectMany(layer => new[] { layer.Diffuse, layer.Mask }));
         var target = ScaleToBgra(source, width, height);
         var targetPixels = ReadBgra(target);
         var layerSeed = baseBitmap is null ? firstLayer : null;
@@ -91,9 +91,9 @@ internal static class NetMaterialLayerCompiler
             return null;
         }
 
-        var scale = Math.Min(1.0, MaximumDimension / (double)Math.Max(source.Width, source.Height));
-        var width = Math.Max(1, (int)Math.Round(source.Width * scale));
-        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+        var (width, height) = CompositeSize(source, layers
+            .Where(layer => ReferenceEquals(layer, firstLayer) && baseMaterial is null || IsActiveLayer(layer.Binding))
+            .SelectMany(layer => new[] { layer.Material, layer.Mask }));
         var target = ScaleToBgra(source, width, height);
         var targetPixels = ReadBgra(target);
         var layerSeed = baseMaterial is null ? firstLayer : null;
@@ -125,6 +125,32 @@ internal static class NetMaterialLayerCompiler
         }
         WriteBgra(target, targetPixels);
         return target;
+    }
+
+    private static bool IsActiveLayer(NetMaterialLayerBinding binding) =>
+        !string.Equals(binding.LayerRole, "base", StringComparison.OrdinalIgnoreCase)
+        && binding.Weight > 0.001f;
+
+    private static (int Width, int Height) CompositeSize(Bitmap source, IEnumerable<Bitmap?> inputs)
+    {
+        // A small base swatch must not collapse a detailed selector or overlay.
+        // Choose a real source domain, as Full does, then bound its size without
+        // inflating small materials or changing the selected aspect ratio.
+        var largest = source;
+        foreach (var input in inputs)
+        {
+            if (input is null) continue;
+            var area = (long)input.Width * input.Height;
+            var largestArea = (long)largest.Width * largest.Height;
+            if (area > largestArea || area == largestArea
+                && Math.Max(input.Width, input.Height) > Math.Max(largest.Width, largest.Height))
+            {
+                largest = input;
+            }
+        }
+        var scale = Math.Min(1.0, MaximumDimension / (double)Math.Max(largest.Width, largest.Height));
+        return (Math.Max(1, (int)Math.Round(largest.Width * scale)),
+            Math.Max(1, (int)Math.Round(largest.Height * scale)));
     }
 
     private static void ApplyTint(byte[] pixels, NetMaterialLayerBinding binding)
@@ -227,13 +253,22 @@ internal static class NetMaterialLayerCompiler
 
     private static Bitmap ScaleToBgra(Bitmap source, int width, int height)
     {
+        if (source.Width == width && source.Height == height)
+        {
+            return source.Clone(new Rectangle(0, 0, width, height), PixelFormat.Format32bppArgb);
+        }
         var result = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         using var graphics = Graphics.FromImage(result);
         graphics.CompositingMode = CompositingMode.SourceCopy;
         graphics.CompositingQuality = CompositingQuality.HighQuality;
         graphics.InterpolationMode = InterpolationMode.HighQualityBilinear;
         graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        graphics.DrawImage(source, new Rectangle(0, 0, width, height));
+        // Clamp samples to the edge instead of blending the border with the
+        // transparent area outside the bitmap during resampling.
+        using var attributes = new ImageAttributes();
+        attributes.SetWrapMode(WrapMode.TileFlipXY);
+        graphics.DrawImage(source, new Rectangle(0, 0, width, height),
+            0, 0, source.Width, source.Height, GraphicsUnit.Pixel, attributes);
         return result;
     }
 

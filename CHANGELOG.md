@@ -4,6 +4,12 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- Item Finder recognizes the updated `.staticinfobody`/`.staticinfoheader` tables as well as `.pabgb`/`.pabgh`, pairs each table with its own header, and reads both compact and marked prefab lists. Model references stay within their item row; incomplete lists and unrelated integer lists cannot supply exact model links. Existing item-name caches rebuild automatically.
+- Item table discovery matches the complete filename, so similarly named tables cannot hide ItemInfo. The updated table extensions also support metadata preview and associated-asset discovery.
+- Layered model textures retain colour, mask, roughness and metalness detail up to 2048 pixels instead of being capped at 512. Composite size follows the largest active source or mask, so a small base swatch no longer shrinks detailed layers. Resampling preserves opaque edges and the base texture's cutout alpha.
+
 ## [1.0.3] - 2026-08-01
 
 ### Added

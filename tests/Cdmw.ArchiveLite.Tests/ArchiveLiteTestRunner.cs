@@ -44,6 +44,7 @@ internal static class ArchiveLiteTestRunner
             ("export paths reject traversal and roots", TestExportPathPolicyAsync),
             ("isolated cache maintenance is bounded, lease-aware, and deterministic", TestCacheMaintenanceAsync),
             ("DDS header facts bound decode cost and preview resource use", TestDdsHeaderAndResourceLimitsAsync),
+            ("material composites preserve detailed textures, masks and source alpha", TestMaterialLayerQualityAsync),
             ("standalone payload extraction is atomic, reusable, and traversal-safe", TestStandaloneRuntimeAsync),
             ("double-click build launcher routes to the verified release pipeline", TestBuildLauncherSourceAsync),
             ("game discovery recognizes archive roots and Steam libraries", TestGameInstallDiscoveryAsync),
@@ -60,6 +61,7 @@ internal static class ArchiveLiteTestRunner
             ("native model previews start immediately and warm-cache hits stay delay-free", TestNativeModelPreviewCacheDwellAsync),
             ("known item names preserve exact matches and propagate related evidence", TestArchiveItemNamesAsync),
             ("native item-name discovery reads every row of the table directory", TestArchiveItemNameDiscoveryAsync),
+            ("Item Finder supports both table names and bounded prefab-list layouts", TestArchiveItemNameLayoutsAsync),
             ("an archive with no row directory degrades to a scan and says so", TestArchiveItemNameScanFallbackAsync),
             ("a string table that disagrees with its own footer is rejected, not truncated", TestLocalizationTableIntegrityAsync),
             ("Item Finder shares the Full catalog contract and keeps icon work bounded", TestItemFinderCatalogAsync),
@@ -4858,7 +4860,7 @@ internal static class ArchiveLiteTestRunner
         var staleCachePath = Path.Combine(ArchiveLiteDataPaths.NameIndexCache, $"{opened.Fingerprint}.json");
         await File.WriteAllTextAsync(
             staleCachePath,
-            """{"schema_version":2,"exact_names":{"stale":"Stale Name"},"related_names":{},"items":[]}""")
+            """{"schema_version":6,"exact_names":{"stale":"Stale Name"},"related_names":{},"items":[]}""")
             .ConfigureAwait(false);
         var service = new ArchiveItemNameIndexService(sessions, native);
         var result = await service.BuildAsync(
@@ -4952,6 +4954,66 @@ internal static class ArchiveLiteTestRunner
             "the merged item-name sort ordered evidence-only rows as if they had no name");
 
         await RequireChunkedIconWarmupAsync(sessions, session, service, native, opened.SessionId).ConfigureAwait(false);
+    }
+
+    private static async Task TestArchiveItemNameLayoutsAsync()
+    {
+        var cases = new[]
+        {
+            (Static: true, Mixed: false, Layout: ItemPrefabListLayout.Marked, Valid: true),
+            (Static: false, Mixed: false, Layout: ItemPrefabListLayout.Compact, Valid: true),
+            (Static: true, Mixed: false, Layout: ItemPrefabListLayout.Compact, Valid: true),
+            (Static: true, Mixed: true, Layout: ItemPrefabListLayout.Compact, Valid: true),
+            (Static: true, Mixed: false, Layout: ItemPrefabListLayout.TruncatedMarked, Valid: false),
+            (Static: true, Mixed: false, Layout: ItemPrefabListLayout.TruncatedCompact, Valid: false),
+            (Static: true, Mixed: false, Layout: ItemPrefabListLayout.MismatchedMarked, Valid: false),
+        };
+        foreach (var testCase in cases)
+        {
+            await using var fixture = await SyntheticArchiveFixture.CreateNameIndexAsync(
+                useStaticInfoNaming: testCase.Static,
+                prefabListLayout: testCase.Layout,
+                mixedTableNames: testCase.Mixed).ConfigureAwait(false);
+            var native = new NativeArchiveCore();
+            using var sessions = new ArchiveSessionManager(native);
+            var opened = await sessions.OpenAsync(
+                new OpenArchiveRequest(fixture.Root, ForceRefresh: true), CancellationToken.None).ConfigureAwait(false);
+            var service = new ArchiveItemNameIndexService(sessions, native);
+            var result = await service.BuildAsync(
+                new BuildNameIndexRequest(opened.SessionId), null, CancellationToken.None).ConfigureAwait(false);
+            Require(result.Available && result.Warning is null,
+                $"table discovery or header pairing failed for {testCase}: {result.Warning}");
+            var catalog = await new ArchiveItemCatalogService(sessions, service).SearchAsync(
+                new ItemCatalogSearchRequest(opened.SessionId), CancellationToken.None).ConfigureAwait(false);
+            var helm = catalog.Items.Single(item => item.ItemId == 1234);
+            var armor = catalog.Items.Single(item => item.ItemId == 5678);
+            Require(helm.DisplayName == SyntheticArchiveFixture.ScannableItemName
+                && armor.DisplayName == SyntheticArchiveFixture.DirectoryOnlyItemName
+                && helm.Description == SyntheticArchiveFixture.ScannableItemDescription
+                && armor.Description == SyntheticArchiveFixture.DirectoryOnlyItemDescription
+                && helm.EquipType == SyntheticArchiveFixture.HelmEquipType
+                && armor.EquipType == SyntheticArchiveFixture.UpperbodyEquipType
+                && helm.StackSize == 1 && armor.StackSize == 100 && helm.Grade == 4 && armor.Grade == 6,
+                $"table layout changed localized names, descriptions or scalar fields for {testCase}");
+            var session = sessions.GetRequired(opened.SessionId);
+            var sword = session.Index.FindEntriesByPath("character/model/cd_test_01_sword.pac").Single();
+            var page = await new ArchiveQueryService(sessions).QueryAsync(
+                new ArchiveQuerySpec(opened.SessionId, EntryIds: [sword.EntryId]), 1, CancellationToken.None)
+                .ConfigureAwait(false);
+            Require(page.Entries.Single().HasExactItemName == testCase.Valid,
+                $"complete or malformed list was misread for {testCase}");
+            Require(testCase.Valid ? result.ExactNameCount > 0 : result.ExactNameCount == 0,
+                $"a list crossed its row boundary or lost the final reference for {testCase}");
+            Require(result.RelatedNameCount > 0, $"related icon evidence was lost for {testCase}");
+
+            using var cachedSessions = new ArchiveSessionManager(native);
+            var reopened = await cachedSessions.OpenAsync(
+                new OpenArchiveRequest(fixture.Root), CancellationToken.None).ConfigureAwait(false);
+            var cached = await new ArchiveItemNameIndexService(cachedSessions, native).BuildAsync(
+                new BuildNameIndexRequest(reopened.SessionId), null, CancellationToken.None).ConfigureAwait(false);
+            Require(cached.UsedCache && cached.ExactNameCount == result.ExactNameCount,
+                $"the corrected catalog was not reusable across sessions for {testCase}");
+        }
     }
 
     /// <summary>
@@ -5672,6 +5734,57 @@ internal static class ArchiveLiteTestRunner
         Package: "synthetic",
         Role: ArchiveEntryRole.Model,
         IsPreviewable: true);
+
+    private static async Task TestMaterialLayerQualityAsync()
+    {
+        var rendererPath = Environment.GetEnvironmentVariable("CDMW_ARCHIVE_LITE_DOTNET_PREVIEW_PATH");
+        Require(!string.IsNullOrWhiteSpace(rendererPath) && File.Exists(rendererPath),
+            "the configured renderer is required for material-layer quality checks");
+        var root = Path.Combine(Path.GetTempPath(), $"cdmw-lite-material-quality-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var reportPath = Path.Combine(root, "quality.json");
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = rendererPath!,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            startInfo.ArgumentList.Add("--material-resource-policy-report");
+            startInfo.ArgumentList.Add(reportPath);
+            using var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("material quality probe did not start");
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+                throw;
+            }
+            var output = await stdout.ConfigureAwait(false);
+            var error = await stderr.ConfigureAwait(false);
+            Require(File.Exists(reportPath), $"material quality probe failed: {output} {error}");
+            using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(false));
+            var gates = report.RootElement.GetProperty("material_layer_quality");
+            Require(gates.EnumerateObject().Count() >= 9 && gates.EnumerateObject().All(gate => gate.Value.GetBoolean()),
+                $"material quality regression: {gates.GetRawText()}");
+            Require(process.ExitCode == 0 && report.RootElement.GetProperty("ok").GetBoolean(),
+                $"material policy regression: {output} {error}");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 
     private static async Task RunConfiguredRendererSmokeAsync(string rendererPath, string packageRoot, string manifestPath)
     {
@@ -7702,6 +7815,13 @@ internal static class ArchiveLiteTestRunner
     private static Task TestSharedContentAnalyzersAsync()
     {
         Require(ArchiveContentRegistry.All.Count >= 100, "shared content manifest is unexpectedly small");
+        foreach (var extension in new[] { ".staticinfobody", ".staticinfoheader" })
+        {
+            Require(ArchiveEntryClassifier.Classify($"gamecommon/item/iteminfo{extension}", extension) == ArchiveEntryRole.Metadata
+                && ArchiveEntryClassifier.ClassifyExtensionCategory(extension) == ArchiveExtensionCategory.MaterialMetadata
+                && ArchiveEntryClassifier.IsPreviewable(extension, ArchiveEntryRole.Metadata),
+                $"the updated table extension is not recognized as previewable metadata: {extension}");
+        }
         Require(
             ArchiveEntryClassifier.Classify("models/tree.obj", ".obj") == ArchiveEntryRole.Text,
             "textual model formats must not be routed to hex/model decoding");

@@ -503,7 +503,8 @@ public sealed class ArchiveAssociationService
         {
             return AssociatedAssetCategory.PrefabMetadata;
         }
-        if (extension is ".pab" or ".pabc" or ".pabv" or ".pabgb" or ".pabgh" or ".papr")
+        if (extension is ".pab" or ".pabc" or ".pabv" or ".pabgb" or ".pabgh" or ".papr"
+            or ".staticinfobody" or ".staticinfoheader")
         {
             return AssociatedAssetCategory.SkeletonRig;
         }

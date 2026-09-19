@@ -1320,6 +1320,7 @@ void fill_item_record_body(
     const std::vector<char>& data,
     const LocalizationTables& loc_tables,
     const std::map<std::uint32_t, std::string>& icon_hashes,
+    const std::map<std::uint32_t, std::string>& model_hashes,
     const std::string& loc_id,
     size_t scan_begin,
     size_t record_end,
@@ -1349,28 +1350,43 @@ void fill_item_record_body(
 
     std::set<std::uint32_t> seen_prefab_hashes;
     size_t scan = scan_begin;
-    while (scan + 15 < record_end && record.prefab_hashes.size() < 128) {
+    while (scan + 4 <= record_end && record.prefab_hashes.size() < 128) {
+        // Older rows carry a marker and two counts; newer rows use one count.
+        // Test the marked form first so its count fields cannot become list values.
         const unsigned char list_marker = static_cast<unsigned char>(data[scan]);
-        if (list_marker != 0x0E && list_marker != 0x0F && list_marker != 0x10) {
-            ++scan;
+        const bool marked = scan + 11 <= record_end
+            && (list_marker == 0x0E || list_marker == 0x0F || list_marker == 0x10)
+            && data[scan + 1] == 0 && data[scan + 2] == 0
+            && read_u32(data, scan + 3) > 0 && read_u32(data, scan + 3) <= 32
+            && read_u32(data, scan + 7) > 0 && read_u32(data, scan + 7) <= 32;
+        const std::uint32_t count = read_u32(data, scan + (marked ? 7 : 0));
+        const size_t list_begin = scan + (marked ? 11 : 4);
+        if (count == 0 || count > 32 || count > (record_end - list_begin) / 4) {
+            scan = marked ? record_end : scan + 1;
             continue;
         }
-        const std::uint32_t count1 = read_u32(data, scan + 3);
-        const std::uint32_t count2 = read_u32(data, scan + 7);
-        if (!(count1 > 0 && count1 <= 32 && count2 > 0 && count2 <= 32)) {
-            ++scan;
+        const size_t list_end = list_begin + static_cast<size_t>(count) * 4;
+        if (marked && read_u32(data, scan + 3) != count) {
+            scan = list_end;
             continue;
         }
-        const size_t list_end = scan + 11 + static_cast<size_t>(count2) * 4;
-        if (list_end > record_end) {
-            ++scan;
-            continue;
+        bool matched = false;
+        bool valid_values = true;
+        for (std::uint32_t hash_index = 0; hash_index < count; ++hash_index) {
+            const std::uint32_t value = read_u32(data, list_begin + hash_index * 4);
+            if (!marked && value == 0) valid_values = false;
+            if (model_hashes.count(value) != 0) matched = true;
         }
-        for (std::uint32_t hash_index = 0; hash_index < count2; ++hash_index) {
-            const std::uint32_t value = read_u32(data, scan + 11 + hash_index * 4);
-            if (value && seen_prefab_hashes.insert(value).second) record.prefab_hashes.push_back(value);
+        if (matched && valid_values) {
+            for (std::uint32_t hash_index = 0; hash_index < count; ++hash_index) {
+                const std::uint32_t value = read_u32(data, list_begin + hash_index * 4);
+                if (model_hashes.count(value) && record.prefab_hashes.size() < 128
+                    && seen_prefab_hashes.insert(value).second) record.prefab_hashes.push_back(value);
+            }
         }
-        scan = list_end;
+        // A small scalar is not proof of a list. Do not let unrelated integers
+        // skip a later model list or consume the bounded reference allowance.
+        scan = marked || (matched && valid_values) ? list_end : scan + 1;
     }
     if (!icon_hashes.empty()) {
         for (size_t at = icon_scan_begin; at + 4 <= icon_scan_end; ++at) {
@@ -1436,6 +1452,7 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
     const PabgTable& table,
     const LocalizationTables& loc_tables,
     const std::map<std::uint32_t, std::string>& icon_hashes,
+    const std::map<std::uint32_t, std::string>& model_hashes,
     const std::map<std::uint32_t, std::string>& equip_types
 ) {
     std::vector<NativeItemRecord> items;
@@ -1453,12 +1470,17 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
         record.name_key = pabg_row_tag_string(data, row, 0x70, &name_key_end);
         record.description_key = pabg_row_tag_string(data, row, 0x71, &description_key_end);
         fill_item_record_stats(data, row, name_end, name_key_end, description_key_end, equip_types, record);
+        // The localized-name sub-record and the equip-type scalar are not lists.
+        const size_t body_begin = name_key_end != 0
+            ? std::min(row.end, name_key_end + 9)
+            : (name_end != 0 ? name_end : row.begin);
         fill_item_record_body(
             data,
             loc_tables,
             icon_hashes,
+            model_hashes,
             record.name_key,
-            row.begin,
+            body_begin,
             row.end,
             row.begin,
             row.end,
@@ -1479,7 +1501,8 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
 std::vector<NativeItemRecord> parse_iteminfo_bin(
     const std::vector<char>& data,
     const LocalizationTables& loc_tables,
-    const std::map<std::uint32_t, std::string>& icon_hashes
+    const std::map<std::uint32_t, std::string>& icon_hashes,
+    const std::map<std::uint32_t, std::string>& model_hashes
 ) {
     static const unsigned char marker[] = {0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x07,0x70,0x00,0x00,0x00};
     std::vector<NativeItemRecord> items;
@@ -1527,6 +1550,7 @@ std::vector<NativeItemRecord> parse_iteminfo_bin(
             data,
             loc_tables,
             icon_hashes,
+            model_hashes,
             loc_id,
             pos + sizeof(marker),
             std::min(next_pos, pos + 800),
@@ -1681,12 +1705,12 @@ int run_item_index_job(
             read_binary_if_exists(work_dir / "iteminfo.header.bin"),
             iteminfo,
             iteminfo_table);
+        const auto hash_table = build_model_hash_table(entries);
         auto items = iteminfo_from_directory
-            ? parse_iteminfo_rows(iteminfo, iteminfo_table, loc_tables, icon_hashes, equip_types)
-            : parse_iteminfo_bin(iteminfo, loc_tables, icon_hashes);
+            ? parse_iteminfo_rows(iteminfo, iteminfo_table, loc_tables, icon_hashes, hash_table, equip_types)
+            : parse_iteminfo_bin(iteminfo, loc_tables, icon_hashes, hash_table);
         const size_t iteminfo_row_count = iteminfo_from_directory ? iteminfo_table.rows.size() : items.size();
         const auto icon_index = build_icon_path_index(entries);
-        const auto hash_table = build_model_hash_table(entries);
         std::map<std::string, std::string> aliases;
         std::map<std::string, std::string> display_names;
         std::map<std::string, std::string> exact_display_names;

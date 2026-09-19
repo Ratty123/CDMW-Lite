@@ -3,6 +3,15 @@ using System.Text;
 
 namespace Cdmw.ArchiveLite.Tests;
 
+internal enum ItemPrefabListLayout
+{
+    Marked,
+    Compact,
+    TruncatedMarked,
+    TruncatedCompact,
+    MismatchedMarked,
+}
+
 internal sealed class SyntheticArchiveFixture : IAsyncDisposable
 {
     private SyntheticArchiveFixture(string root)
@@ -256,7 +265,10 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
     /// </param>
     public static async Task<SyntheticArchiveFixture> CreateNameIndexAsync(
         bool includeRowDirectory = true,
-        bool corruptLocalization = false)
+        bool corruptLocalization = false,
+        bool useStaticInfoNaming = false,
+        ItemPrefabListLayout prefabListLayout = ItemPrefabListLayout.Marked,
+        bool mixedTableNames = false)
     {
         const uint exactModelHash = 0x1D586E71;        // cd_test_01_sword
         const uint relatedModelHash = 0xA1B2C3D4;
@@ -277,7 +289,8 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
                 relatedModelHash,
                 stackSize: 1,
                 equipTypeHash: HelmEquipTypeHash,
-                grade: 4)),
+                grade: 4,
+                prefabListLayout)),
             // Shipped item keys are all numeric, and this one deliberately is not: the reader this
             // replaced accepted only six-to-twenty ASCII digits, so a key of any other shape was
             // unreachable no matter how the record was found.
@@ -290,7 +303,8 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
                 hiddenRelatedModelHash,
                 stackSize: 100,
                 equipTypeHash: UpperbodyEquipTypeHash,
-                grade: 6)),
+                grade: 6,
+                prefabListLayout)),
         ]);
         var (equipTypeInfo, equipTypeInfoDirectory) = BuildEquipTypeInfoTable(
         [
@@ -311,17 +325,28 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         ],
         corruptLocalization ? 1 : 0);
 
+        var bodySuffix = useStaticInfoNaming ? ".staticinfobody" : ".pabgb";
+        var headerSuffix = useStaticInfoNaming ? ".staticinfoheader" : ".pabgh";
+        var stringBodySuffix = mixedTableNames ? ".pabgb" : bodySuffix;
+        var stringHeaderSuffix = mixedTableNames ? ".pabgh" : headerSuffix;
         var tables = new List<(string Path, byte[] Bytes)>
         {
-            ("gamecommon/item/iteminfo.pabgb", itemInfo),
-            ("gamecommon/item/stringinfo.pabgb", stringInfo),
-            ("gamecommon/item/equiptypeinfo.pabgb", equipTypeInfo),
+            // Similar names are not ItemInfo, even when encountered before the real table.
+            ($"gamecommon/item/decoyiteminfo{bodySuffix}", new byte[16]),
+            ($"gamecommon/item/iteminfo{bodySuffix}", itemInfo),
+            ($"gamecommon/item/stringinfo{stringBodySuffix}", stringInfo),
+            ($"gamecommon/item/equiptypeinfo{bodySuffix}", equipTypeInfo),
         };
         if (includeRowDirectory)
         {
-            tables.Add(("gamecommon/item/iteminfo.pabgh", itemInfoDirectory));
-            tables.Add(("gamecommon/item/stringinfo.pabgh", stringInfoDirectory));
-            tables.Add(("gamecommon/item/equiptypeinfo.pabgh", equipTypeInfoDirectory));
+            tables.Add(($"gamecommon/item/iteminfo{headerSuffix}", itemInfoDirectory));
+            tables.Add(($"gamecommon/item/stringinfo{stringHeaderSuffix}", stringInfoDirectory));
+            tables.Add(($"gamecommon/item/equiptypeinfo{headerSuffix}", equipTypeInfoDirectory));
+            if (useStaticInfoNaming)
+            {
+                tables.Add(("gamecommon/item/iteminfo.pabgh", new byte[16]));
+                tables.Add(("elsewhere/iteminfo.staticinfoheader", new byte[16]));
+            }
         }
 
         await BuildPackageAsync(root, "0008", tables).ConfigureAwait(false);
@@ -542,7 +567,8 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         uint relatedModelHash,
         uint stackSize,
         uint equipTypeHash = 0,
-        byte grade = 0xFF)
+        byte grade = 0xFF,
+        ItemPrefabListLayout prefabListLayout = ItemPrefabListLayout.Marked)
     {
         using var output = new MemoryStream();
         var name = Encoding.ASCII.GetBytes(internalName);
@@ -556,10 +582,14 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         // The equip-type key sits five bytes past the display-name sub-record.
         output.Write(new byte[5]);
         WriteUInt32(output, equipTypeHash);
-        output.WriteByte(0x0E);
-        output.WriteByte(0);
-        output.WriteByte(0);
-        WriteUInt32(output, 6);
+        var compact = prefabListLayout is ItemPrefabListLayout.Compact or ItemPrefabListLayout.TruncatedCompact;
+        if (!compact)
+        {
+            output.WriteByte(0x0E);
+            output.WriteByte(0);
+            output.WriteByte(0);
+            WriteUInt32(output, 6);
+        }
         WriteUInt32(output, 6);
         WriteUInt32(output, 0x11111111);
         WriteUInt32(output, 0x22222222);
@@ -567,18 +597,38 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
         WriteUInt32(output, 0x44444444);
         WriteUInt32(output, 0x55555555);
         WriteUInt32(output, 0x66666666);
-        output.WriteByte(0x0F);
-        output.WriteByte(0);
-        output.WriteByte(0);
-        WriteUInt32(output, 1);
-        WriteUInt32(output, 1);
-        WriteUInt32(output, exactModelHash);
         WriteUInt32(output, relatedModelHash);
         WriteSubRecord(output, 0x71, itemId, descriptionId);
         // The grade is one byte 37 past the description sub-record, and the row runs past it.
         output.Write(new byte[37]);
         output.WriteByte(grade);
         output.Write(new byte[16]);
+        if (compact)
+        {
+            // Unknown lists must neither exhaust the reference allowance nor hide
+            // the real list that follows them.
+            for (var list = 0; list < 5; list++)
+            {
+                WriteUInt32(output, 32);
+                for (var value = 0; value < 32; value++)
+                {
+                    WriteUInt32(output, (uint)(0x11110000 + list * 32 + value));
+                }
+            }
+        }
+        var count = prefabListLayout is ItemPrefabListLayout.TruncatedMarked or ItemPrefabListLayout.TruncatedCompact
+            ? 2u : 1u;
+        if (!compact)
+        {
+            output.WriteByte(0x0F);
+            output.WriteByte(0);
+            output.WriteByte(0);
+            WriteUInt32(output, prefabListLayout == ItemPrefabListLayout.MismatchedMarked ? 2u : count);
+        }
+        WriteUInt32(output, count);
+        WriteUInt32(output, exactModelHash);
+        // The list deliberately ends at the row boundary: no next-row bytes may
+        // satisfy a truncated count, and a complete one-entry list must be read.
         return output.ToArray();
 
         static void WriteSubRecord(MemoryStream target, byte tag, uint repeatKey, string value)
