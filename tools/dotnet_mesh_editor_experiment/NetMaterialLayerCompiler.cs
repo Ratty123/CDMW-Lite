@@ -124,47 +124,79 @@ internal static partial class NetMaterialLayerCompiler
         };
     }
 
-    private static Bitmap ScaleToBgra(Bitmap source, int width, int height)
+    // Only raw pixel arrays are shared with the workers. GDI bitmap access stays
+    // on the caller, and each range writes disjoint rows in the original order.
+    private static void ForRows(int width, int height, Action<int, int> process)
     {
+        var workers = Math.Min(4, Environment.ProcessorCount);
+        if (workers == 1 || width * height < 256 * 256)
+        {
+            process(0, height);
+            return;
+        }
+        Parallel.For(0, workers, new ParallelOptions { MaxDegreeOfParallelism = workers },
+            worker => process(worker * height / workers, (worker + 1) * height / workers));
+    }
+
+    private sealed class LayerPixelCache(int width, int height)
+    {
+        private readonly Dictionary<Bitmap, byte[]> _pixels = new(ReferenceEqualityComparer.Instance);
+
+        public byte[] Read(Bitmap source)
+        {
+            if (_pixels.TryGetValue(source, out var pixels)) return pixels;
+            // At most four 2048-square buffers (64 MiB), scoped to this composite.
+            if (_pixels.Count == 4) _pixels.Clear();
+            pixels = ReadScaledBgra(source, width, height);
+            _pixels.Add(source, pixels);
+            return pixels;
+        }
+    }
+
+    private static byte[] ReadScaledBgra(Bitmap source, int width, int height)
+    {
+        var input = ReadBgra(source);
         if (source.Width == width && source.Height == height)
         {
-            return source.Clone(new Rectangle(0, 0, width, height), PixelFormat.Format32bppArgb);
+            return input;
         }
-        var result = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        var input = ReadBgra(source);
         var output = new byte[checked(width * height * 4)];
         var horizontal = new (int Left, int Right, float Weight)[width];
-        var scaleX = source.Width / (float)width;
-        var scaleY = source.Height / (float)height;
+        var sourceWidth = source.Width;
+        var sourceHeight = source.Height;
+        var scaleX = sourceWidth / (float)width;
+        var scaleY = sourceHeight / (float)height;
         for (var x = 0; x < width; x++)
         {
-            var position = Math.Clamp((x + 0.5f) * scaleX - 0.5f, 0, source.Width - 1);
+            var position = Math.Clamp((x + 0.5f) * scaleX - 0.5f, 0, sourceWidth - 1);
             var left = (int)position;
-            horizontal[x] = (left * 4, Math.Min(left + 1, source.Width - 1) * 4, position - left);
+            horizontal[x] = (left * 4, Math.Min(left + 1, sourceWidth - 1) * 4, position - left);
         }
         // DDS channels are independent data. GDI's premultiplied-alpha scaling
         // changes RGB when alpha stores cutout coverage or packed specularity.
-        for (var y = 0; y < height; y++)
+        ForRows(width, height, (first, last) =>
         {
-            var position = Math.Clamp((y + 0.5f) * scaleY - 0.5f, 0, source.Height - 1);
-            var top = (int)position;
-            var weightY = position - top;
-            var row0 = top * source.Width * 4;
-            var row1 = Math.Min(top + 1, source.Height - 1) * source.Width * 4;
-            for (var x = 0; x < width; x++)
+            for (var y = first; y < last; y++)
             {
-                var (left, right, weightX) = horizontal[x];
-                for (var channel = 0; channel < 4; channel++)
+                var position = Math.Clamp((y + 0.5f) * scaleY - 0.5f, 0, sourceHeight - 1);
+                var top = (int)position;
+                var weightY = position - top;
+                var row0 = top * sourceWidth * 4;
+                var row1 = Math.Min(top + 1, sourceHeight - 1) * sourceWidth * 4;
+                for (var x = 0; x < width; x++)
                 {
-                    var upper = input[row0 + left + channel] * (1 - weightX) + input[row0 + right + channel] * weightX;
-                    var lower = input[row1 + left + channel] * (1 - weightX) + input[row1 + right + channel] * weightX;
-                    output[(y * width + x) * 4 + channel] = (byte)MathF.Round(upper * (1 - weightY) + lower * weightY,
-                        MidpointRounding.AwayFromZero);
+                    var (left, right, weightX) = horizontal[x];
+                    for (var channel = 0; channel < 4; channel++)
+                    {
+                        var upper = input[row0 + left + channel] * (1 - weightX) + input[row0 + right + channel] * weightX;
+                        var lower = input[row1 + left + channel] * (1 - weightX) + input[row1 + right + channel] * weightX;
+                        output[(y * width + x) * 4 + channel] = (byte)MathF.Round(upper * (1 - weightY) + lower * weightY,
+                            MidpointRounding.AwayFromZero);
+                    }
                 }
             }
-        }
-        WriteBgra(result, output);
-        return result;
+        });
+        return output;
     }
 
     private static byte[] ReadBgra(Bitmap bitmap)

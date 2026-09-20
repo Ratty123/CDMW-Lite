@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 
 namespace Cdmw.MeshEditorExperiment;
 
@@ -81,6 +82,7 @@ internal static class MaterialLayerQualityProof
         alphaData.SetPixel(0, 0, Color.FromArgb(0, 255, 0, 0));
         using var largerMask = Solid(3, 1, Color.Black);
         using var independentlyScaled = NetMaterialLayerCompiler.Compile(alphaData, [new(binding, alphaData, largerMask)]);
+        var parallel = ParallelMatchesSerialRows();
 
         return new Dictionary<string, bool>
         {
@@ -113,7 +115,82 @@ internal static class MaterialLayerQualityProof
                 && D3D11MaterialViewport.TextureUsesSrgb("auto", true),
             ["resampling_does_not_premultiply_dds_channels"] = independentlyScaled?.GetPixel(1, 0)
                 == Color.FromArgb(128, 128, 0, 128),
+            ["parallel_composites_match_serial_rows"] = parallel.PixelsMatch,
+            ["shared_layer_inputs_remain_unchanged"] = parallel.InputsUnchanged,
         };
+    }
+
+    private static (bool PixelsMatch, bool InputsUnchanged) ParallelMatchesSerialRows()
+    {
+        // One row takes the serial path; the tall image exercises parallel row
+        // boundaries, including a final partial range, with identical inputs.
+        var serial = CompileRepeatedRows(1);
+        var parallel = CompileRepeatedRows(259);
+        var equal = serial.Maps.All(pair =>
+        {
+            var pixels = parallel.Maps[pair.Key];
+            if (pixels.Length != pair.Value.Length * 259) return false;
+            for (var row = 0; row < 259; row++)
+                if (!pixels.AsSpan(row * pair.Value.Length, pair.Value.Length).SequenceEqual(pair.Value)) return false;
+            return true;
+        });
+        return (equal, serial.InputsUnchanged && parallel.InputsUnchanged);
+    }
+
+    private static (Dictionary<string, byte[]> Maps, bool InputsUnchanged) CompileRepeatedRows(int height)
+    {
+        using var source = Stripes(257, height, Color.FromArgb(173, 120, 90, 70), Color.FromArgb(0, 50, 80, 100));
+        using var mask = Stripes(257, height, Color.FromArgb(191, 255, 127, 63), Color.FromArgb(37, 0, 63, 127));
+        // Repeated sources and masks exercise reuse; distinct swatches exceed
+        // the bounded input cache. Scaling must preserve all four DDS channels.
+        var swatches = Enumerable.Range(0, 6).Select(i => Stripes(3 + i, 1,
+            Color.FromArgb(0, 35 + 21 * i, 90, 180), Color.FromArgb(203, 210, 50 + 17 * i, 70))).ToArray();
+        try
+        {
+            var originals = new[] { source, mask }.Concat(swatches).Select(Pixels).ToArray();
+            var bindings = Enumerable.Range(0, 8).Select(i => new NetMaterialLayerBinding(
+                "detail", new[] { "r", "g", "b", "a" }[i % 4], 0.6f, 0.7f, 0.9f, 0.5f, "", "",
+                TintA: 0.8f, RoughnessHint: 0.3f, MetalnessHint: 0.4f, SpecularHint: 0.2f)).ToArray();
+            var colors = bindings.Select((binding, i) => new NetMaterialLayerSource(
+                binding, i < 2 ? source : swatches[i - 2], mask)).ToList();
+            colors.Insert(0, new NetMaterialLayerSource(bindings[0] with { LayerRole = "color_seed" }, null, mask));
+            colors.Insert(1, new NetMaterialLayerSource(bindings[1] with { LayerRole = "color_seed" }, null, mask));
+            var support = bindings.Select((binding, i) => new NetMaterialLayerSurfaceSource(
+                binding, i < 2 ? source : swatches[i - 2], mask)).ToArray();
+            using var diffuse = NetMaterialLayerCompiler.Compile(source, colors);
+            using var surface = NetMaterialLayerCompiler.CompileSurface(source, support);
+            using var normal = NetMaterialLayerCompiler.CompileSupport(source, support, normal: true);
+            using var displacement = NetMaterialLayerCompiler.CompileSupport(source, support, normal: false);
+            var unchanged = new[] { source, mask }.Concat(swatches)
+                .Select((bitmap, i) => Pixels(bitmap).AsSpan().SequenceEqual(originals[i])).All(value => value);
+            return (new Dictionary<string, byte[]>
+            {
+                ["diffuse"] = Pixels(diffuse!), ["surface"] = Pixels(surface!),
+                ["normal"] = Pixels(normal!), ["height"] = Pixels(displacement!),
+            }, unchanged);
+        }
+        finally
+        {
+            foreach (var bitmap in swatches) bitmap.Dispose();
+        }
+    }
+
+    private static byte[] Pixels(Bitmap bitmap)
+    {
+        var data = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+            ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            var rowBytes = bitmap.Width * 4;
+            var pixels = new byte[rowBytes * bitmap.Height];
+            for (var y = 0; y < bitmap.Height; y++)
+                Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), pixels, y * rowBytes, rowBytes);
+            return pixels;
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
     }
 
     private static Bitmap Solid(int width, int height, Color color)

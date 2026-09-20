@@ -44,7 +44,7 @@ internal static partial class ArchiveLiteTestRunner
             ("export paths reject traversal and roots", TestExportPathPolicyAsync),
             ("isolated cache maintenance is bounded, lease-aware, and deterministic", TestCacheMaintenanceAsync),
             ("DDS header facts bound decode cost and preview resource use", TestDdsHeaderAndResourceLimitsAsync),
-            ("material composites preserve detailed textures, masks and source alpha", TestMaterialLayerQualityAsync),
+            ("material composites preserve detail, alpha and deterministic parallel output", TestMaterialLayerQualityAsync),
             ("standalone payload extraction is atomic, reusable, and traversal-safe", TestStandaloneRuntimeAsync),
             ("double-click build launcher routes to the verified release pipeline", TestBuildLauncherSourceAsync),
             ("game discovery recognizes archive roots and Steam libraries", TestGameInstallDiscoveryAsync),
@@ -5851,6 +5851,9 @@ internal static partial class ArchiveLiteTestRunner
             Require(File.Exists(reportPath), $"material quality probe failed: {output} {error}");
             using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(false));
             var gates = report.RootElement.GetProperty("material_layer_quality");
+            Require(gates.GetProperty("parallel_composites_match_serial_rows").GetBoolean()
+                && gates.GetProperty("shared_layer_inputs_remain_unchanged").GetBoolean(),
+                "parallel material composition changed pixels or mutated shared source textures");
             Require(gates.EnumerateObject().Count() >= 9 && gates.EnumerateObject().All(gate => gate.Value.GetBoolean()),
                 $"material quality regression: {gates.GetRawText()}");
             Require(process.ExitCode == 0 && report.RootElement.GetProperty("ok").GetBoolean(),

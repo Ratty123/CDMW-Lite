@@ -119,6 +119,8 @@ flowchart LR
 
 Blended colour and surface maps use the largest active source texture or selector mask, capped at 2048 pixels with its aspect ratio preserved. Small base swatches do not reduce detailed overlays to swatch size. The compositor keeps the base alpha and samples image edges without introducing transparent borders; direct DDS textures retain their source resolution and mip chains.
 
+Display textures prepares large layered maps in the renderer process using up to four CPU workers. Repeated layer inputs reuse a bounded sampling cache, avoiding redundant bitmap conversions while preserving layer order and the resulting pixels.
+
 | suffix | role | notes |
 | --- | --- | --- |
 | `X.dds` | albedo | the part's own colour |

@@ -10,6 +10,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- Display textures loads complex layered models faster by reusing sampled inputs and processing large texture maps in parallel, preserving texture resolution, colours, masks and normals.
 - Compressed item and character localization tables now decode correctly, restoring current game names and multilingual searches. Corrupt languages produce a visible warning without discarding valid languages.
 - Finder filters retain their labels after refresh. Character previews and thumbnails show loading progress, remain cancellable, and preload following pages. Embedded faces no longer receive a duplicate head. Finder tabs, larger text, window restoration, narrow-window navigation, and preview controls fit the application theme and available space.
 - Item Finder now follows active package mount order and current localized item tables. Distinct item IDs and items without model links remain searchable, including after a cache reload. Old item caches rebuild automatically and mount changes invalidate them.
