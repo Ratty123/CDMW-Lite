@@ -114,7 +114,9 @@ public sealed class ArchiveSession : IDisposable
         lock (_catalogueGate) _characterCatalog = catalog;
     }
 
-    internal void SetCatalogue(ArchiveItemNameIndex nameIndex, ArchiveItemCatalog itemCatalog)
+    internal string? ItemCatalogWarning { get; private set; }
+
+    internal void SetCatalogue(ArchiveItemNameIndex nameIndex, ArchiveItemCatalog itemCatalog, string? warning = null)
     {
         ArgumentNullException.ThrowIfNull(nameIndex);
         ArgumentNullException.ThrowIfNull(itemCatalog);
@@ -122,6 +124,7 @@ public sealed class ArchiveSession : IDisposable
         {
             _nameIndex = nameIndex;
             _itemCatalog = itemCatalog;
+            ItemCatalogWarning = warning;
         }
     }
 

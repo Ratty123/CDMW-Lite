@@ -488,4 +488,7 @@
   <data name="CharacterCopyPath" xml:space="preserve"><value>Pfad kopieren</value></data>
   <data name="CharacterScopeLoading" xml:space="preserve"><value>Charakterdateien werden ermittelt…</value></data>
   <data name="CharacterScopeApplied" xml:space="preserve"><value>Körper- und Gesichtssuche: {0} — {1:N0} Dateien, davon {2:N0} direkte Verknüpfungen</value></data>
+  <data name="CharacterThumbnailProgress" xml:space="preserve"><value>Vorschaubilder bereit: {0:N0} / {1:N0}</value></data>
+  <data name="CharacterThumbnailQueued" xml:space="preserve"><value>In Warteschlange</value></data>
+  <data name="CharacterLoadingCancelled" xml:space="preserve"><value>Laden abgebrochen.</value></data>
 </root>

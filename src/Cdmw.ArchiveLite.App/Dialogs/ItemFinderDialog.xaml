@@ -133,7 +133,7 @@
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                                 <Setter Property="Width" Value="174" />
-                                <Setter Property="Height" Value="182" />
+                                <Setter Property="MinHeight" Value="182" />
                                 <Setter Property="Margin" Value="4" />
                                 <Setter Property="Padding" Value="7" />
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -293,8 +293,8 @@
                                  BorderThickness="0"
                                  Background="Transparent" />
 
-                        <StackPanel Margin="0,18,0,0" Orientation="Horizontal">
-                            <Button Margin="0,0,8,0"
+                        <WrapPanel Margin="0,18,0,0">
+                            <Button Margin="0,0,8,6"
                                     Style="{StaticResource PrimaryButtonStyle}"
                                     Content="{infra:Loc Key=ItemFinderShowExact}"
                                     ToolTip="{infra:Loc Key=ItemFinderShowExactHint}"
@@ -302,7 +302,7 @@
                             <Button Content="{infra:Loc Key=ItemFinderShowRelated}"
                                     ToolTip="{infra:Loc Key=ItemFinderShowRelatedHint}"
                                     Command="{Binding DataContext.ShowRelatedSetCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
-                        </StackPanel>
+                        </WrapPanel>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

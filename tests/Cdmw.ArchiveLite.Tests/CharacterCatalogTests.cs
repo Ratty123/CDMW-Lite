@@ -88,14 +88,16 @@ internal static class CharacterCatalogTests
         BinaryPrimitives.WriteUInt32LittleEndian(link.AsSpan(25), 1);
         Add(table + "characterappearanceindexinfo.staticinfobody", link, "0036");
         Add(table + "characterappearanceindexinfo.staticinfoheader", new byte[] { 1, 0 }.Concat(U32(1)).Concat(U32(0)).Concat(U32(0)).ToArray(), "0036");
-        byte[] Loc(string value) => U32((uint)nameKey.Length).Concat(Encoding.ASCII.GetBytes(nameKey))
-            .Concat(U32((uint)Encoding.UTF8.GetByteCount(value))).Concat(Encoding.UTF8.GetBytes(value)).ToArray();
-        Add("gamedata/stringtable/binary__/eng/character.paloc", Loc("Test Hero"), "0036");
-        Add("gamedata/stringtable/binary__/ara/character.paloc", Loc("البطل"), "0036");
+        byte[] Loc(string value) => new byte[8].Concat(U32((uint)nameKey.Length)).Concat(Encoding.ASCII.GetBytes(nameKey))
+            .Concat(U32((uint)Encoding.UTF8.GetByteCount(value))).Concat(Encoding.UTF8.GetBytes(value)).Concat(U32(1)).ToArray();
+        Add("gamedata/stringtable/binary__/eng/character.paloc", SyntheticArchiveFixture.WrapLocalization(Loc("Test Hero")), "0036");
+        Add("gamedata/stringtable/binary__/ara/character.paloc", SyntheticArchiveFixture.WrapLocalization(Loc("البطل")), "0036");
+        Add("gamedata/stringtable/binary__/ger/character.paloc", SyntheticArchiveFixture.WrapLocalization(Loc("Invalid footer")[..^1]), "0036");
 
         CharacterCatalogSnapshot Build(CancellationToken token = default) => ArchiveCharacterCatalogBuilder.Build(
             fixture.Root, "fixture-generation", inventory, entry => bytes[entry.EntryId], token);
         var snapshot = Build();
+        Check(snapshot.Warnings.Any(w => w.Contains("ger/character.paloc")), "corrupt character localization was not reported");
         var catalogue = new ArchiveCharacterCatalog(snapshot);
         var hero = catalogue.Search(new("fixture", Query: "البطل", View: "appearances", Tab: "all"));
         Check(hero.Rows.Count == 2 && hero.Rows.All(row => row.Label == "Test Hero"), "validated multilingual character name join failed");

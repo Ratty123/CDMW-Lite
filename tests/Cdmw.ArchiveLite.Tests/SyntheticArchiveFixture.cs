@@ -373,7 +373,7 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
             root,
             currentMountedSources ? "0037" : "0020",
             [(useStaticInfoNaming ? "gamedata/stringtable/binary__/eng/item.paloc"
-                : "gamedata/stringtable/binary__/localizationstring_eng.paloc", localization)]).ConfigureAwait(false);
+                : "gamedata/stringtable/binary__/localizationstring_eng.paloc", currentMountedSources ? WrapLocalization(localization) : localization)]).ConfigureAwait(false);
         if (currentMountedSources)
         {
             await BuildPackageAsync(root, "0008", [
@@ -383,10 +383,28 @@ internal sealed class SyntheticArchiveFixture : IAsyncDisposable
                 ($"{tableRoot}/iteminfo{bodySuffix}", new byte[16]),
                 ($"{tableRoot}/iteminfo{headerSuffix}", new byte[16])]).ConfigureAwait(false);
             await BuildPackageAsync(root, "0038", [("gamedata/stringtable/binary__/ara/item.paloc",
-                BuildLocalization([(ItemStringCategory, "32345678", "رسالة مفقودة")], 0))]).ConfigureAwait(false);
+                WrapLocalization(BuildLocalization([(ItemStringCategory, "32345678", "رسالة مفقودة")], 0)))]).ConfigureAwait(false);
             await fixture.WriteMountOrderAsync(["0036", "0037", "0038", "0042", "0008"]).ConfigureAwait(false);
         }
         return fixture;
+    }
+
+    internal static byte[] WrapLocalization(byte[] payload)
+    {
+        using var compressed = new MemoryStream();
+        compressed.WriteByte((byte)(Math.Min(payload.Length, 15) << 4));
+        if (payload.Length >= 15)
+        {
+            var remaining = payload.Length - 15;
+            while (remaining >= 255) { compressed.WriteByte(255); remaining -= 255; }
+            compressed.WriteByte((byte)remaining);
+        }
+        compressed.Write(payload);
+        var header = new byte[512];
+        "paloc"u8.CopyTo(header);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(9), (uint)compressed.Length);
+        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(13), (uint)payload.Length);
+        return header.Concat(compressed.ToArray()).ToArray();
     }
 
     public async Task WriteMountOrderAsync(IReadOnlyList<string> packages)

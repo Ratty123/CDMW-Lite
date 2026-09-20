@@ -18,13 +18,14 @@ public sealed class ArchiveCharacterPreviewService(
         Func<ProgressUpdate, Task>? progress, CancellationToken token)
     {
         var detail = await catalog.DetailAsync(new(request.SessionId, request.Key), progress, token).ConfigureAwait(false);
-        if (detail.Models.Count == 0 || detail.Row.Resolution == "ambiguous")
+        var previewModels = PreviewModels(detail);
+        if (previewModels.Count == 0 || detail.Row.Resolution == "ambiguous")
             return new(request.SessionId, request.Key, null, ["The model is unresolved or ambiguous. Inspect its files and resolution evidence."]);
-        if (detail.Models.Count > 32)
+        if (previewModels.Count > 32)
             return new(request.SessionId, request.Key, null, ["This appearance exceeds the preview limit of 32 model components."]);
         var session = sessions.GetRequired(request.SessionId);
         var parts = new List<CharacterPreviewPart>();
-        foreach (var model in detail.Models)
+        foreach (var model in previewModels)
         {
             token.ThrowIfCancellationRequested();
             var package = await models.BuildAsync(session, model, request.IncludeTextures, progress, token).ConfigureAwait(false);
@@ -64,6 +65,15 @@ public sealed class ArchiveCharacterPreviewService(
         }
         finally { gate.Release(); }
         return new(session.Id, request.Key, destination, warnings);
+    }
+
+    internal static IReadOnlyList<ArchiveEntryDto> PreviewModels(CharacterCatalogDetailResult detail)
+    {
+        if (!detail.Row.EmbeddedFace || detail.Row.Role is not ("body" or "whole_character")) return detail.Models;
+        var bodyIds = detail.Components.Where(component => component.Role is "body" or "whole_character")
+            .SelectMany(component => component.ModelEntryIds).ToHashSet();
+        // A body that already includes its face must not also draw the separate head.
+        return bodyIds.Count == 0 ? detail.Models : detail.Models.Where(model => bodyIds.Contains(model.EntryId)).ToArray();
     }
 
     public async Task<CharacterThumbnailResult> ThumbnailsAsync(CharacterThumbnailRequest request, CancellationToken token)

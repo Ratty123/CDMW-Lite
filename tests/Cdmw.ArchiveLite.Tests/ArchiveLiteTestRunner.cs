@@ -1179,13 +1179,13 @@ internal static partial class ArchiveLiteTestRunner
                 && string.Equals((string?)element.Attribute("Value"), "Center", StringComparison.Ordinal)),
             "top-bar selectors are not vertically centered in the fixed-height title row");
         var shellGrid = window.Root!.Elements().Single(element => element.Name.LocalName == "Grid");
-        var titleRowHeight = double.Parse(
-            shellGrid.Elements().Single(element => element.Name.LocalName == "Grid.RowDefinitions")
-                .Elements().First().Attribute("Height")!.Value,
-            CultureInfo.InvariantCulture);
         var titleBarGrid = shellGrid.Elements().Single(element =>
             element.Attributes().Any(attribute =>
                 attribute.Name.LocalName == "Name" && attribute.Value == "TitleBarGrid"));
+        var titleRowHeight = double.Parse(
+            titleBarGrid.Elements().Single(element => element.Name.LocalName == "Grid.RowDefinitions")
+                .Elements().First().Attribute("Height")!.Value,
+            CultureInfo.InvariantCulture);
         var topBarSelectors = titleBarGrid.Elements().Where(element =>
             element.Name.LocalName == "ComboBox"
             && ((string?)element.Attribute("Style"))?.Contains("TopBarComboBoxStyle", StringComparison.Ordinal) == true)
@@ -5154,6 +5154,9 @@ internal static partial class ArchiveLiteTestRunner
         Require(
             catalog.Items.All(item => item.LocalizedNames.Count == 0 && item.Description.Length == 0),
             "a rejected string table still supplied names, so it was read partially rather than rejected");
+        Require(catalog.Warning == result.Warning
+            && (await service.BuildAsync(new(opened.SessionId), null, CancellationToken.None)).Warning == result.Warning,
+            "catalogue or in-session reuse hid a degraded localization warning");
     }
 
     /// <summary>

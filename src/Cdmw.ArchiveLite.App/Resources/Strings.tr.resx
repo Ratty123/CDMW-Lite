@@ -488,4 +488,7 @@
   <data name="CharacterCopyPath" xml:space="preserve"><value>Yolu kopyala</value></data>
   <data name="CharacterScopeLoading" xml:space="preserve"><value>Karakter dosyaları çözümleniyor…</value></data>
   <data name="CharacterScopeApplied" xml:space="preserve"><value>Gövde ve Yüz Bulucu: {0} — {1:N0} dosya, {2:N0} doğrudan bağlantı</value></data>
+  <data name="CharacterThumbnailProgress" xml:space="preserve"><value>Hazır küçük resimler: {0:N0} / {1:N0}</value></data>
+  <data name="CharacterThumbnailQueued" xml:space="preserve"><value>Sırada</value></data>
+  <data name="CharacterLoadingCancelled" xml:space="preserve"><value>Yükleme iptal edildi.</value></data>
 </root>

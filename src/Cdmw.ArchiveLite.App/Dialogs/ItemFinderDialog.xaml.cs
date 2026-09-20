@@ -56,7 +56,8 @@ public partial class ItemFinderDialog : Window
 
     private void OnClosing(object? sender, CancelEventArgs eventArgs)
     {
-        _viewModel.UpdateWindowSize(ActualWidth, ActualHeight);
+        var size = WindowState == WindowState.Normal ? new Size(ActualWidth, ActualHeight) : RestoreBounds.Size;
+        _viewModel.UpdateWindowSize(size.Width, size.Height);
         _viewModel.Deactivate();
         _viewModel.CloseRequested -= OnCloseRequested;
     }

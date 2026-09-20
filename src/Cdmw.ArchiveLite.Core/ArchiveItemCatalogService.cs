@@ -43,7 +43,8 @@ public sealed class ArchiveItemCatalogService(
             request.PageStart,
             request.PageSize,
             page.Items.Select(ToContract).ToArray(),
-            catalog.CategoryFacets);
+            catalog.CategoryFacets,
+            session.ItemCatalogWarning);
     }
 
     internal static ItemCatalogRow ToContract(ArchiveItemCatalogRecord item) => new(

@@ -28,7 +28,8 @@ public partial class CharacterFinderDialog : Window
     }
     private void OnClosing(object? sender, CancelEventArgs args)
     {
-        _viewModel.UpdateWindowSize(ActualWidth, ActualHeight);
+        var size = WindowState == WindowState.Normal ? new Size(ActualWidth, ActualHeight) : RestoreBounds.Size;
+        _viewModel.UpdateWindowSize(size.Width, size.Height);
         _viewModel.Deactivate();
     }
     private async void OnClosed(object? sender, EventArgs args)
@@ -37,7 +38,21 @@ public partial class CharacterFinderDialog : Window
         _viewModel.CloseRequested -= OnCloseRequested;
         await ModelPreview.ShutdownAsync().ConfigureAwait(true);
     }
-    private void OnSourceInitialized(object? sender, EventArgs args) => ThemedWindowChrome.Apply(this);
+    private void OnSourceInitialized(object? sender, EventArgs args)
+    {
+        ThemedWindowChrome.Apply(this);
+        MaximizedWindowBounds.Apply(this);
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var bounds = NativeWindowPlacement.Capture(handle)?.Restored ?? default;
+        var monitors = NativeWindowPlacement.Monitors();
+        if (monitors.Count == 0) return;
+        var work = monitors.OrderByDescending(monitor => monitor.Bounds.IntersectionArea(bounds)).First().WorkArea;
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+        var maxWidth = Math.Max(1, work.Width / dpi.DpiScaleX - 24);
+        var maxHeight = Math.Max(1, work.Height / dpi.DpiScaleY - 48);
+        MinWidth = Math.Min(MinWidth, maxWidth); MinHeight = Math.Min(MinHeight, maxHeight);
+        Width = Math.Min(Width, maxWidth); Height = Math.Min(Height, maxHeight);
+    }
     private void OnThemeChanged(object? sender, EventArgs args)
     {
         if (Dispatcher.CheckAccess()) ThemedWindowChrome.Apply(this);

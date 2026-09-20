@@ -25,21 +25,21 @@
         <StackPanel Grid.Row="1" Margin="14,12,14,10">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="140" /><ColumnDefinition Width="190" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <ComboBox Margin="0,0,8,0" ItemsSource="{Binding Tabs}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Tab}" />
-                <ComboBox Grid.Column="1" Margin="0,0,8,0" ItemsSource="{Binding Views}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding View}" />
+                <ComboBox MinWidth="130" Margin="0,0,8,0" ItemsSource="{Binding Tabs}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Tab}" />
+                <ComboBox Grid.Column="1" MinWidth="175" Margin="0,0,8,0" ItemsSource="{Binding Views}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding View}" />
                 <TextBox x:Name="SearchBox" Grid.Column="2" Margin="0,0,8,0" Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" ToolTip="{infra:Loc Key=CharacterSearchHint}" KeyDown="OnSearchKeyDown" />
                 <Button Grid.Column="3" Margin="0,0,8,0" Content="{infra:Loc Key=Search}" Command="{Binding SearchCommand}" />
                 <Button Grid.Column="4" Content="{infra:Loc Key=Clear}" Command="{Binding ClearCommand}" />
             </Grid>
             <UniformGrid Columns="4" Margin="0,8,0,0">
-                <ComboBox Margin="0,0,8,0" ItemsSource="{Binding Roles}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Role}" />
-                <ComboBox Margin="0,0,8,0" ItemsSource="{Binding Sources}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SourceGroup}" />
-                <ComboBox Margin="0,0,8,0" ItemsSource="{Binding Families}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding BodyFamily}" />
-                <ComboBox ItemsSource="{Binding Resolutions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Resolution}" />
+                <ComboBox Margin="0,0,8,0" ItemsSource="{Binding Roles}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedRole}" />
+                <ComboBox Margin="0,0,8,0" ItemsSource="{Binding Sources}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedSource}" />
+                <ComboBox Margin="0,0,8,0" ItemsSource="{Binding Families}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedFamily}" />
+                <ComboBox ItemsSource="{Binding Resolutions}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedResolution}" />
             </UniformGrid>
-            <TextBlock Margin="0,6,0,0" Text="{Binding Warnings}" TextWrapping="Wrap" MaxHeight="54" Foreground="{DynamicResource TextMutedBrush}" />
+            <TextBlock Margin="0,6,0,0" Text="{Binding Warnings}" ToolTip="{Binding Warnings}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMutedBrush}" />
             <Button Margin="0,6,0,0" Content="{infra:Loc Key=CharacterShowAll}" Command="{Binding ClearCommand}" HorizontalAlignment="Left"
                     Visibility="{Binding HasRelatedFilter, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </StackPanel>
@@ -50,15 +50,18 @@
                 <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Width="152" Margin="3" ToolTip="{Binding Source.Path}">
+                        <StackPanel Width="160" Margin="3" ToolTip="{Binding Source.Path}">
                             <Border Height="126" CornerRadius="4" Background="{DynamicResource SurfaceRaisedBrush}">
                                 <Grid>
-                                    <TextBlock Text="{Binding Subtitle}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8" Foreground="{DynamicResource TextMutedBrush}" />
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8">
+                                        <TextBlock Text="{Binding LoadingLabel}" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource TextMutedBrush}" />
+                                        <ProgressBar Height="4" Margin="0,8,0,0" IsIndeterminate="True" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </StackPanel>
                                     <Image Source="{Binding Thumbnail}" Stretch="Uniform" ToolTip="{Binding ThumbnailWarning}" />
                                 </Grid>
                             </Border>
-                            <TextBlock Text="{Binding Label}" Margin="0,6,0,2" TextWrapping="Wrap" MaxHeight="36" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding Subtitle}" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMutedBrush}" />
+                            <TextBlock Text="{Binding Label}" Margin="0,6,0,2" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" />
+                            <TextBlock Text="{Binding Subtitle}" FontSize="{DynamicResource CaptionFontSize}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMutedBrush}" />
                         </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -68,13 +71,25 @@
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="3*" /><RowDefinition Height="Auto" /><RowDefinition Height="2*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <TextBlock Text="{Binding PreviewTitle}" FontWeight="SemiBold" Margin="0,0,0,6" TextTrimming="CharacterEllipsis" />
                 <Border Grid.Row="1" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                    <controls:DotNetModelPreviewHost x:Name="ModelPreview" PackagePath="{Binding PackagePath}" />
+                    <controls:DotNetModelPreviewHost x:Name="ModelPreview" PackagePath="{Binding PackagePath}"
+                        Visibility="{Binding HasPackage, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </Border>
                 <StackPanel Grid.Row="2" Margin="0,6">
-                    <TextBlock Text="{Binding PreviewStatus}" TextWrapping="Wrap" MaxHeight="56" />
-                    <TextBlock Text="{Binding ElementName=ModelPreview, Path=StatusText}" TextWrapping="Wrap" MaxHeight="42" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding PreviewStatus}" ToolTip="{Binding PreviewStatus}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding ElementName=ModelPreview, Path=StatusText}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextMutedBrush}" />
+                    <ProgressBar Height="5" Margin="0,5,0,0" IsIndeterminate="True">
+                        <ProgressBar.Style>
+                            <Style TargetType="ProgressBar">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPreparingPreview}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                    <DataTrigger Binding="{Binding ElementName=ModelPreview, Path=IsLoading}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ProgressBar.Style>
+                    </ProgressBar>
                 </StackPanel>
-                <TabControl Grid.Row="3">
+                <TabControl Grid.Row="3" Style="{StaticResource SettingsTabControlStyle}">
                     <TabItem Header="{infra:Loc Key=CharacterDetails}">
                         <TextBox Text="{Binding Details, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
                     </TabItem>
@@ -94,7 +109,12 @@
         </Grid>
         <Grid Grid.Row="3" Margin="14,10,14,14">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="{Binding Status}" ToolTip="{Binding Status}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding ThumbnailStatus}" FontSize="{DynamicResource CaptionFontSize}" Foreground="{DynamicResource TextMutedBrush}" />
+                <ProgressBar Height="4" Margin="0,4,0,0" Value="{Binding ThumbnailCount, Mode=OneWay}" Maximum="{Binding ThumbnailTotal}"
+                    Visibility="{Binding IsLoadingThumbnails, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            </StackPanel>
             <Button Grid.Column="1" Margin="8,0,0,0" Content="{infra:Loc Key=Cancel}" Command="{Binding CancelCommand}" />
             <Button Grid.Column="2" Margin="8,0,0,0" Content="{infra:Loc Key=PreviousPage}" Command="{Binding PreviousCommand}" />
             <Button Grid.Column="3" Margin="8,0,0,0" Content="{infra:Loc Key=NextPage}" Command="{Binding NextCommand}" />

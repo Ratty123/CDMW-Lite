@@ -40,7 +40,7 @@
 
     <Grid Background="{DynamicResource WindowBackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="50" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="40" />
         </Grid.RowDefinitions>
@@ -49,6 +49,7 @@
               Grid.Row="0"
               Background="{DynamicResource SurfaceRaisedBrush}"
               ClipToBounds="True">
+            <Grid.RowDefinitions><RowDefinition Height="50" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -68,7 +69,7 @@
                        FontWeight="SemiBold"
                        Text="{infra:Loc Key=ProductName}"
                        MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown" />
-            <StackPanel Grid.Column="1"
+            <WrapPanel x:Name="NavigationPanel" Grid.Column="1"
                         Margin="0,0,10,0"
                         VerticalAlignment="Center"
                         Orientation="Horizontal"
@@ -104,7 +105,7 @@
                         Content="{infra:Loc Key=CharacterFinderTitle}"
                         IsEnabled="{Binding CharacterFinder.IsAvailable}"
                         Click="OnCharacterFinderClick" />
-            </StackPanel>
+            </WrapPanel>
             <Border Grid.Column="2"
                     Background="Transparent"
                     MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown" />
@@ -287,7 +288,7 @@
                             <ColumnDefinition Width="7" />
                             <ColumnDefinition x:Name="ArchiveFolderColumn" Width="240" MinWidth="170" />
                             <ColumnDefinition x:Name="ArchiveFolderSplitterColumn" Width="7" />
-                            <ColumnDefinition x:Name="ArchiveResultsColumn" Width="1.5*" MinWidth="410" />
+                            <ColumnDefinition x:Name="ArchiveResultsColumn" Width="1.5*" MinWidth="380" />
                             <ColumnDefinition Width="7" />
                             <ColumnDefinition x:Name="ArchivePreviewColumn" Width="0.85*" MinWidth="350" MaxWidth="1000" />
                         </Grid.ColumnDefinitions>
@@ -707,42 +708,32 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <Grid Grid.Row="0" Margin="0,0,0,11">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0"
+                                <WrapPanel Grid.Row="0" Margin="0,0,0,11">
+                                    <TextBlock Margin="0,0,8,4" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                Style="{StaticResource SectionTitleStyle}"
                                                Text="{Binding ArchiveBrowser.PreviewTitle}" />
-                                    <Button Grid.Column="1"
-                                            Margin="10,0,0,0"
+                                    <Button Margin="0,0,8,4"
                                             Style="{StaticResource CompactButtonStyle}"
                                             Content="{Binding ArchiveBrowser.AssociatedAssets.Header}"
                                             Command="{Binding ArchiveBrowser.AssociatedAssets.ToggleDrawerCommand}" />
-                                    <CheckBox Grid.Column="2"
-                                              Margin="10,0,0,0"
+                                    <CheckBox Margin="0,0,8,4"
                                               VerticalAlignment="Center"
                                               Content="{infra:Loc Key=DisplayModelTextures}"
                                               ToolTip="{infra:Loc Key=DisplayModelTexturesHint}"
                                               IsChecked="{Binding ArchiveBrowser.ShowModelTextures, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                               Visibility="{Binding ArchiveBrowser.IsModelSelection, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <Button Grid.Column="3"
-                                            Margin="8,0,0,0"
+                                    <Button Margin="0,0,8,4"
                                             Style="{StaticResource CompactButtonStyle}"
                                             Content="{infra:Loc Key=PreviewSettings}"
                                             Click="OnModelPreviewSettingsClick"
                                             Visibility="{Binding ArchiveBrowser.CanOpenPreviewSettings, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                    <Border Grid.Column="4" Style="{StaticResource BadgeBorderStyle}" Margin="8,0,0,0">
+                                    <Border Style="{StaticResource BadgeBorderStyle}" Margin="0,0,0,4" VerticalAlignment="Center">
                                          <TextBlock FontSize="{DynamicResource BadgeFontSize}"
                                                    FontWeight="Bold"
                                                    Foreground="{DynamicResource TextMutedBrush}"
                                                    Text="{infra:Loc Key=ReadOnlyBadge}" />
                                     </Border>
-                                </Grid>
+                                </WrapPanel>
 
                                 <Border Grid.Row="1"
                                         Margin="0,0,0,8"
@@ -794,24 +785,26 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <DockPanel Grid.Column="0" LastChildFill="True">
-                                                    <TextBlock Margin="0,0,7,0"
+                                                    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,4" TextWrapping="Wrap"
                                                                VerticalAlignment="Center"
                                                                Foreground="{DynamicResource TextMutedBrush}"
                                                                Text="{infra:Loc Key=FindInFile}" />
                                                     <TextBox x:Name="ArchivePreviewFindBox"
-                                                             MinWidth="120"
+                                                             MinWidth="40"
                                                              Padding="8,4"
                                                              VerticalContentAlignment="Center"
                                                              KeyDown="OnArchivePreviewFindKeyDown"
                                                              ToolTip="{infra:Loc Key=FindInFile}" />
                                                 </DockPanel>
                                                 <Button Grid.Column="1"
+                                                        MinWidth="32" VerticalAlignment="Bottom"
                                                         Margin="6,0,0,0"
                                                         Style="{StaticResource CompactButtonStyle}"
                                                         Content="&#x2191;"
                                                         ToolTip="{infra:Loc Key=FindPrevious}"
                                                         Click="OnArchivePreviewFindPreviousClick" />
                                                 <Button Grid.Column="2"
+                                                        MinWidth="32" VerticalAlignment="Bottom"
                                                         Margin="4,0,0,0"
                                                         Style="{StaticResource CompactButtonStyle}"
                                                         Content="&#x2193;"
@@ -1312,24 +1305,26 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <DockPanel Grid.Column="0" LastChildFill="True">
-                                        <TextBlock Margin="0,0,7,0"
+                                        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,4" TextWrapping="Wrap"
                                                    VerticalAlignment="Center"
                                                    Foreground="{DynamicResource TextMutedBrush}"
                                                    Text="{infra:Loc Key=FindInFile}" />
                                         <TextBox x:Name="TextSearchPreviewFindBox"
-                                                 MinWidth="120"
+                                                 MinWidth="40"
                                                  Padding="8,4"
                                                  VerticalContentAlignment="Center"
                                                  KeyDown="OnTextSearchPreviewFindKeyDown"
                                                  ToolTip="{infra:Loc Key=FindInFile}" />
                                     </DockPanel>
                                     <Button Grid.Column="1"
+                                            MinWidth="32" VerticalAlignment="Bottom"
                                             Margin="6,0,0,0"
                                             Style="{StaticResource CompactButtonStyle}"
                                             Content="&#x2191;"
                                             ToolTip="{infra:Loc Key=FindPrevious}"
                                             Click="OnTextSearchPreviewFindPreviousClick" />
                                     <Button Grid.Column="2"
+                                            MinWidth="32" VerticalAlignment="Bottom"
                                             Margin="4,0,0,0"
                                             Style="{StaticResource CompactButtonStyle}"
                                             Content="&#x2193;"

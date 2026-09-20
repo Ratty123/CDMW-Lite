@@ -49,6 +49,13 @@ internal static partial class ArchiveLiteTestRunner
         var related = await service.ScopeAsync(new(opened.SessionId, detail.Row.Key, true), null, CancellationToken.None);
         Require(detail.Models.Single().Path == body && detail.Related.Single().Path == appearance,
             "detail/ownership did not resolve the archive's actual entries");
+        var head = detail.Models[0] with { EntryId = 900, Path = "character/model/head.pac" };
+        var embedded = detail with { Row = detail.Row with { EmbeddedFace = true }, Models = [detail.Models[0], head],
+            Components = [new("body", "body", [detail.Models[0].EntryId], [], 1, new Dictionary<string, string>(), "resolved"),
+                new("head", "head", [head.EntryId], [], 1, new Dictionary<string, string>(), "resolved")] };
+        Require(ArchiveCharacterPreviewService.PreviewModels(embedded).Single().Path == body
+            && ArchiveCharacterPreviewService.PreviewModels(embedded with { Row = embedded.Row with { EmbeddedFace = false } }).Count == 2,
+            "an embedded face was doubled or a separate head was dropped from preview");
         Require(exact.EntryIds.Count == 1 && related.EntryIds.Count > exact.EntryIds.Count
             && exact.Extensions!.Any(facet => facet.Extension == ".pac"), "finder scopes lost model links or extension facets");
         var bounded = await service.ScopeAsync(new(opened.SessionId, detail.Row.Key, true, 1), null, CancellationToken.None);
@@ -174,30 +181,38 @@ internal static partial class ArchiveLiteTestRunner
             await RunOnWpfDispatcherAsync(async () =>
             {
                 var worker = new FakeCharacterFinderWorker(image);
+                int VisibleSearches() => worker.Searches.Count(search => search.PageStart == 0);
                 var session = "session-a";
                 var scopes = new List<(string, bool)>();
                 var model = new CharacterFinderViewModel(worker, () => session, (key, _, related, _) =>
                 { scopes.Add((key, related)); return Task.FromResult(true); });
+                var roleBox = new System.Windows.Controls.ComboBox { DisplayMemberPath = "Label", SelectedValuePath = "Value", DataContext = model };
+                roleBox.SetBinding(System.Windows.Controls.ItemsControl.ItemsSourceProperty, new System.Windows.Data.Binding(nameof(model.Roles)));
+                roleBox.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedItemProperty,
+                    new System.Windows.Data.Binding(nameof(model.SelectedRole)) { Mode = System.Windows.Data.BindingMode.TwoWay });
                 await model.ActivateAsync(CancellationToken.None);
-                await WaitUntilAsync(() => model.Rows.All(row => row.Thumbnail is not null) && model.PackagePath is not null, TimeSpan.FromSeconds(3));
-                Require(worker.Searches.Count == 1 && model.Rows.Count == 5 && worker.ThumbnailBatches.SequenceEqual([4, 1]),
+                await WaitUntilAsync(() => !model.IsLoadingThumbnails && model.PackagePath is not null, TimeSpan.FromSeconds(3));
+                Require(VisibleSearches() == 1 && model.Rows.Count == 5 && worker.ThumbnailBatches.Count == 10 && worker.ThumbnailBatches.All(count => count == 1),
                     "character page or bounded thumbnail batches are wrong");
+                Require(roleBox.SelectedItem is FinderOption { Value: "" }, "WPF lost the all-roles label when facets were rebuilt");
                 model.Query = "h"; model.Query = "he"; model.Query = "hero";
-                await WaitUntilAsync(() => worker.Searches.Count == 2 && !model.IsBusy, TimeSpan.FromSeconds(2));
+                await WaitUntilAsync(() => VisibleSearches() == 2 && !model.IsBusy, TimeSpan.FromSeconds(2));
                 await Task.Delay(300);
-                Require(worker.Searches.Count == 2 && worker.Searches[^1].Query == "hero", "typing did not debounce to the latest query");
+                Require(VisibleSearches() == 2 && worker.Searches[^1].Query == "hero", "typing did not debounce to the latest query");
+                Require(worker.ThumbnailBatches.Count == 10, "cached thumbnails were regenerated when rows were revisited");
                 model.Query = "immediate"; model.SearchCommand.Execute(null);
-                await WaitUntilAsync(() => worker.Searches.Count == 3 && !model.IsBusy, TimeSpan.FromSeconds(2));
+                await WaitUntilAsync(() => VisibleSearches() == 3 && !model.IsBusy, TimeSpan.FromSeconds(2));
                 await Task.Delay(300);
-                Require(worker.Searches.Count == 3, "Enter/Search left a second debounced request queued");
+                Require(VisibleSearches() == 3, "Enter/Search left a second debounced request queued");
                 model.Role = "body";
-                await WaitUntilAsync(() => worker.Searches.Count == 4 && !model.IsBusy, TimeSpan.FromSeconds(2));
+                await WaitUntilAsync(() => VisibleSearches() == 4 && !model.IsBusy, TimeSpan.FromSeconds(2));
                 model.RefreshLocalization();
                 await Task.Delay(280);
-                Require(worker.Searches.Count == 4 && model.Role == "body", "facet refresh reset a filter or scheduled a search");
+                Require(VisibleSearches() == 4 && model.Role == "body" && roleBox.SelectedValue is "body", "facet refresh reset a filter or scheduled a search");
+                var searchesBeforeNext = worker.Searches.Count;
                 model.NextCommand.Execute(null);
-                await WaitUntilAsync(() => worker.Searches.Count == 5 && !model.IsBusy, TimeSpan.FromSeconds(2));
-                Require(worker.Searches[^1].PageStart == 72, "next page lost its offset");
+                await WaitUntilAsync(() => model.SelectedRow?.Source.Key == "asset:72" && !model.IsBusy, TimeSpan.FromSeconds(2));
+                Require(worker.Searches.Count == searchesBeforeNext && model.Rows.All(row => row.Thumbnail is not null), "next page did not reuse its preloaded catalogue and thumbnails");
                 await WaitUntilAsync(() => model.PackagePath is not null && model.ShowExactCommand.CanExecute(null), TimeSpan.FromSeconds(2));
                 var closes = 0; model.CloseRequested += (_, _) => closes++;
                 model.ShowExactCommand.Execute(null);
@@ -214,7 +229,7 @@ internal static partial class ArchiveLiteTestRunner
                 await Task.Delay(500);
                 Require(model.PackagePath == previous.Source.Key, "a late preview replaced the newer selection");
                 model.Query = "late-session";
-                await WaitUntilAsync(() => worker.Searches.Count == 6, TimeSpan.FromSeconds(2));
+                await WaitUntilAsync(() => VisibleSearches() == 5, TimeSpan.FromSeconds(2));
                 session = "session-b"; model.NotifyArchiveSessionChanged();
                 await Task.Delay(450);
                 Require(model.Rows.Count == 0 && model.PackagePath is null, "old session results repopulated the finder");
@@ -226,6 +241,15 @@ internal static partial class ArchiveLiteTestRunner
                 Require(loaded?.CharacterFinder == settings && JsonSerializer.Deserialize<LiteSettings>("{}")?.CharacterFinder is null,
                     "finder settings failed to round-trip or broke earlier settings");
                 model.RequestShutdown();
+                var delayed = new FakeCharacterFinderWorker(image) { Delay = 150, IgnoreCancellation = true };
+                var cancellable = new CharacterFinderViewModel(delayed, () => "cancel-session", (_, _, _, _) => Task.FromResult(false));
+                await cancellable.ActivateAsync(CancellationToken.None);
+                Require(!cancellable.IsBusy && cancellable.CancelCommand.CanExecute(null), "preview and thumbnail loading disabled Cancel");
+                cancellable.CancelCommand.Execute(null);
+                await Task.Delay(500);
+                Require(cancellable.PackagePath is null && cancellable.Rows.All(row => row.Thumbnail is null)
+                    && !cancellable.IsPreparingPreview && !cancellable.IsLoadingThumbnails, "cancelled work published late images or stayed busy");
+                cancellable.RequestShutdown();
             });
         }
         finally { File.Delete(image); }

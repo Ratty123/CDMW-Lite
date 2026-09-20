@@ -10,7 +10,7 @@ public sealed class ArchiveItemNameIndexService(
     NativeArchiveCore native,
     ArchiveWorkPriority? workPriority = null)
 {
-    private const int CacheSchemaVersion = 8;
+    private const int CacheSchemaVersion = 9;
     private const int NativeCatalogSchemaVersion = 4;
     private const int MaximumDiagnosticCharacters = 64 * 1024;
     private static readonly TimeSpan IndexerTimeout = TimeSpan.FromMinutes(3);
@@ -37,7 +37,7 @@ public sealed class ArchiveItemNameIndexService(
                 && session.TryGetItemCatalog(out var activeCatalog)
                 && activeCatalog is not null)
             {
-                return Result(session, active, activeCatalog, usedCache: true);
+                return Result(session, active, activeCatalog, usedCache: true, session.ItemCatalogWarning);
             }
 
             ArchiveLiteDataPaths.EnsureCreated();
@@ -45,7 +45,7 @@ public sealed class ArchiveItemNameIndexService(
             var cached = await TryLoadCacheAsync(cachePath, cancellationToken).ConfigureAwait(false);
             if (cached is not null)
             {
-                session.SetCatalogue(cached.NameIndex, cached.ItemCatalog);
+                session.SetCatalogue(cached.NameIndex, cached.ItemCatalog, cached.Warning);
                 return Result(session, cached.NameIndex, cached.ItemCatalog, usedCache: true, cached.Warning);
             }
             await WaitForForegroundAsync(yieldToForeground, cancellationToken).ConfigureAwait(false);
@@ -75,7 +75,7 @@ public sealed class ArchiveItemNameIndexService(
                         ItemCount: 0);
                 }
 
-                await ExtractSourcesAsync(
+                var localizationWarnings = await ExtractSourcesAsync(
                     sources,
                     payloadRoot,
                     publishProgress,
@@ -89,8 +89,10 @@ public sealed class ArchiveItemNameIndexService(
                 }
                 await RunIndexerAsync(entriesPath, payloadRoot, reportPath, cancellationToken).ConfigureAwait(false);
                 var catalogue = await ReadReportAsync(reportPath, cancellationToken).ConfigureAwait(false);
+                if (localizationWarnings.Count > 0)
+                    catalogue = catalogue with { Warning = string.Join(" ", localizationWarnings.Append(catalogue.Warning).Where(value => !string.IsNullOrEmpty(value))) };
                 await SaveCacheAsync(cachePath, catalogue, cancellationToken).ConfigureAwait(false);
-                session.SetCatalogue(catalogue.NameIndex, catalogue.ItemCatalog);
+                session.SetCatalogue(catalogue.NameIndex, catalogue.ItemCatalog, catalogue.Warning);
                 if (publishProgress is not null)
                 {
                     await publishProgress(new ProgressUpdate(1, 1, "name_publish")).ConfigureAwait(false);
@@ -189,13 +191,14 @@ public sealed class ArchiveItemNameIndexService(
         return sources;
     }
 
-    private async Task ExtractSourcesAsync(
+    private async Task<IReadOnlyList<string>> ExtractSourcesAsync(
         ArchiveItemSources sources,
         string payloadRoot,
         Func<ProgressUpdate, Task>? publishProgress,
         CancellationToken cancellationToken,
         bool yieldToForeground)
     {
+        var warnings = new List<string>();
         var payloads = new List<(string Name, ArchiveEntryDto Entry)>
         {
             ("iteminfo.bin", sources.ItemInfo!),
@@ -232,12 +235,23 @@ public sealed class ArchiveItemNameIndexService(
                 await publishProgress(new ProgressUpdate(index, payloads.Count, "name_extract", name)).ConfigureAwait(false);
             }
             var decoded = await Task.Run(() => native.Decode(entry), cancellationToken).ConfigureAwait(false);
-            await File.WriteAllBytesAsync(Path.Combine(payloadRoot, name), decoded.Bytes, cancellationToken).ConfigureAwait(false);
+            var bytes = decoded.Bytes;
+            if (name.StartsWith("loc_", StringComparison.Ordinal))
+            {
+                try { bytes = ArchiveMetadataReader.LocalizationPayload(bytes); }
+                catch (InvalidDataException error)
+                {
+                    warnings.Add($"Could not read {entry.Path}: {error.Message}");
+                    continue;
+                }
+            }
+            await File.WriteAllBytesAsync(Path.Combine(payloadRoot, name), bytes, cancellationToken).ConfigureAwait(false);
         }
         if (publishProgress is not null)
         {
             await publishProgress(new ProgressUpdate(payloads.Count, payloads.Count, "name_extract")).ConfigureAwait(false);
         }
+        return warnings;
     }
 
     private static async Task RunIndexerAsync(

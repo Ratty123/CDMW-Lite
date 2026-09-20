@@ -488,4 +488,7 @@
   <data name="CharacterCopyPath" xml:space="preserve"><value>复制路径</value></data>
   <data name="CharacterScopeLoading" xml:space="preserve"><value>正在解析角色文件…</value></data>
   <data name="CharacterScopeApplied" xml:space="preserve"><value>身体与面部查找器：{0} — {1:N0} 个文件，其中 {2:N0} 个直接链接</value></data>
+  <data name="CharacterThumbnailProgress" xml:space="preserve"><value>缩略图已就绪：{0:N0} / {1:N0}</value></data>
+  <data name="CharacterThumbnailQueued" xml:space="preserve"><value>排队中</value></data>
+  <data name="CharacterLoadingCancelled" xml:space="preserve"><value>加载已取消。</value></data>
 </root>

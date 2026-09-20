@@ -41,7 +41,7 @@ public sealed class ArchiveCharacterCatalogService(ArchiveSessionManager session
                 snapshot = await Task.Run(() => ArchiveCharacterCatalogBuilder.Build(session.PackageRoot, signature,
                     Enumerate(session, token), entry => native.Decode(entry).Bytes, token,
                     (done, total, phase) => {
-                        if (((done & 0x7F) == 0 || done == total) && progress is not null)
+                        if ((total == 0 || (done & 0x7F) == 0 || done == total) && progress is not null)
                             progress(new ProgressUpdate(done, total, "character_catalog", phase)).GetAwaiter().GetResult();
                     }), token).ConfigureAwait(false);
                 var temporary = cachePath + "." + Guid.NewGuid().ToString("N") + ".tmp";

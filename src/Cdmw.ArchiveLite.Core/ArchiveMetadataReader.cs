@@ -74,49 +74,86 @@ internal static class ArchiveMetadataReader
     private static readonly int[] PabghCountWidths = [1, 2, 4];
     private static readonly int[] PabghKeyWidths = [1, 2, 4, 8, 12];
     internal sealed record PabghDirectoryRow(byte[] Key, uint Offset);
+    internal static byte[] LocalizationPayload(byte[] data)
+    {
+        if (!data.AsSpan().StartsWith("paloc"u8)) return data;
+        const int headerSize = 512;
+        if (data.Length < headerSize) throw new InvalidDataException("PALOC container header is truncated.");
+        if (ReadUInt32(data, 5) != 0) throw new InvalidDataException("Unsupported PALOC container version.");
+        if (ReadUInt32(data, 9) != data.Length - headerSize)
+            throw new InvalidDataException("PALOC compressed size does not match its bytes.");
+        var size = ReadUInt32(data, 13);
+        if (size is < 4 or > 256 * 1024 * 1024)
+            throw new InvalidDataException("PALOC uncompressed size is out of bounds.");
+        var output = new byte[(int)size];
+        var inputAt = headerSize;
+        var outputAt = 0;
+        int Length(int length)
+        {
+            if (length != 15) return length;
+            byte extra;
+            do
+            {
+                if (inputAt >= data.Length) throw new InvalidDataException("PALOC LZ4 length is truncated.");
+                extra = data[inputAt++];
+                if (length > output.Length - extra) throw new InvalidDataException("PALOC LZ4 run exceeds its output size.");
+                length += extra;
+            } while (extra == 255);
+            return length;
+        }
+        while (inputAt < data.Length)
+        {
+            var control = data[inputAt++];
+            var literals = Length(control >> 4);
+            if (literals > data.Length - inputAt || literals > output.Length - outputAt)
+                throw new InvalidDataException("PALOC LZ4 literal run is out of bounds.");
+            data.AsSpan(inputAt, literals).CopyTo(output.AsSpan(outputAt));
+            inputAt += literals; outputAt += literals;
+            if (inputAt == data.Length) break;
+            if (data.Length - inputAt < 2) throw new InvalidDataException("PALOC LZ4 match is truncated.");
+            var offset = data[inputAt] | data[inputAt + 1] << 8;
+            inputAt += 2;
+            if (offset == 0 || offset > outputAt) throw new InvalidDataException("PALOC LZ4 match offset is invalid.");
+            var match = checked(Length(control & 15) + 4);
+            if (match > output.Length - outputAt) throw new InvalidDataException("PALOC LZ4 match run is out of bounds.");
+            for (var i = 0; i < match; i++, outputAt++) output[outputAt] = output[outputAt - offset];
+        }
+        if (outputAt != output.Length) throw new InvalidDataException("PALOC LZ4 decoded size does not match its header.");
+        return output;
+    }
+
     internal static Dictionary<string, string> ParseLocalization(
         byte[] data,
         IReadOnlySet<string> wantedIds,
         CancellationToken cancellationToken)
     {
+        data = LocalizationPayload(data);
+        if (data.Length < 4) throw new InvalidDataException("PALOC record count is missing.");
         var rows = new Dictionary<string, string>(StringComparer.Ordinal);
+        var utf8 = new UTF8Encoding(false, true);
+        var limit = data.Length - 4;
+        var declared = ReadUInt32(data, limit);
         var position = 0;
-        while (position + 8 < data.Length)
+        var count = 0;
+        while (position < limit)
         {
-            if ((position & 0xFFFFF) == 0)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-            var idLength = ReadUInt32(data, position);
-            if (idLength is >= 6 and <= 20 && idLength <= int.MaxValue &&
-                position + 4L + idLength <= data.Length)
-            {
-                var idBytes = data.AsSpan(position + 4, (int)idLength);
-                if (IsAsciiDigits(idBytes))
-                {
-                    var id = Encoding.ASCII.GetString(idBytes);
-                    var textPosition = checked(position + 4 + (int)idLength);
-                    if (textPosition + 4 < data.Length)
-                    {
-                        var textLength = ReadUInt32(data, textPosition);
-                        if (textLength is > 0 and < 50_000 && textLength <= int.MaxValue &&
-                            textPosition + 4L + textLength <= data.Length)
-                        {
-                            if (wantedIds.Contains(id))
-                            {
-                                rows[id] = Encoding.UTF8.GetString(
-                                    data,
-                                    textPosition + 4,
-                                    (int)textLength);
-                            }
-                            position = checked(textPosition + 4 + (int)textLength);
-                            continue;
-                        }
-                    }
-                }
-            }
-            position++;
+            if ((count & 127) == 0) cancellationToken.ThrowIfCancellationRequested();
+            if (limit - position < 12) throw new InvalidDataException("PALOC record header is truncated.");
+            var idLength = ReadUInt32(data, position + 8);
+            position += 12;
+            if (idLength > limit - position || limit - position - idLength < 4)
+                throw new InvalidDataException("PALOC key is truncated.");
+            var id = utf8.GetString(data, position, (int)idLength);
+            position += (int)idLength;
+            var textLength = ReadUInt32(data, position);
+            position += 4;
+            if (textLength > limit - position) throw new InvalidDataException("PALOC text is truncated.");
+            var text = utf8.GetString(data, position, (int)textLength);
+            if (wantedIds.Contains(id)) rows[id] = text;
+            position += (int)textLength;
+            count++;
         }
+        if (count != declared) throw new InvalidDataException("PALOC record count does not match its footer.");
         return rows;
     }
     internal static List<PabghDirectoryRow>? ResolvePabghDirectory(byte[] header, byte[] payload)
@@ -204,18 +241,6 @@ internal static class ArchiveMetadataReader
         var nul = raw.IndexOf((byte)0);
         return Encoding.ASCII.GetString(nul < 0 ? raw : raw[..nul]);
     }
-    private static bool IsAsciiDigits(ReadOnlySpan<byte> value)
-    {
-        foreach (var character in value)
-        {
-            if (character is < (byte)'0' or > (byte)'9')
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private static uint ReadUInt32(byte[] data, int offset) =>
         BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset, sizeof(uint)));
 

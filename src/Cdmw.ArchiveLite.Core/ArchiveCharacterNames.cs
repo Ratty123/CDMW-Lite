@@ -48,7 +48,9 @@ internal static class ArchiveCharacterNames
             foreach (var (language, entry) in sources.DomainLocalizations("character"))
             {
                 token.ThrowIfCancellationRequested();
-                localized[language] = ArchiveMetadataReader.ParseLocalization(decode(entry), wanted, token);
+                try { localized[language] = ArchiveMetadataReader.ParseLocalization(decode(entry), wanted, token); }
+                catch (Exception error) when (error is InvalidDataException or IOException or ArgumentException)
+                { warnings.Add($"Could not read {entry.Path}: {error.Message}"); }
             }
             var hashes = appearances.GroupBy(static entry => ArchiveMetadataReader.ModelNameHash(entry.Path.ToLowerInvariant()))
                 .ToDictionary(static group => group.Key, static group => group.ToArray());

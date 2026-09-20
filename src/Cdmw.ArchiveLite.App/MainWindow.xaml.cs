@@ -54,6 +54,7 @@ public partial class MainWindow : Window
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         InitializeComponent();
         DataContext = viewModel;
+        TitleBarGrid.LayoutUpdated += OnTitleBarLayoutUpdated;
         WorkspaceTabs.SelectedIndex = 0;
         Closing += OnClosing;
         Closed += OnClosed;
@@ -63,6 +64,22 @@ public partial class MainWindow : Window
         ThemeManager.ThemeChanged += OnThemeChanged;
         _viewModel.ArchiveBrowser.PropertyChanged += OnArchiveBrowserPropertyChanged;
         _viewModel.ArchiveBrowser.Entries.CollectionChanged += OnArchiveEntriesChanged;
+    }
+
+    private void OnTitleBarLayoutUpdated(object? sender, EventArgs args)
+    {
+        if (ActualWidth <= 0) return;
+        UpdateWorkspacePreviewLimits();
+        var navigationWidth = NavigationPanel.Children.OfType<FrameworkElement>().Sum(child => child.DesiredSize.Width) + 10;
+        var otherWidth = TitleBarGrid.Children.OfType<FrameworkElement>()
+            .Where(child => child != NavigationPanel && child.Visibility == Visibility.Visible)
+            .Sum(child => child.DesiredSize.Width);
+        var wrap = navigationWidth + otherWidth > ActualWidth;
+        if ((Grid.GetRow(NavigationPanel) == 1) == wrap) return;
+        Grid.SetRow(NavigationPanel, wrap ? 1 : 0);
+        Grid.SetColumn(NavigationPanel, wrap ? 0 : 1);
+        Grid.SetColumnSpan(NavigationPanel, wrap ? TitleBarGrid.ColumnDefinitions.Count : 1);
+        NavigationPanel.Margin = wrap ? new Thickness(14, 0, 14, 8) : new Thickness(0, 0, 10, 0);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs eventArgs)
@@ -149,6 +166,7 @@ public partial class MainWindow : Window
     private void OnClosed(object? sender, EventArgs eventArgs)
     {
         StateChanged -= OnWindowStateChanged;
+        TitleBarGrid.LayoutUpdated -= OnTitleBarLayoutUpdated;
         ThemeManager.ThemeChanged -= OnThemeChanged;
         _viewModel.ArchiveBrowser.PropertyChanged -= OnArchiveBrowserPropertyChanged;
         _viewModel.ArchiveBrowser.Entries.CollectionChanged -= OnArchiveEntriesChanged;
@@ -179,6 +197,15 @@ public partial class MainWindow : Window
 
     private void UpdateWorkspacePreviewLimits()
     {
+        var availableWidth = Math.Max(1, ActualWidth - WorkspaceTabs.Margin.Left - WorkspaceTabs.Margin.Right);
+        ArchiveWorkspaceGrid.MaxWidth = availableWidth;
+        TextSearchWorkspaceGrid.MaxWidth = availableWidth;
+        // Restored splitter widths take effect after Loaded. Recalculate from the
+        // arranged columns too, so a wider remembered filter cannot push preview controls outside the window.
+        if (ArchiveWorkspaceGrid.ActualWidth > 0 && ArchiveFolderColumn.MinWidth > 0)
+            ArchiveFolderColumn.MaxWidth = Math.Max(ArchiveFolderColumn.MinWidth,
+                availableWidth - ArchiveFilterColumn.MinWidth - ArchiveResultsColumn.MinWidth
+                - ArchivePreviewColumn.MinWidth - 21);
         UpdateWorkspacePreviewLimit(
             ArchiveWorkspaceGrid,
             ArchiveFilterColumn,
@@ -207,8 +234,11 @@ public partial class MainWindow : Window
                 && !ReferenceEquals(column, results)
                 && !ReferenceEquals(column, preview))
             .Sum(MeasuredGridColumnWidth);
+        var availableWidth = Math.Min(workspace.ActualWidth, workspace.MaxWidth);
+        filter.MaxWidth = Math.Max(filter.MinWidth,
+            availableWidth - results.MinWidth - preview.MinWidth - splitterWidth);
         preview.MaxWidth = WorkspacePaneSizing.CalculatePreviewMaximum(
-            workspace.ActualWidth,
+            availableWidth,
             MeasuredGridColumnWidth(filter),
             results.MinWidth,
             splitterWidth,
@@ -584,7 +614,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnClosing(object? sender, CancelEventArgs eventArgs)
+    internal async void OnClosing(object? sender, CancelEventArgs eventArgs)
     {
         if (_shutdownComplete)
         {

@@ -488,4 +488,7 @@
   <data name="CharacterCopyPath" xml:space="preserve"><value>경로 복사</value></data>
   <data name="CharacterScopeLoading" xml:space="preserve"><value>캐릭터 파일을 확인하는 중…</value></data>
   <data name="CharacterScopeApplied" xml:space="preserve"><value>몸체 및 얼굴 찾기: {0} — 파일 {1:N0}개, 직접 연결 {2:N0}개 포함</value></data>
+  <data name="CharacterThumbnailProgress" xml:space="preserve"><value>썸네일 준비 완료: {0:N0} / {1:N0}</value></data>
+  <data name="CharacterThumbnailQueued" xml:space="preserve"><value>대기 중</value></data>
+  <data name="CharacterLoadingCancelled" xml:space="preserve"><value>로딩이 취소되었습니다.</value></data>
 </root>

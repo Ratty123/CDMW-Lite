@@ -7,6 +7,24 @@ internal static partial class ArchiveLiteTestRunner
 {
     private static async Task TestCurrentItemCatalogAsync()
     {
+        var literal = System.Text.Encoding.UTF8.GetBytes(new string('x', 1100));
+        Require(ArchiveMetadataReader.LocalizationPayload(SyntheticArchiveFixture.WrapLocalization(literal)).SequenceEqual(literal),
+            "wrapped PALOC extended literal lengths decoded incorrectly");
+        var matched = SyntheticArchiveFixture.WrapLocalization(new byte[14])[..512]
+            .Concat(new byte[] { 0x32, 97, 98, 99, 3, 0, 0x50, 120, 121, 122, 117, 118 }).ToArray();
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(matched.AsSpan(9), 12);
+        Require(System.Text.Encoding.ASCII.GetString(ArchiveMetadataReader.LocalizationPayload(matched)) == "abcabcabcxyzuv",
+            "overlapping PALOC LZ4 matches decoded incorrectly");
+        var unsupported = (byte[])matched.Clone(); unsupported[5] = 1;
+        var oversized = (byte[])matched.Clone();
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(oversized.AsSpan(13), uint.MaxValue);
+        var invalidOffset = (byte[])matched.Clone(); invalidOffset[516] = 0;
+        foreach (var damaged in new[] { matched[..510], matched[..^1], unsupported, oversized, invalidOffset })
+        {
+            var rejectedContainer = false;
+            try { ArchiveMetadataReader.LocalizationPayload(damaged); } catch (InvalidDataException) { rejectedContainer = true; }
+            Require(rejectedContainer, "a malformed PALOC wrapper was accepted");
+        }
         await using var fixture = await SyntheticArchiveFixture.CreateNameIndexAsync(
             useStaticInfoNaming: true, currentMountedSources: true).ConfigureAwait(false);
         var native = new NativeArchiveCore();

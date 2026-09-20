@@ -10,6 +10,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- Compressed item and character localization tables now decode correctly, restoring current game names and multilingual searches. Corrupt languages produce a visible warning without discarding valid languages.
+- Finder filters retain their labels after refresh. Character previews and thumbnails show loading progress, remain cancellable, and preload following pages. Embedded faces no longer receive a duplicate head. Finder tabs, larger text, window restoration, narrow-window navigation, and preview controls fit the application theme and available space.
 - Item Finder now follows active package mount order and current localized item tables. Distinct item IDs and items without model links remain searchable, including after a cache reload. Old item caches rebuild automatically and mount changes invalidate them.
 - OBJ and FBX omit placeholder texture bindings and can resolve a real diffuse companion instead. Incomplete declared skin tables fail export instead of silently dropping the rig. Skipped or cancelled mesh selections no longer report unpublished companions as exported, and Cancel applies to companion collisions too.
 - OBJ, FBX and GLB exports retain unused source vertices, corrected PAC normals and all eight skin influences. PAMLOD exports keep separate material parts; partially compressed PAM geometry now decodes correctly. Invalid declared export buffers are rejected instead of silently losing geometry or rig data.

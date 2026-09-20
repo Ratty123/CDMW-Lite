@@ -488,4 +488,7 @@
   <data name="CharacterCopyPath" xml:space="preserve"><value>Copiar caminho</value></data>
   <data name="CharacterScopeLoading" xml:space="preserve"><value>Resolvendo arquivos de personagens…</value></data>
   <data name="CharacterScopeApplied" xml:space="preserve"><value>Busca de corpos e rostos: {0} — {1:N0} arquivos, incluindo {2:N0} vínculos diretos</value></data>
+  <data name="CharacterThumbnailProgress" xml:space="preserve"><value>Miniaturas prontas: {0:N0} / {1:N0}</value></data>
+  <data name="CharacterThumbnailQueued" xml:space="preserve"><value>Na fila</value></data>
+  <data name="CharacterLoadingCancelled" xml:space="preserve"><value>Carregamento cancelado.</value></data>
 </root>
