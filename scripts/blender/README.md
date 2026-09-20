@@ -42,7 +42,12 @@ An import also brings in geometry that is not the model: Blender's glTF importer
 `Icosphere` as the bones' display shape and files it under a `glTF_not_exported` collection. That
 is why the mesh is selected by its armature modifier and never by taking the first `MESH` object.
 
-Reference runs on exports from the shipped archives:
+Historical reference runs for the 1.0.3 export implementation, using shipped archives:
+
+Version 1.1.0 adds corrected PAC normals, eight-influence skinning and mesh publication fixes.
+Its synthetic regression coverage does not rerun the Blender measurements below. A fresh
+Blender run against the release's exports is required before treating these figures as current
+import or deformation evidence.
 
 | asset | format | bones | vertices | posed bone | moved | mean distance, moved vs still |
 | --- | --- | --- | --- | --- | --- | --- |

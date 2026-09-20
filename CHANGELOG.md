@@ -4,6 +4,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-20
+
 ### Added
 
 - Body & Face Finder with unique assets and appearances, body/face filters, thumbnails, interactive model previews, character relationships, and exact or related archive-file browsing. Unresolved references remain visible for inspection.

@@ -1,7 +1,7 @@
 # CDMW Archive Lite
 
 [![Archive Lite](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml/badge.svg)](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml)
-![version](https://img.shields.io/badge/version-1.0.3-blue)
+![version](https://img.shields.io/badge/version-1.1.0-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2011%20x64-lightgrey)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![read-only](https://img.shields.io/badge/archives-read--only-brightgreen)
@@ -9,6 +9,25 @@
 CDMW Archive Lite is a standalone, read-only Windows desktop application for browsing Crimson Desert PAMT/PAZ archives. It can search, inspect, preview, and export archive content without modifying the source archives.
 
 The application is self-contained in this repository and keeps archive queries, decoding, media conversion, and mesh rendering outside the UI process.
+
+## Download and run
+
+[Download the latest release](https://github.com/Ratty123/CDMW-Lite/releases/latest) for Windows 11 x64. Both packages include the required runtime; no separate .NET or Python installation is needed.
+
+- **Standalone EXE:** download `CDMW-Archive-Lite-1.1.0-Standalone-win-x64.exe` to a writable folder and run it. The first launch extracts and verifies the bundled runtime; later launches reuse it.
+- **Portable ZIP:** extract `CDMW-Archive-Lite-1.1.0-win-x64.zip` and run `CdmwArchiveLite.exe` from the extracted folder. Keep its companion files and folders together.
+
+Open your Crimson Desert installation or archive folder, then build or reuse its index. Use Item Finder for equipment names and Body & Face Finder for character assets and appearances. Select a separate output folder when exporting.
+
+## New in 1.1.0
+
+- Body & Face Finder with searchable assets and appearances, body/face filters, thumbnails, interactive previews, and linked archive files.
+- Current ItemInfo and compressed localization support, preserving distinct items and names across mounted packages and cache reloads.
+- More faithful authored material colours, dye strength, DDS channels, and layered normal, height, roughness and metalness maps.
+- Faster layered texture preparation and Finder previews, with geometry shown while uncached full textures load.
+- OBJ, FBX and GLB export fixes for source vertices, PAC normals, eight skin influences, PAMLOD materials, texture references, and complete output publication.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release details.
 
 ## Highlights
 
@@ -32,7 +51,9 @@ Archive Lite has no archive-write, replacement, patching, backup, restore, or mo
 
 The repository does not contain game archives, extracted game assets, or other local game data.
 
-## Requirements
+## Build requirements
+
+These tools are needed only when building from source:
 
 - Windows 11 x64
 - .NET 10 SDK
@@ -133,15 +154,7 @@ Body & Face Finder shows geometry first while an uncached model's full textures 
 | `X_disp.dds` | height | |
 | `X_f.dds` | strand direction | orients the anisotropic hair highlight |
 
-Preview output is checked against the assets themselves rather than by eye. [PREVIEW-MATERIAL-AUDIT.md](PREVIEW-MATERIAL-AUDIT.md) records the method, what is confirmed authored, and which explanations were refuted.
-
-| measured over | result |
-| --- | --- |
-| brightness reproduced vs. the asset's own textures | **0.982** (1.000 = exact) |
-| colour reproduced vs. the asset's own textures | **0.926** |
-| lighting preserves albedo, lit/unlit over 728 assets | **0.97 – 1.01** |
-| equipment assets rendered and compared | **~5,400** |
-| whole-corpus scans of all 12,340 equipment PACs | **4** |
+The material audit recorded on 2026-09-19 covered ten assets, 50 parts and 60 Lite captures: all 3,160 declared material parameters were retained, no declared textures were unresolved, and 694 shared DDS comparisons matched byte-for-byte. This is sampled evidence, not a claim of identical lighting or complete game coverage. [PREVIEW-MATERIAL-AUDIT.md](PREVIEW-MATERIAL-AUDIT.md) records the method and historical corpus measurements separately; those older measurements do not validate the current compositor.
 
 ## Mesh export
 
@@ -194,17 +207,11 @@ features; Lite does not acquire archive-writing or model-replacement authority f
 and sums to 1.0, poses a bone and asserts the vertices that moved are the ones near it. It is not
 part of the focused gate, since it needs Blender and licensed game assets.
 
-## Verified behaviour
+## Validation
 
-These are asserted by the focused gate, not measured by hand. `scripts/test_archive_lite.ps1 -Configuration Debug` reproduces them.
+`scripts/test_archive_lite.ps1 -Configuration Debug` checks synthetic archive reads, Item Finder and Body & Face Finder, material composition, OBJ/FBX/GLB exports, cache reuse, cancellation, worker lifetime and hidden D3D11 renderer behavior. The runner reports the current scenario count.
 
-| | |
-| --- | --- |
-| focused scenarios | 57, covering archive, preview, export, worker lifetime and cache eviction |
-| model preview, cold cache | ~100 ms |
-| model preview, warm cache | ~1 ms, and warm across sessions |
-| renderer | headless GPU soak, production D3D11 backend, windows stay hidden |
-| archive access | read-only; export is contained, atomic and manifested |
+`scripts/build_archive_lite.ps1` repeats the focused checks in Release and verifies the packaged application, native helpers, renderer and standalone launcher, including first-run extraction and cached startup. These checks do not establish real-game performance, full-corpus material fidelity or Blender import behavior for every asset. See [TESTING.md](TESTING.md) for coverage and separate validation requirements.
 
 ## Repository layout
 
@@ -222,7 +229,7 @@ Portable builds keep settings, caches, logs, and crash reports beside the execut
 
 These paths and all build outputs are excluded from version control.
 
-Neither package is code-signed. The standalone launcher unpacks its runtime — 990 files, 978 of them DLLs and EXEs — and then starts it, and that sequence is what scanners react to: Microsoft Defender's machine-learning heuristic has flagged a fresh release as `Trojan:Win32/Wacatac.B!ml`, VirusTotal carries generic packed-executable names such as `Trojan.Win64.Crypt`, and its sandbox reports the PEs written as executable creation and the asynchronous write handles bound to I/O completion ports as `Data Encrypted for Impact` (T1486). All are false positives, and nothing already on the disk is read, changed or deleted. Each release lists the SHA-256 of both packages, and the portable zip carries the same application as ordinary files rather than as a self-extracting executable.
+Neither package is code-signed. Security software may flag an unsigned self-extracting executable. Release notes include SHA-256 hashes for checking downloaded files. The portable ZIP contains the same application as ordinary files and can be used without the self-extracting launcher.
 
 ## Project documents
 

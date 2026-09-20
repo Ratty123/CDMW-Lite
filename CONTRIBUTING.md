@@ -1,6 +1,6 @@
 # Contributing
 
-CDMW Archive Lite is a private Windows application with managed and native components. Keep changes focused, preserve its read-only archive boundary, and avoid dependencies on sibling checkouts or local game installations.
+CDMW Archive Lite is a standalone Windows application with managed and native components. Keep changes focused, preserve its read-only archive boundary, and avoid dependencies on sibling checkouts or local game installations.
 
 ## Development setup
 
@@ -28,3 +28,11 @@ Describe what changed, why it changed, and how it was verified. Call out any val
 Before requesting review, inspect the scoped diff and confirm that only intended files are included.
 
 Merge with squash only; the branch is deleted on merge. Branch rulesets are unavailable on this repository's plan, so the Archive Lite workflow is not enforced as a required check — confirm it is green on the pull request before merging, and do not force-push or delete `main`.
+
+## Releases
+
+1. Move the completed `Unreleased` entries into a dated version section in `CHANGELOG.md` and update the user and validation documentation.
+2. Set the same version in `scripts/build_archive_lite.ps1`, `Directory.Build.props`, and the README badge and download filenames. The build script is the package version of record.
+3. Run the focused Debug gate, inspect the release diff, and commit the release preparation. Build from that clean commit with `scripts/build_archive_lite.ps1`; its Release tests and portable/standalone artifact guards must all pass.
+4. Calculate SHA-256 hashes for the resulting standalone EXE and portable ZIP. Record the version, source commit, checks performed and any validation limits in the release notes. Keep build outputs and local evidence out of Git.
+5. When publication is authorized, push the release commit and its `v<version>` tag, upload both verified packages, and publish the GitHub release. For a stable release, verify that it is published, is not marked as a prerelease, is selected as latest, and contains the expected asset names, sizes and hashes.
