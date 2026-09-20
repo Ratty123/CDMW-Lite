@@ -51,8 +51,8 @@ public sealed record CharacterCatalogScopeResult(
     string SessionId, IReadOnlyList<long> EntryIds, int DirectCount, int TotalCount, bool Truncated,
     IReadOnlyList<ArchiveExtensionFacet>? Extensions = null);
 
-public sealed record CharacterPreviewRequest(string SessionId, string Key, bool IncludeTextures = true);
-public sealed record CharacterPreviewResult(string SessionId, string Key, string? PackagePath, IReadOnlyList<string> Warnings);
+public sealed record CharacterPreviewRequest(string SessionId, string Key, bool IncludeTextures = true, bool FirstFrameOnly = false);
+public sealed record CharacterPreviewResult(string SessionId, string Key, string? PackagePath, IReadOnlyList<string> Warnings, bool TexturesIncluded = true);
 public sealed record CharacterThumbnailRequest(string SessionId, IReadOnlyList<string> Keys);
 public sealed record CharacterThumbnail(string Key, string? PngPath, string? Warning = null);
 public sealed record CharacterThumbnailResult(string SessionId, IReadOnlyList<CharacterThumbnail> Items);

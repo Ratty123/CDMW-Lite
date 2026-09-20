@@ -21,6 +21,15 @@ public sealed class NativeModelPreviewService
 
     public static bool Supports(string extension) => extension.ToLowerInvariant() is ".pac" or ".pam" or ".pamlod" or ".pat";
 
+    internal async Task<bool> HasReusableTexturedPackageAsync(ArchiveSession session, ArchiveEntryDto entry, CancellationToken token)
+    {
+        var companion = FindCompanion(session.Index, entry);
+        var key = NativeModelPreviewCache.ComputeKey(TexturedPackageVersion, session, entry, companion);
+        var destination = Path.Combine(ArchiveLiteDataPaths.PreviewCache, "models", key);
+        return await NativeModelPreviewCache.IsReusableAsync(destination, TexturedPackageVersion, key, session, entry, token).ConfigureAwait(false)
+            && NativePreviewPackageAdapter.HasCurrentAdapterMetadata(destination);
+    }
+
     public async Task<string> BuildAsync(
         ArchiveSession session,
         ArchiveEntryDto entry,

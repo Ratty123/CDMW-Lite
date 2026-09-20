@@ -253,14 +253,21 @@ public sealed class CharacterFinderViewModel : ObservableObject
             _detail = detail; RelatedRows.Clear();
             foreach (var related in detail.Related) RelatedRows.Add(related);
             OnPropertyChanged(nameof(Details)); RaiseCommands();
-            var preview = await _worker.SendAsync<CharacterPreviewRequest, CharacterPreviewResult>(
-                WorkerProtocol.PreviewCharacter, generation, new(session, row.Source.Key), operation.Token,
-                new Progress<ProgressUpdate>(update =>
+            var progress = new Progress<ProgressUpdate>(update =>
                 {
                     if (CurrentSelection()) PreviewStatus = L(update.Phase switch
                         { "model_preview_native" => "PreviewProgressNative", "model_preview_adapt" => "PreviewProgressAdapting", _ => "CharacterPreviewLoading" })
                         + (update.Total > 0 ? $" {update.Completed:N0} / {update.Total:N0}" : "");
-                })).ConfigureAwait(true);
+                });
+            var preview = await _worker.SendAsync<CharacterPreviewRequest, CharacterPreviewResult>(
+                WorkerProtocol.PreviewCharacter, generation, new(session, row.Source.Key, FirstFrameOnly: true), operation.Token, progress).ConfigureAwait(true);
+            if (!CurrentSelection()) return;
+            PackagePath = preview.PackagePath;
+            if (preview.PackagePath is not null && !preview.TexturesIncluded)
+            {
+                preview = await _worker.SendAsync<CharacterPreviewRequest, CharacterPreviewResult>(
+                    WorkerProtocol.PreviewCharacter, generation, new(session, row.Source.Key), operation.Token, progress).ConfigureAwait(true);
+            }
             if (!CurrentSelection()) return;
             PackagePath = preview.PackagePath;
             PreviewTitle = row.Label;
@@ -277,8 +284,9 @@ public sealed class CharacterFinderViewModel : ObservableObject
         try
         {
             IsLoadingThumbnails = true;
-            // Publish each completed image immediately; a slow model must not hold back its neighbours.
-            foreach (var row in rows.Where(row => row.CanPreview && row.Thumbnail is null))
+            // Two requests overlap archive preparation with rendering. Each completed image
+            // is published immediately, and foreground selection still has worker priority.
+            async Task LoadRowAsync(CharacterFinderRow row)
             {
                 operation.Token.ThrowIfCancellationRequested();
                 row.IsLoading = true;
@@ -302,6 +310,18 @@ public sealed class CharacterFinderViewModel : ObservableObject
                 { if (Current(session, generation)) row.ThumbnailWarning = error.Message; }
                 finally { row.IsLoading = false; if (Current(session, generation)) RaiseThumbnailProgress(); }
             }
+            var queue = new Queue<CharacterFinderRow>(rows.Where(row => row.CanPreview && row.Thumbnail is null));
+            async Task DrainAsync()
+            {
+                while (queue.TryDequeue(out var row))
+                {
+                    operation.Token.ThrowIfCancellationRequested();
+                    if (!Current(session, generation)) return;
+                    await LoadRowAsync(row).ConfigureAwait(true);
+                }
+            }
+            // Both consumers stay on the dispatcher; only the worker requests run concurrently.
+            await Task.WhenAll(DrainAsync(), DrainAsync()).ConfigureAwait(true);
             // Warm four following catalogue pages after the visible thumbnails. Only one
             // background request runs at a time and navigation cancels the old queue.
             for (var offset = 1; offset <= 4 && request.PageStart + offset * PageSize < _total; offset++)

@@ -71,7 +71,7 @@
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="3*" /><RowDefinition Height="Auto" /><RowDefinition Height="2*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <TextBlock Text="{Binding PreviewTitle}" FontWeight="SemiBold" Margin="0,0,0,6" TextTrimming="CharacterEllipsis" />
                 <Border Grid.Row="1" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                    <controls:DotNetModelPreviewHost x:Name="ModelPreview" PackagePath="{Binding PackagePath}"
+                    <controls:DotNetModelPreviewHost x:Name="ModelPreview" PackagePath="{Binding PackagePath}" Prewarm="True"
                         Visibility="{Binding HasPackage, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 </Border>
                 <StackPanel Grid.Row="2" Margin="0,6">

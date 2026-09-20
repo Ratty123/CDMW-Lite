@@ -51,7 +51,7 @@ internal sealed partial class NetTextureSet
             Map: materials.TextureReferenceForResource(ResourceId(layer), "layer_" + map, colorSpace),
             Mask: materials.TextureReferenceForResource(layer.MaskResourceId, "layer_mask", "linear"))).ToArray();
         var parameters = materials.ParametersForSubmesh(submeshIndex);
-        var signature = string.Join("|", "material-composer-v2", materials.Signature, submeshIndex, map,
+        var signature = string.Join("|", "material-composer-v2", _materialLayerMaximumDimension, materials.Signature, submeshIndex, map,
             baseReference.SourceCacheKey, JsonSerializer.Serialize(layers), parameters.BaseTintColor,
             string.Join(";", references.Select(item => item.Map.SourceCacheKey + "," + item.Mask.SourceCacheKey)));
         var fingerprint = "managed-layer-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature))).ToLowerInvariant();
@@ -85,9 +85,9 @@ internal sealed partial class NetTextureSet
                 (int)(Math.Clamp(tint.Y, 0, 1) * 255), (int)(Math.Clamp(tint.Z, 0, 1) * 255));
             var compiled = map switch
             {
-                "diffuse" => NetMaterialLayerCompiler.Compile(baseBitmap, colors, fallback),
-                "material" => NetMaterialLayerCompiler.CompileSurface(baseBitmap, support),
-                _ => NetMaterialLayerCompiler.CompileSupport(baseBitmap, support, map == "normal"),
+                "diffuse" => NetMaterialLayerCompiler.Compile(baseBitmap, colors, fallback, _materialLayerMaximumDimension),
+                "material" => NetMaterialLayerCompiler.CompileSurface(baseBitmap, support, _materialLayerMaximumDimension),
+                _ => NetMaterialLayerCompiler.CompileSupport(baseBitmap, support, map == "normal", _materialLayerMaximumDimension),
             };
             if (compiled is null) return NetMaterialTextureReference.Empty;
             _decodedByFingerprint[reference.SourceCacheKey] = compiled;

@@ -10,6 +10,7 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ### Fixed
 
+- Body & Face Finder reuses one hidden thumbnail renderer, overlaps two visible thumbnail requests, and sizes layered thumbnail materials for the cards. Selected models show geometry while uncached full textures load; cached textured models open directly, and the interactive renderer warms when the Finder opens.
 - Display textures loads complex layered models faster by reusing sampled inputs and processing large texture maps in parallel, preserving texture resolution, colours, masks and normals.
 - Compressed item and character localization tables now decode correctly, restoring current game names and multilingual searches. Corrupt languages produce a visible warning without discarding valid languages.
 - Finder filters retain their labels after refresh. Character previews and thumbnails show loading progress, remain cancellable, and preload following pages. Embedded faces no longer receive a duplicate head. Finder tabs, larger text, window restoration, narrow-window navigation, and preview controls fit the application theme and available space.

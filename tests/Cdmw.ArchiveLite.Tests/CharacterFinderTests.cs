@@ -165,6 +165,50 @@ internal static partial class ArchiveLiteTestRunner
             var colors = pixels.Chunk(4).Select(pixel => BitConverter.ToInt32(pixel, 0)).GroupBy(color => color).ToArray();
             var foregroundPixels = 160 * 160 - colors.Max(color => color.Count());
             Require(foregroundPixels > 100, $"thumbnail contains no rendered geometry ({colors.Length} colors, {foregroundPixels} foreground pixels)");
+            // A Finder queue must retain its process/device, reject bad outputs and recover
+            // after cancellation without publishing an image from a cancelled generation.
+            var residentStart = new ProcessStartInfo(renderer!) { UseShellExecute = false, CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardInput = true, RedirectStandardOutput = true };
+            residentStart.ArgumentList.Add("--character-thumbnail-worker");
+            using (var resident = Process.Start(residentStart)!)
+            {
+                try
+                {
+                    for (var scene = 1; scene <= 2; scene++)
+                    {
+                        await resident.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { Key = "scene-" + scene, Package = destination, Output = thumbnail }));
+                        await resident.StandardInput.FlushAsync();
+                        using var response = JsonDocument.Parse((await resident.StandardOutput.ReadLineAsync(deadline.Token))!);
+                        Require(response.RootElement.GetProperty("Error").ValueKind == JsonValueKind.Null
+                            && response.RootElement.GetProperty("ProcessId").GetInt32() == resident.Id
+                            && response.RootElement.GetProperty("SceneCount").GetInt64() == scene,
+                            "thumbnail queue restarted its process/device or failed to replace the scene");
+                    }
+                    await resident.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { Key = "bad", Package = destination, Output = Path.Combine(root, "outside.png") }));
+                    await resident.StandardInput.FlushAsync();
+                    using var rejected = JsonDocument.Parse((await resident.StandardOutput.ReadLineAsync(deadline.Token))!);
+                    Require(rejected.RootElement.GetProperty("Error").GetString()!.Contains("remain in its preview package")
+                        && !File.Exists(Path.Combine(root, "outside.png")), "resident thumbnail worker wrote outside the package");
+                    resident.StandardInput.Close();
+                    await resident.WaitForExitAsync(deadline.Token);
+                    Require(resident.ExitCode == 0, "thumbnail worker did not shut down on EOF");
+                }
+                finally { if (!resident.HasExited) resident.Kill(entireProcessTree: true); }
+            }
+            using (var owner = new CharacterThumbnailRenderer())
+            {
+                File.Delete(thumbnail);
+                using var cancelledRender = new CancellationTokenSource(TimeSpan.FromMilliseconds(5));
+                try
+                {
+                    await owner.RenderAsync(renderer!, "cancel", destination, thumbnail, cancelledRender.Token);
+                    throw new InvalidOperationException("cancelled thumbnail render succeeded");
+                }
+                catch (OperationCanceledException) { }
+                Require(!File.Exists(thumbnail), "cancelled thumbnail renderer published an image");
+                await owner.RenderAsync(renderer!, "recovered", destination, thumbnail, deadline.Token);
+                Require(File.Exists(thumbnail), "thumbnail renderer did not restart after cancellation");
+            }
             Require(CharacterPreviewPackage.IsReusable(destination), "a complete character package could not be reused");
             File.Delete(Path.Combine(destination, batches[0].GetProperty("vertex_file").GetString()!));
             Require(!CharacterPreviewPackage.IsReusable(destination), "an evicted geometry file left a reusable blank preview");
@@ -180,7 +224,7 @@ internal static partial class ArchiveLiteTestRunner
         {
             await RunOnWpfDispatcherAsync(async () =>
             {
-                var worker = new FakeCharacterFinderWorker(image);
+                var worker = new FakeCharacterFinderWorker(image) { ThumbnailDelay = 20 };
                 int VisibleSearches() => worker.Searches.Count(search => search.PageStart == 0);
                 var session = "session-a";
                 var scopes = new List<(string, bool)>();
@@ -194,6 +238,7 @@ internal static partial class ArchiveLiteTestRunner
                 await WaitUntilAsync(() => !model.IsLoadingThumbnails && model.PackagePath is not null, TimeSpan.FromSeconds(3));
                 Require(VisibleSearches() == 1 && model.Rows.Count == 5 && worker.ThumbnailBatches.Count == 10 && worker.ThumbnailBatches.All(count => count == 1),
                     "character page or bounded thumbnail batches are wrong");
+                Require(worker.MaximumActiveThumbnails == 2, "visible thumbnail work did not stay bounded to two concurrent requests");
                 Require(roleBox.SelectedItem is FinderOption { Value: "" }, "WPF lost the all-roles label when facets were rebuilt");
                 model.Query = "h"; model.Query = "he"; model.Query = "hero";
                 await WaitUntilAsync(() => VisibleSearches() == 2 && !model.IsBusy, TimeSpan.FromSeconds(2));
@@ -250,6 +295,19 @@ internal static partial class ArchiveLiteTestRunner
                 Require(cancellable.PackagePath is null && cancellable.Rows.All(row => row.Thumbnail is null)
                     && !cancellable.IsPreparingPreview && !cancellable.IsLoadingThumbnails, "cancelled work published late images or stayed busy");
                 cancellable.RequestShutdown();
+                var progressiveWorker = new FakeCharacterFinderWorker(image) { Progressive = true };
+                var progressive = new CharacterFinderViewModel(progressiveWorker, () => "progressive", (_, _, _, _) => Task.FromResult(false));
+                await progressive.ActivateAsync(CancellationToken.None);
+                await WaitUntilAsync(() => progressive.PackagePath == "asset:0-geometry", TimeSpan.FromSeconds(2));
+                Require(progressive.IsPreparingPreview, "geometry was not shown while full textures were pending");
+                await WaitUntilAsync(() => progressive.PackagePath == "asset:0" && !progressive.IsPreparingPreview, TimeSpan.FromSeconds(2));
+                progressive.SelectedRow = progressive.Rows[1];
+                await WaitUntilAsync(() => progressive.PackagePath == "asset:1-geometry", TimeSpan.FromSeconds(2));
+                progressive.CancelCommand.Execute(null);
+                await Task.Delay(350);
+                Require(progressive.PackagePath is null && !progressive.IsPreparingPreview,
+                    "cancelled progressive textures replaced the cancelled preview");
+                progressive.RequestShutdown();
             });
         }
         finally { File.Delete(image); }
@@ -260,6 +318,10 @@ internal static partial class ArchiveLiteTestRunner
         public List<CharacterCatalogSearchRequest> Searches { get; } = [];
         public List<int> ThumbnailBatches { get; } = [];
         public int Delay { get; set; }
+        public int ThumbnailDelay { get; set; }
+        public bool Progressive { get; set; }
+        public int MaximumActiveThumbnails { get; private set; }
+        private int _activeThumbnails;
         public bool IgnoreCancellation { get; set; }
         private static CharacterCatalogRow Row(string key) => new(key, "assets", "body", key, key,
             "character/model/" + key + ".pac", "1_pc", "1_phm", "resolved", "ready", 1, 1, "fixture");
@@ -267,6 +329,18 @@ internal static partial class ArchiveLiteTestRunner
             CancellationToken token, IProgress<ProgressUpdate>? progress = null)
         {
             if (payload is CharacterCatalogSearchRequest requested) Searches.Add(requested);
+            if (payload is CharacterPreviewRequest previewRequest && Progressive)
+            {
+                if (!previewRequest.FirstFrameOnly) await Task.Delay(250); // Deliberately ignore cancellation.
+                return (TResult)(object)new CharacterPreviewResult(previewRequest.SessionId, previewRequest.Key,
+                    previewRequest.Key + (previewRequest.FirstFrameOnly ? "-geometry" : ""), [], !previewRequest.FirstFrameOnly);
+            }
+            if (payload is CharacterThumbnailRequest && ThumbnailDelay > 0)
+            {
+                MaximumActiveThumbnails = Math.Max(MaximumActiveThumbnails, ++_activeThumbnails);
+                try { await Task.Delay(ThumbnailDelay, token); }
+                finally { _activeThumbnails--; }
+            }
             if (Delay > 0) await Task.Delay(Delay, IgnoreCancellation ? CancellationToken.None : token);
             object result = payload switch
             {

@@ -7,14 +7,14 @@ namespace Cdmw.MeshEditorExperiment;
 internal static partial class NetMaterialLayerCompiler
 {
     public static Bitmap? Compile(Bitmap? baseBitmap, IReadOnlyList<NetMaterialLayerSource> layers,
-        Color? baseColor = null)
+        Color? baseColor = null, int maximumDimension = 2048)
     {
         var source = baseBitmap ?? layers.FirstOrDefault(layer => layer.Binding.LayerRole == "base")?.Diffuse;
         var domain = source ?? layers.SelectMany(layer => new[] { layer.Diffuse, layer.Mask })
             .FirstOrDefault(bitmap => bitmap is not null);
         if (domain is null) return null;
         var (width, height) = CompositeSize(domain, layers.Where(layer => IsActiveLayer(layer.Binding))
-            .SelectMany(layer => new[] { layer.Diffuse, layer.Mask }));
+            .SelectMany(layer => new[] { layer.Diffuse, layer.Mask }), maximumDimension);
         var target = source is null ? SolidBitmap(width, height, baseColor ?? Color.FromArgb(158, 158, 158))
             : new Bitmap(width, height, PixelFormat.Format32bppArgb);
         var pixels = source is null ? ReadBgra(target) : ReadScaledBgra(source, width, height);
@@ -129,12 +129,12 @@ internal static partial class NetMaterialLayerCompiler
 
     // Output is linear RGBA: coverage=1, roughness, metalness, specular. Decode
     // each layer before blending; selector masks are never surface-response DDSs.
-    public static Bitmap? CompileSurface(Bitmap? baseMaterial, IReadOnlyList<NetMaterialLayerSurfaceSource> layers)
+    public static Bitmap? CompileSurface(Bitmap? baseMaterial, IReadOnlyList<NetMaterialLayerSurfaceSource> layers, int maximumDimension = 2048)
     {
         var source = baseMaterial ?? layers.FirstOrDefault()?.Material;
         if (source is null) return null;
         var (width, height) = CompositeSize(source, layers.Where(layer => IsActiveLayer(layer.Binding)
-            || layer.Binding.LayerRole == "base").SelectMany(layer => new[] { layer.Material, layer.Mask }));
+            || layer.Binding.LayerRole == "base").SelectMany(layer => new[] { layer.Material, layer.Mask }), maximumDimension);
         var target = SolidBitmap(width, height, Color.FromArgb(10, 255, 148, 0));
         var pixels = ReadBgra(target);
         var sampled = new LayerPixelCache(width, height);
@@ -181,12 +181,12 @@ internal static partial class NetMaterialLayerCompiler
         return target;
     }
 
-    public static Bitmap? CompileSupport(Bitmap? baseMap, IReadOnlyList<NetMaterialLayerSurfaceSource> layers, bool normal)
+    public static Bitmap? CompileSupport(Bitmap? baseMap, IReadOnlyList<NetMaterialLayerSurfaceSource> layers, bool normal, int maximumDimension = 2048)
     {
         var domain = baseMap ?? layers.FirstOrDefault()?.Material;
         if (domain is null) return null;
         var (width, height) = CompositeSize(domain, layers.Where(layer => IsActiveLayer(layer.Binding))
-            .SelectMany(layer => new[] { layer.Material, layer.Mask }));
+            .SelectMany(layer => new[] { layer.Material, layer.Mask }), maximumDimension);
         var target = baseMap is null
             ? SolidBitmap(width, height, normal ? Color.FromArgb(128, 128, 255) : Color.FromArgb(128, 128, 128))
             : new Bitmap(width, height, PixelFormat.Format32bppArgb);

@@ -22,7 +22,7 @@ internal static partial class NetMaterialLayerCompiler
         !string.Equals(binding.LayerRole, "base", StringComparison.OrdinalIgnoreCase)
         && binding.Weight > 0.001f;
 
-    private static (int Width, int Height) CompositeSize(Bitmap source, IEnumerable<Bitmap?> inputs)
+    private static (int Width, int Height) CompositeSize(Bitmap source, IEnumerable<Bitmap?> inputs, int maximumDimension)
     {
         // A small base swatch must not collapse a detailed selector or overlay.
         // Choose a real source domain, as Full does, then bound its size without
@@ -39,7 +39,7 @@ internal static partial class NetMaterialLayerCompiler
                 largest = input;
             }
         }
-        var scale = Math.Min(1.0, MaximumDimension / (double)Math.Max(largest.Width, largest.Height));
+        var scale = Math.Min(1.0, Math.Clamp(maximumDimension, 1, MaximumDimension) / (double)Math.Max(largest.Width, largest.Height));
         return (Math.Max(1, (int)Math.Round(largest.Width * scale)),
             Math.Max(1, (int)Math.Round(largest.Height * scale)));
     }

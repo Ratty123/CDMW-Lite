@@ -226,7 +226,11 @@ internal sealed class WorkerRuntime : IDisposable
         }
     }
 
-    public void Dispose() => _sessions.Dispose();
+    public void Dispose()
+    {
+        _characterPreviews.Dispose();
+        _sessions.Dispose();
+    }
 
     private static T RequirePayload<T>(WorkerMessage request)
     {

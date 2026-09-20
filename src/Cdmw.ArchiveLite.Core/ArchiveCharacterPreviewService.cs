@@ -1,18 +1,17 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Cdmw.ArchiveLite.Contracts;
 
 namespace Cdmw.ArchiveLite.Core;
 
 public sealed class ArchiveCharacterPreviewService(
     ArchiveSessionManager sessions, ArchiveCharacterCatalogService catalog,
-    NativeModelPreviewService models, ArchiveWorkPriority priority)
+    NativeModelPreviewService models, ArchiveWorkPriority priority) : IDisposable
 {
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _buildGates = new(StringComparer.Ordinal);
-    private readonly SemaphoreSlim _thumbnailGate = new(1, 1);
+    private readonly SemaphoreSlim _thumbnailPreparation = new(2, 2);
+    private readonly CharacterThumbnailRenderer _thumbnailRenderer = new();
 
     public async Task<CharacterPreviewResult> BuildAsync(CharacterPreviewRequest request,
         Func<ProgressUpdate, Task>? progress, CancellationToken token)
@@ -24,11 +23,18 @@ public sealed class ArchiveCharacterPreviewService(
         if (previewModels.Count > 32)
             return new(request.SessionId, request.Key, null, ["This appearance exceeds the preview limit of 32 model components."]);
         var session = sessions.GetRequired(request.SessionId);
+        var includeTextures = request.IncludeTextures;
+        if (request.FirstFrameOnly && includeTextures)
+        {
+            foreach (var model in previewModels)
+                if (!await models.HasReusableTexturedPackageAsync(session, model, token).ConfigureAwait(false))
+                { includeTextures = false; break; }
+        }
         var parts = new List<CharacterPreviewPart>();
         foreach (var model in previewModels)
         {
             token.ThrowIfCancellationRequested();
-            var package = await models.BuildAsync(session, model, request.IncludeTextures, progress, token).ConfigureAwait(false);
+            var package = await models.BuildAsync(session, model, includeTextures, progress, token).ConfigureAwait(false);
             var component = detail.Components.FirstOrDefault(component => component.ModelEntryIds.Contains(model.EntryId));
             parts.Add(new(package, component?.Scale ?? 1));
         }
@@ -37,9 +43,9 @@ public sealed class ArchiveCharacterPreviewService(
         if (detail.Row.View == "appearances")
             warnings.Add("Base-model preview: customization, morphs and animation are not applied.");
         if (parts.Count == 1 && parts[0].Scale == 1)
-            return new(session.Id, request.Key, parts[0].PackagePath, warnings);
+            return new(session.Id, request.Key, parts[0].PackagePath, warnings, includeTextures);
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            "character-preview-v1:" + session.Fingerprint + ":" + detail.ContextKey + ":" + request.IncludeTextures + ":"
+            "character-preview-v1:" + session.Fingerprint + ":" + detail.ContextKey + ":" + includeTextures + ":"
             + string.Join('|', parts.Select(part => part.PackagePath + ":" + part.Scale.ToString(System.Globalization.CultureInfo.InvariantCulture)))))).ToLowerInvariant();
         var root = Path.Combine(ArchiveLiteDataPaths.PreviewCache, "characters");
         Directory.CreateDirectory(root);
@@ -58,13 +64,13 @@ public sealed class ArchiveCharacterPreviewService(
                     sessions.GetRequired(session.Id);
                     if (Directory.Exists(destination)) Directory.Delete(destination, recursive: true);
                     Directory.Move(staging, destination);
-                    await NativePreviewPackageAdapter.PrepareAsync(destination, detail.Row.Path, token, request.IncludeTextures).ConfigureAwait(false);
+                    await NativePreviewPackageAdapter.PrepareAsync(destination, detail.Row.Path, token, includeTextures).ConfigureAwait(false);
                 }
                 finally { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); }
             }
         }
         finally { gate.Release(); }
-        return new(session.Id, request.Key, destination, warnings);
+        return new(session.Id, request.Key, destination, warnings, includeTextures);
     }
 
     internal static IReadOnlyList<ArchiveEntryDto> PreviewModels(CharacterCatalogDetailResult detail)
@@ -79,83 +85,41 @@ public sealed class ArchiveCharacterPreviewService(
     public async Task<CharacterThumbnailResult> ThumbnailsAsync(CharacterThumbnailRequest request, CancellationToken token)
     {
         if (request.Keys.Count > 4) throw new ArgumentException("Character thumbnail batches may contain at most four rows.");
-        await _thumbnailGate.WaitAsync(token).ConfigureAwait(false);
-        try
+        var results = new List<CharacterThumbnail>();
+        foreach (var key in request.Keys.Distinct(StringComparer.Ordinal))
         {
-            var results = new List<CharacterThumbnail>();
-            var jobs = new List<ThumbnailJob>();
-            foreach (var key in request.Keys.Distinct(StringComparer.Ordinal))
+            try
             {
-                await priority.WaitForForegroundAsync(token).ConfigureAwait(false);
+                CharacterPreviewResult preview;
+                await _thumbnailPreparation.WaitAsync(token).ConfigureAwait(false);
                 try
                 {
-                    var preview = await BuildAsync(new(request.SessionId, key), null, token).ConfigureAwait(false);
-                    if (preview.PackagePath is null)
-                    {
-                        results.Add(new(key, null, string.Join(" ", preview.Warnings)));
-                        continue;
-                    }
-                    var output = Path.Combine(preview.PackagePath, "character-thumbnail-v1.png");
-                    if (File.Exists(output) && new FileInfo(output).Length > 0) results.Add(new(key, output));
-                    else jobs.Add(new(key, preview.PackagePath, output));
+                    await priority.WaitForForegroundAsync(token).ConfigureAwait(false);
+                    preview = await BuildAsync(new(request.SessionId, key), null, token).ConfigureAwait(false);
                 }
-                catch (Exception error) when (error is not OperationCanceledException)
-                { results.Add(new(key, null, error.Message)); }
-            }
-            if (jobs.Count > 0)
-            {
-                await priority.WaitForForegroundAsync(token).ConfigureAwait(false);
-                try
+                finally { _thumbnailPreparation.Release(); }
+                if (preview.PackagePath is null)
                 {
-                    await RenderThumbnailsAsync(jobs, token).ConfigureAwait(false);
-                    results.AddRange(jobs.Select(job => File.Exists(job.Output)
-                        ? new CharacterThumbnail(job.Key, job.Output)
-                        : new CharacterThumbnail(job.Key, null, "Thumbnail rendering was unavailable.")));
+                    results.Add(new(key, null, string.Join(" ", preview.Warnings)));
+                    continue;
                 }
-                catch (Exception error) when (error is not OperationCanceledException)
-                { results.AddRange(jobs.Select(job => new CharacterThumbnail(job.Key, null, error.Message))); }
+                var output = Path.Combine(preview.PackagePath, "character-thumbnail-v1.png");
+                if (!File.Exists(output) || new FileInfo(output).Length == 0)
+                {
+                    await priority.WaitForForegroundAsync(token).ConfigureAwait(false);
+                    await _thumbnailRenderer.RenderAsync(ResolveRendererPath(), key, preview.PackagePath, output, token).ConfigureAwait(false);
+                }
+                results.Add(File.Exists(output) ? new(key, output)
+                    : new(key, null, "Thumbnail rendering was unavailable."));
             }
-            token.ThrowIfCancellationRequested();
-            return new(request.SessionId, results);
+            catch (Exception error) when (error is not OperationCanceledException)
+            { results.Add(new(key, null, error.Message)); }
         }
-        finally { _thumbnailGate.Release(); }
+        token.ThrowIfCancellationRequested();
+        return new(request.SessionId, results);
     }
 
-    private static async Task RenderThumbnailsAsync(IReadOnlyList<ThumbnailJob> jobs, CancellationToken token)
-    {
-        var root = Path.Combine(ArchiveLiteDataPaths.PreviewCache, "character-thumbnail-jobs");
-        Directory.CreateDirectory(root);
-        var jobPath = Path.Combine(root, Guid.NewGuid().ToString("N") + ".json");
-        try
-        {
-            await File.WriteAllTextAsync(jobPath, JsonSerializer.Serialize(jobs), token).ConfigureAwait(false);
-            var start = new ProcessStartInfo(ResolveRendererPath())
-            {
-                UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
-                RedirectStandardOutput = true, RedirectStandardError = true,
-            };
-            start.ArgumentList.Add("--character-thumbnails");
-            start.ArgumentList.Add(jobPath);
-            using var process = Process.Start(start) ?? throw new IOException("Could not start the character thumbnail renderer.");
-            var stdout = process.StandardOutput.ReadToEndAsync(token);
-            var stderr = process.StandardError.ReadToEndAsync(token);
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-            deadline.CancelAfter(TimeSpan.FromSeconds(90));
-            try { await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false); }
-            catch (OperationCanceledException)
-            {
-                try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-                try { await Task.WhenAll(stdout, stderr).ConfigureAwait(false); } catch (OperationCanceledException) { }
-                token.ThrowIfCancellationRequested();
-                throw new TimeoutException("Character thumbnail rendering timed out.");
-            }
-            await stdout.ConfigureAwait(false);
-            var error = await stderr.ConfigureAwait(false);
-            if (process.ExitCode != 0) throw new IOException("Character thumbnail renderer failed: " + error[..Math.Min(error.Length, 1024)]);
-        }
-        finally { if (File.Exists(jobPath)) File.Delete(jobPath); }
-    }
+    public void Dispose() => _thumbnailRenderer.Dispose();
 
     private static string ResolveRendererPath()
     {
@@ -173,5 +137,4 @@ public sealed class ArchiveCharacterPreviewService(
         throw new FileNotFoundException("The Archive Lite 3D renderer could not be located.");
     }
 
-    private sealed record ThumbnailJob(string Key, string Package, string Output);
 }

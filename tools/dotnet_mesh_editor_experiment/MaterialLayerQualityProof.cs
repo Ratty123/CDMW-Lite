@@ -51,6 +51,9 @@ internal static class MaterialLayerQualityProof
         using var boundedSurface = NetMaterialLayerCompiler.CompileSurface(large, []);
         var bounded = boundedColor is { Width: 2048, Height: 32 }
             && boundedSurface is { Width: 2048, Height: 32 };
+        using var thumbnailColor = NetMaterialLayerCompiler.Compile(large, [], maximumDimension: 256);
+        using var thumbnailSurface = NetMaterialLayerCompiler.CompileSurface(large, [], maximumDimension: 256);
+        using var thumbnailSupport = NetMaterialLayerCompiler.CompileSupport(large, [], normal: false, maximumDimension: 256);
         using var small = NetMaterialLayerCompiler.Compile(baseColor,
             [new NetMaterialLayerSource(binding with { Weight = 0 }, large, mask)]);
         using var smallSurface = NetMaterialLayerCompiler.CompileSurface(seedSurface,
@@ -92,6 +95,11 @@ internal static class MaterialLayerQualityProof
             ["fine_overlay_survives_small_base_swatch"] = overlayDetail,
             ["native_size_color_texels_are_preserved"] = sourceDetail,
             ["large_composites_are_bounded_and_keep_aspect"] = bounded,
+            ["thumbnail_size_does_not_reduce_interactive_detail"] = bounded
+                && thumbnailColor is { Width: 256, Height: 4 }
+                && thumbnailSurface is { Width: 256, Height: 4 }
+                && thumbnailSupport is { Width: 256, Height: 4 }
+                && thumbnailColor.GetPixel(128, 2).ToArgb() == large.GetPixel(2048, 32).ToArgb(),
             ["inactive_layers_do_not_inflate_small_materials"] = small is { Width: 4, Height: 4 }
                 && smallSurface is { Width: 4, Height: 4 },
             ["source_orientation_is_preserved"] = NetMaterialLayerCompiler.PreservesSourceOrientation(),

@@ -11,6 +11,11 @@ internal static class Program
     {
         try
         {
+            if (Array.IndexOf(args, "--character-thumbnail-worker") >= 0)
+            {
+                ApplicationConfiguration.Initialize();
+                return CharacterThumbnailBatch.RunWorker();
+            }
             var thumbnails = Array.IndexOf(args, "--character-thumbnails");
             if (thumbnails >= 0)
             {
@@ -86,6 +91,7 @@ internal static class Program
         }
         catch (Exception ex)
         {
+            Console.Error.WriteLine(ex);
             var options = LaunchOptions.TryParse(args);
             if (options is not null)
             {
@@ -95,6 +101,7 @@ internal static class Program
                 string.Equals(arg, "--embedded", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--headless-smoke", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--character-thumbnails", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(arg, "--character-thumbnail-worker", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--headless-gpu-frame-pacing-soak", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--headless-gpu-sparse-soak", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(arg, "--visual-audit-batch", StringComparison.OrdinalIgnoreCase)

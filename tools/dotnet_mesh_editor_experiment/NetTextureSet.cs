@@ -19,10 +19,16 @@ internal sealed partial class NetTextureSet : IDisposable
     private readonly List<string> _textureLoadFailures = new();
     private Task? _loadTask;
     private bool _disposed;
+    private readonly int _materialLayerMaximumDimension;
 
-    private NetTextureSet()
+    private NetTextureSet(int materialLayerMaximumDimension = 2048)
     {
+        _materialLayerMaximumDimension = materialLayerMaximumDimension;
     }
+
+    // A 160-pixel Finder card does not need a 2048-pixel material composite.
+    // This instance is isolated from the full-resolution interactive preview.
+    public static NetTextureSet LoadForThumbnail() => new(256);
 
     public int DecodedCount { get { lock (_gate) return _decoded.Count; } }
     public int DdsResourceCount { get { lock (_gate) return _ddsResources.Count; } }

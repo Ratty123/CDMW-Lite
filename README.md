@@ -121,6 +121,8 @@ Blended colour and surface maps use the largest active source texture or selecto
 
 Display textures prepares large layered maps in the renderer process using up to four CPU workers. Repeated layer inputs reuse a bounded sampling cache, avoiding redundant bitmap conversions while preserving layer order and the resulting pixels.
 
+Body & Face Finder shows geometry first while an uncached model's full textures prepare. Cached textured models open directly. Its interactive renderer warms when the dialog opens, and the thumbnail queue reuses a separate hidden D3D11 device instead of starting one process per card. Two visible requests overlap archive preparation with rendering; subsequent pages preload at lower priority. Thumbnail material composites are capped at 256 pixels for the 160-pixel cards. Interactive previews retain the full 2048-pixel composite limit and original DDS mip chains. Cancelling a render stops its helper, and an idle thumbnail helper exits after 30 seconds.
+
 | suffix | role | notes |
 | --- | --- | --- |
 | `X.dds` | albedo | the part's own colour |
