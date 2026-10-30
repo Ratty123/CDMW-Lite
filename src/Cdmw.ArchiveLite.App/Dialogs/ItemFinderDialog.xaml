@@ -77,9 +77,13 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <TextBlock Foreground="{DynamicResource TextMutedBrush}"
-                           Text="{infra:Loc Key=ItemFinderIntro}"
-                           TextWrapping="Wrap" />
+                <StackPanel>
+                    <TextBlock Foreground="{DynamicResource TextMutedBrush}"
+                               Text="{infra:Loc Key=ItemFinderIntro}"
+                               TextWrapping="Wrap" />
+                    <CheckBox Content="{infra:Loc Key=ItemFinderOnlyDlc}"
+                              IsChecked="{Binding OnlyDlc}" Margin="0,8,0,0" />
+                </StackPanel>
                 <Grid Grid.Row="1" Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

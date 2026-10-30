@@ -491,4 +491,76 @@
   <data name="CharacterThumbnailProgress" xml:space="preserve"><value>サムネイル準備完了: {0:N0} / {1:N0}</value></data>
   <data name="CharacterThumbnailQueued" xml:space="preserve"><value>待機中</value></data>
   <data name="CharacterLoadingCancelled" xml:space="preserve"><value>読み込みをキャンセルしました。</value></data>
+  <data name="ItemFinderOnlyDlc" xml:space="preserve">
+    <value>DLCアイテムのみ</value>
+  </data>
+  <data name="ItemCategoryShips" xml:space="preserve">
+    <value>船</value>
+  </data>
+  <data name="ItemCategoryTradeGoods" xml:space="preserve">
+    <value>交易品</value>
+  </data>
+  <data name="ItemGroupSails" xml:space="preserve">
+    <value>帆</value>
+  </data>
+  <data name="ItemGroupFigureheads" xml:space="preserve">
+    <value>船首像</value>
+  </data>
+  <data name="ItemGroupSterns" xml:space="preserve">
+    <value>船尾装飾</value>
+  </data>
+  <data name="ItemGroupCannons" xml:space="preserve">
+    <value>大砲</value>
+  </data>
+  <data name="ItemGroupTeleporters" xml:space="preserve">
+    <value>テレポーター</value>
+  </data>
+  <data name="ItemGroupBlueprintParts" xml:space="preserve">
+    <value>設計図の断片</value>
+  </data>
+  <data name="ItemGroupShipBlueprints" xml:space="preserve">
+    <value>船の設計図</value>
+  </data>
+  <data name="ItemGroupEquipmentBlueprints" xml:space="preserve">
+    <value>装備の設計図</value>
+  </data>
+  <data name="ItemGroupShipMaterials" xml:space="preserve">
+    <value>船の素材</value>
+  </data>
+  <data name="ItemGroupMountGear" xml:space="preserve">
+    <value>騎乗動物の装備</value>
+  </data>
+  <data name="ItemGroupVehicleGear" xml:space="preserve">
+    <value>乗り物の装備</value>
+  </data>
+  <data name="ItemGroupPackagedCargo" xml:space="preserve">
+    <value>梱包された貨物</value>
+  </data>
+  <data name="ItemGroupTradeGoods" xml:space="preserve">
+    <value>交易品</value>
+  </data>
+  <data name="ItemGroupUpgradeMaterial" xml:space="preserve">
+    <value>強化素材</value>
+  </data>
+  <data name="ItemGroupMemoryFragment" xml:space="preserve">
+    <value>記憶の断片</value>
+  </data>
+  <data name="ItemGroupSeaLife" xml:space="preserve">
+    <value>海洋生物</value>
+  </data>
+  <data name="ItemGroupInsects" xml:space="preserve">
+    <value>昆虫</value>
+  </data>
+  <data name="ItemGroupBuildingsTents" xml:space="preserve">
+    <value>建物 / テント</value>
+  </data>
+  <data name="ItemGroupDoorsWindowsFences" xml:space="preserve">
+    <value>扉 / 窓 / 柵</value>
+  </data>
+  <data name="ItemGroupRelic" xml:space="preserve">
+    <value>遺物</value>
+  </data>
+  <data name="ItemEvidenceRecoveredItemDefinitionEquipType" xml:space="preserve">
+    <value>取得したアイテム定義 / 装備タイプ</value>
+  </data>
 </root>

@@ -12,7 +12,7 @@ internal enum ItemPrefabListLayout
     MismatchedMarked,
 }
 
-internal sealed class SyntheticArchiveFixture : IAsyncDisposable
+internal sealed partial class SyntheticArchiveFixture : IAsyncDisposable
 {
     private SyntheticArchiveFixture(string root)
     {

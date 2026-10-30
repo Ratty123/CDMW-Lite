@@ -1,4 +1,5 @@
 #include "archive_core_internal.hpp"
+#include "../../common/partial_static_mesh.hpp"
 
 namespace cdmw::archive {
 
@@ -155,27 +156,6 @@ std::vector<std::uint8_t> maybe_decompress_partial_par(
     const std::vector<std::uint8_t>& data,
     std::uint64_t original_size) {
     if (data.size() < 0x50 || std::memcmp(data.data(), "PAR ", 4) != 0) return {};
-    // PAM 0x1802 stores one compressed geometry block, not the PAR section table.
-    if (read_u32(data, 4) == 0x1802) {
-        const size_t offset = read_u32(data, 0x3c);
-        const size_t decoded_size = read_u32(data, 0x40);
-        const size_t compressed_size = read_u32(data, 0x44);
-        if (compressed_size == 0) return {};
-        if (offset < 0x50 || decoded_size == 0 || offset > data.size()
-            || compressed_size > data.size() - offset
-            || data.size() - compressed_size + decoded_size != original_size) {
-            throw std::runtime_error("Partial PAM geometry block has inconsistent sizes");
-        }
-        const auto start = data.begin() + offset;
-        const auto end = start + compressed_size;
-        const auto geometry = lz4_decompress(std::vector<std::uint8_t>(start, end), decoded_size);
-        if (geometry.size() != decoded_size) throw std::runtime_error("Partial PAM geometry size mismatch");
-        std::vector<std::uint8_t> rebuilt(data.begin(), start);
-        std::fill(rebuilt.begin() + 0x44, rebuilt.begin() + 0x48, std::uint8_t{0});
-        rebuilt.insert(rebuilt.end(), geometry.begin(), geometry.end());
-        rebuilt.insert(rebuilt.end(), end, data.end());
-        return rebuilt;
-    }
     struct Slot { std::uint32_t compressed; std::uint32_t decoded; size_t offset; };
     std::vector<Slot> slots;
     size_t source_offset = 0x50;
@@ -250,7 +230,7 @@ DecodeResult decode_entry(
     auto data = read_entry_raw(paz_path, archive_offset, stored_size);
     std::vector<std::string> notes;
     const auto encryption_type = (flags >> 4) & 0x0Fu;
-    if ((flags >> 4) != 0) {
+    if (encryption_type != 0) {
         if (encryption_type != 3) throw UnsupportedError("unsupported archive encryption type " + std::to_string(encryption_type));
         data = crypt_chacha20_filename(data, virtual_path);
         notes.emplace_back("ChaCha20");
@@ -261,7 +241,10 @@ DecodeResult decode_entry(
             data = lz4_decompress(data, static_cast<size_t>(original_size));
             notes.emplace_back("LZ4");
         } else if (compression_type == 1) {
-            auto partial_par = maybe_decompress_partial_par(data, original_size);
+            const auto extension = lower_copy(fs::path(virtual_path).extension().string());
+            auto partial_par = decode_partial_static_mesh(extension, data, original_size, lz4_decompress);
+            if (partial_par.empty() && extension != ".pam" && extension != ".pamlod")
+                partial_par = maybe_decompress_partial_par(data, original_size);
             if (!partial_par.empty()) {
                 data = std::move(partial_par);
                 notes.emplace_back("PartialPAR");

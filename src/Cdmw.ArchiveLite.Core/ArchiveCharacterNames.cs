@@ -14,17 +14,28 @@ internal static class ArchiveCharacterNames
         Func<ArchiveEntryDto, byte[]> decode, List<string> warnings, List<CharacterUnresolvedNameLink> unresolved, CancellationToken token)
     {
         var owners = new Dictionary<string, List<CharacterNameLink>>(StringComparer.OrdinalIgnoreCase);
+        var installed = appearances.ToArray();
+        foreach (var suffix in new[] { "" }.Concat(sources.DlcTableSuffixes("characterinfo").Select(static name => "." + name)))
+            ReadTables(sources, installed, decode, warnings, unresolved, token, owners, suffix);
+        return owners;
+    }
+
+    private static void ReadTables(ArchiveItemSources sources, ArchiveEntryDto[] appearances,
+        Func<ArchiveEntryDto, byte[]> decode, List<string> warnings, List<CharacterUnresolvedNameLink> unresolved,
+        CancellationToken token, Dictionary<string, List<CharacterNameLink>> owners, string suffix)
+    {
         try
         {
-            var characters = sources.TablePair("characterinfo");
-            var links = sources.TablePair("characterappearanceindexinfo");
+            var characters = sources.TablePair("characterinfo" + suffix);
+            var links = sources.TablePair("characterappearanceindexinfo" + suffix);
             if (characters.Body is null || characters.Header is null || links.Body is null || links.Header is null)
             {
                 warnings.Add("Character naming tables are incomplete or absent; internal appearance names remain searchable.");
-                return owners;
+                return;
             }
             var characterBytes = decode(characters.Body);
-            var characterRows = ArchiveMetadataReader.ResolvePabghDirectory(decode(characters.Header), characterBytes)
+            var characterRows = ArchiveMetadataReader.ResolvePabghDirectory(decode(characters.Header), characterBytes,
+                ArchiveMetadataReader.TableKeyLayout.Named)
                 ?? throw new InvalidDataException("CharacterInfo row directory is unsupported.");
             var names = new Dictionary<uint, (string Name, string NameKey)>();
             for (var i = 0; i < characterRows.Count; i++)
@@ -40,22 +51,29 @@ internal static class ArchiveCharacterNames
                 // inside this row before joining the localization namespace.
                 var keyBytes = System.Text.Encoding.ASCII.GetBytes(key);
                 if (characterBytes.AsSpan(start, end - start).IndexOf(keyBytes) < 0) key = "";
-                names[id] = (ArchiveMetadataReader.ReadItemInfoRowInternalName(characterBytes, start, end), key);
+                names[id] = (ArchiveMetadataReader.ReadItemInfoRowInternalName(characterBytes, start, end, row.KeyOffset != 0), key);
             }
             var wanted = names.Values.Select(static row => row.NameKey).Where(static value => value.Length > 0)
                 .ToHashSet(StringComparer.Ordinal);
             var localized = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (language, entry) in sources.DomainLocalizations("character"))
+            foreach (var domain in new[] { "character" }.Concat(sources.DlcTableSuffixes("characterinfo").Select(static value => "character." + value)))
+            foreach (var (language, entry) in sources.DomainLocalizations(domain))
             {
                 token.ThrowIfCancellationRequested();
-                try { localized[language] = ArchiveMetadataReader.ParseLocalization(decode(entry), wanted, token); }
+                if (!localized.TryGetValue(language, out var languageNames)) localized[language] = languageNames = new(StringComparer.Ordinal);
+                try
+                {
+                    foreach (var (key, value) in ArchiveMetadataReader.ParseLocalization(decode(entry), wanted, token))
+                        languageNames[key] = value;
+                }
                 catch (Exception error) when (error is InvalidDataException or IOException or ArgumentException)
                 { warnings.Add($"Could not read {entry.Path}: {error.Message}"); }
             }
             var hashes = appearances.GroupBy(static entry => ArchiveMetadataReader.ModelNameHash(entry.Path.ToLowerInvariant()))
                 .ToDictionary(static group => group.Key, static group => group.ToArray());
             var linkBytes = decode(links.Body);
-            var rows = ArchiveMetadataReader.ResolvePabghDirectory(decode(links.Header), linkBytes)
+            var rows = ArchiveMetadataReader.ResolvePabghDirectory(decode(links.Header), linkBytes,
+                ArchiveMetadataReader.TableKeyLayout.PrefixFourZeros)
                 ?? throw new InvalidDataException("CharacterAppearanceIndexInfo row directory is unsupported.");
             var unmatched = 0;
             for (var i = 0; i < rows.Count; i++)
@@ -97,6 +115,5 @@ internal static class ArchiveCharacterNames
         {
             warnings.Add($"Character names unavailable: {error.Message}");
         }
-        return owners;
     }
 }

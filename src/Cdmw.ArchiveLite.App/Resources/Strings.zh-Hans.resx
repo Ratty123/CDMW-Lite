@@ -491,4 +491,76 @@
   <data name="CharacterThumbnailProgress" xml:space="preserve"><value>缩略图已就绪：{0:N0} / {1:N0}</value></data>
   <data name="CharacterThumbnailQueued" xml:space="preserve"><value>排队中</value></data>
   <data name="CharacterLoadingCancelled" xml:space="preserve"><value>加载已取消。</value></data>
+  <data name="ItemFinderOnlyDlc" xml:space="preserve">
+    <value>仅显示DLC物品</value>
+  </data>
+  <data name="ItemCategoryShips" xml:space="preserve">
+    <value>船只</value>
+  </data>
+  <data name="ItemCategoryTradeGoods" xml:space="preserve">
+    <value>贸易品</value>
+  </data>
+  <data name="ItemGroupSails" xml:space="preserve">
+    <value>船帆</value>
+  </data>
+  <data name="ItemGroupFigureheads" xml:space="preserve">
+    <value>船首像</value>
+  </data>
+  <data name="ItemGroupSterns" xml:space="preserve">
+    <value>船尾装饰</value>
+  </data>
+  <data name="ItemGroupCannons" xml:space="preserve">
+    <value>火炮</value>
+  </data>
+  <data name="ItemGroupTeleporters" xml:space="preserve">
+    <value>传送装置</value>
+  </data>
+  <data name="ItemGroupBlueprintParts" xml:space="preserve">
+    <value>蓝图碎片</value>
+  </data>
+  <data name="ItemGroupShipBlueprints" xml:space="preserve">
+    <value>船只蓝图</value>
+  </data>
+  <data name="ItemGroupEquipmentBlueprints" xml:space="preserve">
+    <value>装备蓝图</value>
+  </data>
+  <data name="ItemGroupShipMaterials" xml:space="preserve">
+    <value>船只材料</value>
+  </data>
+  <data name="ItemGroupMountGear" xml:space="preserve">
+    <value>坐骑装备</value>
+  </data>
+  <data name="ItemGroupVehicleGear" xml:space="preserve">
+    <value>载具装备</value>
+  </data>
+  <data name="ItemGroupPackagedCargo" xml:space="preserve">
+    <value>打包货物</value>
+  </data>
+  <data name="ItemGroupTradeGoods" xml:space="preserve">
+    <value>贸易品</value>
+  </data>
+  <data name="ItemGroupUpgradeMaterial" xml:space="preserve">
+    <value>强化材料</value>
+  </data>
+  <data name="ItemGroupMemoryFragment" xml:space="preserve">
+    <value>记忆碎片</value>
+  </data>
+  <data name="ItemGroupSeaLife" xml:space="preserve">
+    <value>海洋生物</value>
+  </data>
+  <data name="ItemGroupInsects" xml:space="preserve">
+    <value>昆虫</value>
+  </data>
+  <data name="ItemGroupBuildingsTents" xml:space="preserve">
+    <value>建筑 / 帐篷</value>
+  </data>
+  <data name="ItemGroupDoorsWindowsFences" xml:space="preserve">
+    <value>门 / 窗 / 围栏</value>
+  </data>
+  <data name="ItemGroupRelic" xml:space="preserve">
+    <value>遗物</value>
+  </data>
+  <data name="ItemEvidenceRecoveredItemDefinitionEquipType" xml:space="preserve">
+    <value>已读取的物品定义 / 装备类型</value>
+  </data>
 </root>

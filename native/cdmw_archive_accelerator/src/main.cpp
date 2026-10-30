@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "../../common/pamt_compact.hpp"
 
 namespace fs = std::filesystem;
 
@@ -205,10 +206,11 @@ std::uint32_t hashlittle_bytes(const std::string& text, std::uint32_t initval = 
 
 class VfsPathResolver {
 public:
-    explicit VfsPathResolver(std::vector<char> data, size_t max_cache_entries = 200000)
-        : data_(std::move(data)), max_cache_entries_(max_cache_entries) {}
+    explicit VfsPathResolver(std::vector<char> data, size_t max_cache_entries = 200000, bool compact = false)
+        : data_(std::move(data)), max_cache_entries_(max_cache_entries), compact_(compact) {}
 
     std::string full_path(std::uint32_t offset) {
+        if (compact_ && offset != 0xFFFFFFFFu && offset >= data_.size()) throw std::runtime_error("Compact VFS offset is outside the name block");
         if (offset >= data_.size()) return {};
         auto cached = cache_.find(offset);
         if (cached != cache_.end()) return cached->second;
@@ -223,6 +225,13 @@ public:
             if (parent_cached != cache_.end()) {
                 base = parent_cached->second;
                 break;
+            }
+            if (compact_) {
+                const auto part = cdmw::archive::compact_name_part(data_, current);
+                parts.emplace_back(current, part.text);
+                current = part.parent;
+                if (parts.size() > 255) throw std::runtime_error("Compact VFS path is too deep");
+                continue;
             }
             const size_t pos = static_cast<size_t>(current);
             if (pos + 5 > data_.size()) break;
@@ -246,6 +255,7 @@ public:
 private:
     std::vector<char> data_;
     size_t max_cache_entries_;
+    bool compact_;
     std::unordered_map<std::uint32_t, std::string> cache_;
 };
 
@@ -443,8 +453,9 @@ std::vector<Entry> parse_pamt(const fs::path& pamt_path) {
     const size_t file_table_offset = off;
     if (off + static_cast<size_t>(file_count) * 20u > data.size()) throw std::runtime_error("file table is truncated");
 
-    VfsPathResolver file_resolver(std::move(file_names));
-    VfsPathResolver dir_resolver(std::move(directory), 50000);
+    const auto extensions = cdmw::archive::pamt_extensions(data, file_table_offset + static_cast<size_t>(file_count) * 20);
+    VfsPathResolver file_resolver(std::move(file_names), 200000, !extensions.empty());
+    VfsPathResolver dir_resolver(std::move(directory), 50000, !extensions.empty());
     struct FolderRange { std::uint32_t start; std::uint32_t end; std::string dir; };
     std::vector<FolderRange> ranges;
     for (std::uint32_t i = 0; i < folder_count; ++i) {
@@ -456,8 +467,12 @@ std::vector<Entry> parse_pamt(const fs::path& pamt_path) {
         ranges.push_back({file_start, file_start + count, slash_copy(dir_resolver.full_path(name_offset))});
     }
     std::sort(ranges.begin(), ranges.end(), [](const FolderRange& a, const FolderRange& b) { return a.start < b.start; });
-    std::vector<fs::path> paz_files;
-    for (std::uint32_t i = 0; i < paz_count; ++i) paz_files.push_back(pamt_path.parent_path() / (std::to_string(i) + ".paz"));
+    std::unordered_map<std::uint32_t, fs::path> paz_files;
+    for (std::uint32_t i = 0; i < paz_count; ++i) {
+        const auto id = read_u32(data, 12 + static_cast<size_t>(i) * 12);
+        if (id > 0xFFFFu || !paz_files.emplace(id, pamt_path.parent_path() / (std::to_string(id) + ".paz")).second)
+            throw std::runtime_error("PAMT has duplicate or invalid PAZ identifiers");
+    }
     std::vector<Entry> entries;
     entries.reserve(file_count);
     size_t folder_cursor = 0;
@@ -465,7 +480,7 @@ std::vector<Entry> parse_pamt(const fs::path& pamt_path) {
         const size_t row = file_table_offset + static_cast<size_t>(i) * 20u;
         const std::uint32_t name_offset = read_u32(data, row);
         Entry entry;
-        entry.path = slash_copy(file_resolver.full_path(name_offset));
+        entry.path = slash_copy(file_resolver.full_path(name_offset)) + cdmw::archive::pamt_extension(extensions, read_u16(data, row + 18));
         while (folder_cursor < ranges.size() && i >= ranges[folder_cursor].end) ++folder_cursor;
         if (folder_cursor < ranges.size() && i >= ranges[folder_cursor].start && i < ranges[folder_cursor].end && !ranges[folder_cursor].dir.empty()) {
             entry.path = ranges[folder_cursor].dir + "/" + entry.path;
@@ -476,7 +491,7 @@ std::vector<Entry> parse_pamt(const fs::path& pamt_path) {
         entry.orig_size = read_u32(data, row + 12);
         entry.paz_index = read_u16(data, row + 16);
         entry.flags = read_u16(data, row + 18);
-        if (entry.paz_index >= paz_files.size()) throw std::runtime_error("invalid paz index");
+        if (paz_files.count(entry.paz_index) == 0) throw std::runtime_error("invalid paz index");
         entry.paz_file = paz_files[entry.paz_index];
         entries.push_back(std::move(entry));
     }
@@ -895,6 +910,7 @@ struct NativeItemRecord {
     long long stack_size = -1;
     int grade = -1;
     std::string equip_type;
+    bool is_dlc = false;
     std::vector<std::string> localized_names;
     std::vector<std::uint32_t> prefab_hashes;
     std::vector<std::string> model_stems;
@@ -991,7 +1007,10 @@ struct PabgRow {
     std::vector<unsigned char> key;
     size_t begin = 0;
     size_t end = 0;
+    size_t key_offset = 0;
 };
+
+enum class TableKeyLayout { Inline, Named, StringInfo };
 
 struct PabgTable {
     std::vector<PabgRow> rows;
@@ -1014,7 +1033,8 @@ std::uint32_t pabg_row_key(const PabgRow& row) {
 bool parse_pabg_directory(
     const std::vector<char>& header,
     const std::vector<char>& blob,
-    PabgTable& table
+    PabgTable& table,
+    TableKeyLayout layout = TableKeyLayout::Inline
 ) {
     if (header.empty() || blob.empty()) return false;
     for (const size_t count_width : {size_t{1}, size_t{2}, size_t{4}}) {
@@ -1044,10 +1064,6 @@ bool parse_pabg_directory(
             row.key.assign(
                 reinterpret_cast<const unsigned char*>(header.data()) + entry,
                 reinterpret_cast<const unsigned char*>(header.data()) + entry + key_width);
-            if (!std::equal(
-                    row.key.begin(),
-                    row.key.end(),
-                    reinterpret_cast<const unsigned char*>(blob.data()) + offset)) { valid = false; break; }
             row.begin = offset;
             if (!rows.empty()) rows.back().end = offset;
             rows.push_back(std::move(row));
@@ -1055,6 +1071,34 @@ bool parse_pabg_directory(
         }
         if (!valid) continue;
         rows.back().end = blob.size();
+        for (auto& row : rows) {
+            if (row.begin + key_width > row.end) { valid = false; break; }
+            bool inline_match = std::equal(row.key.begin(), row.key.end(),
+                reinterpret_cast<const unsigned char*>(blob.data() + row.begin));
+            if (layout == TableKeyLayout::Named && inline_match) {
+                inline_match = key_width == 4 && row.begin + 8 <= row.end;
+                if (inline_match) {
+                    const auto length = read_u32(blob, row.begin + 4);
+                    inline_match = length > 0 && length <= 256 && row.begin + 8 + length <= row.end;
+                }
+            }
+            if (!inline_match) {
+                if (key_width != 4) { valid = false; break; }
+                if (layout == TableKeyLayout::Named && row.begin + 8 <= row.end) {
+                    const auto length = read_u32(blob, row.begin);
+                    if (length == 0 || length > 256 || row.begin + 8 + length > row.end) { valid = false; break; }
+                    row.key_offset = 4 + length;
+                } else if (layout == TableKeyLayout::StringInfo && row.begin + 13 <= row.end
+                        && read_u32(blob, row.begin) == 0 && blob[row.begin + 8] == 0) {
+                    row.key_offset = 4;
+                } else { valid = false; break; }
+                if (!std::equal(row.key.begin(), row.key.end(),
+                        reinterpret_cast<const unsigned char*>(blob.data() + row.begin + row.key_offset))) {
+                    valid = false; break;
+                }
+            }
+        }
+        if (!valid) continue;
         table.rows = std::move(rows);
         table.count_width = count_width;
         table.key_width = key_width;
@@ -1106,24 +1150,26 @@ std::map<std::uint32_t, std::string> parse_equiptypeinfo_rows(
     std::map<std::uint32_t, std::string> names;
     for (const PabgRow& row : table.rows) {
         if (row.begin + 8 > row.end) continue;
-        const std::uint32_t length = read_u32(data, row.begin + 4);
+        const size_t name_at = row.begin + (row.key_offset ? 0 : 4);
+        const std::uint32_t length = read_u32(data, name_at);
         if (length == 0 || length > 120 || row.begin + 8 + length > row.end) continue;
         names[pabg_row_key(row)] = std::string(
-            data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8),
-            data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8 + length));
+            data.begin() + static_cast<std::ptrdiff_t>(name_at + 4),
+            data.begin() + static_cast<std::ptrdiff_t>(name_at + 4 + length));
     }
     return names;
 }
 
-// Rows open with their key, then a length-prefixed, NUL-terminated internal name.
+// The repeated key can precede or follow the length-prefixed internal name.
 std::string pabg_row_name(const std::vector<char>& data, const PabgRow& row, size_t* end_offset = nullptr) {
     if (row.begin + 8 > row.end) return {};
-    const std::uint32_t length = read_u32(data, row.begin + 4);
+    const size_t name_at = row.begin + (row.key_offset ? 0 : 4);
+    const std::uint32_t length = read_u32(data, name_at);
     if (length == 0 || length > 200 || row.begin + 8 + length > row.end) return {};
     if (end_offset != nullptr) *end_offset = std::min(row.end, row.begin + 8 + length + 1);
     return std::string(
-        data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8),
-        data.begin() + static_cast<std::ptrdiff_t>(row.begin + 8 + length));
+        data.begin() + static_cast<std::ptrdiff_t>(name_at + 4),
+        data.begin() + static_cast<std::ptrdiff_t>(name_at + 4 + length));
 }
 
 // Reads a scalar at a fixed offset from one of the row's landmarks, or reports that the row is too
@@ -1156,7 +1202,7 @@ void add_stringinfo_icon_hash(
     }
     if (prefix.empty()) return;
     const std::string model_stem = normalize_icon_model_stem(text.substr(prefix.size()));
-    if (!starts_with(model_stem, "cd_")) return;
+    if (!starts_with(model_stem, "cd_") || model_stem == "cd_t9999_empty") return;
     if (stored_hash) hashes[stored_hash] = model_stem;
     hashes[hashlittle_bytes(text, 0xC5EDE)] = model_stem;
     hashes[hashlittle_bytes(model_stem, 0xC5EDE)] = model_stem;
@@ -1180,6 +1226,32 @@ std::map<std::uint32_t, std::string> parse_stringinfo_rows(
         add_stringinfo_icon_hash(hashes, text, pabg_row_key(row));
     }
     return hashes;
+}
+
+// Only verified StringInfo hashes and installed assets establish these links.
+std::map<std::uint32_t, std::string> parse_asset_stringinfo(
+    const std::vector<char>& data, const PabgTable& table,
+    const std::vector<Entry>& entries, bool inventory_icons
+) {
+    std::map<std::string, std::string> assets;
+    for (const auto& entry : entries) {
+        const auto path = lower_copy(slash_copy(entry.path));
+        const auto stem = stem_for_path(path);
+        if (stem == "cd_t9999_empty" || stem == "itemicon_prefab_cd_t9999_empty") continue;
+        if (inventory_icons ? (extension_for(path) == ".dds" && path.find("/icon/") != std::string::npos)
+                            : extension_for(path) == ".prefab")
+            assets[stem] = inventory_icons ? slash_copy(entry.path) : stem;
+    }
+    std::map<std::uint32_t, std::string> result;
+    for (const auto& row : table.rows) {
+        if (row.begin + 13 > row.end || read_u32(data, row.begin + 9) != row.end - row.begin - 13) continue;
+        if (read_u32(data, row.begin + (row.key_offset ? 0 : 4)) != 0 || data[row.begin + 8] != 0) continue;
+        const std::string name(data.begin() + row.begin + 13, data.begin() + row.end);
+        const auto asset = assets.find(lower_copy(name));
+        const auto key = pabg_row_key(row);
+        if (key == hashlittle_bytes(name, 0xC5EDE) && asset != assets.end()) result[key] = asset->second;
+    }
+    return result;
 }
 
 // Kept for archives whose StringInfo directory is missing or does not describe its blob. The walk
@@ -1453,7 +1525,9 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
     const LocalizationTables& loc_tables,
     const std::map<std::uint32_t, std::string>& icon_hashes,
     const std::map<std::uint32_t, std::string>& model_hashes,
-    const std::map<std::uint32_t, std::string>& equip_types
+    const std::map<std::uint32_t, std::string>& equip_types,
+    const std::map<std::uint32_t, std::string>& prefab_names,
+    const std::map<std::uint32_t, std::string>& exact_icons
 ) {
     std::vector<NativeItemRecord> items;
     items.reserve(table.rows.size());
@@ -1485,6 +1559,13 @@ std::vector<NativeItemRecord> parse_iteminfo_rows(
             row.begin,
             row.end,
             record);
+        for (size_t at = row.begin + 8 + record.internal_name.size(); at + 4 <= row.end; ++at) {
+            const auto value = read_u32(data, at);
+            const auto icon = exact_icons.find(value);
+            if (icon != exact_icons.end()) add_unique(record.icon_paths, icon->second);
+            if (prefab_names.count(value) && std::find(record.prefab_hashes.begin(), record.prefab_hashes.end(), value) == record.prefab_hashes.end())
+                record.prefab_hashes.push_back(value);
+        }
         if (const LocalizationRow* row = localized_row(loc_tables, "eng", record.description_key)) {
             record.description = row->text;
             record.description_category = static_cast<int>(row->category);
@@ -1569,6 +1650,7 @@ std::map<std::string, std::vector<std::string>> build_icon_path_index(const std:
         const std::string lower_path = lower_copy(slash_copy(entry.path));
         if (extension_for(lower_path) != ".dds") continue;
         const std::string stem = stem_for_path(lower_path);
+        if (stem == "itemicon_prefab_cd_t9999_empty" || stem == "cd_t9999_empty") continue;
         if (lower_path.find("itemicon") == std::string::npos && std::none_of(prefixes.begin(), prefixes.end(), [&](const std::string& p) { return starts_with(stem, p); })) continue;
         std::string model_stem;
         for (const std::string& prefix : prefixes) {
@@ -1660,11 +1742,20 @@ int run_item_index_job(
 ) {
     try {
         std::vector<Entry> entries = read_entries_tsv(entries_path);
+        std::vector<fs::path> datasets{work_dir};
+        if (fs::is_directory(work_dir / "dlc")) {
+            std::vector<fs::path> dlc;
+            for (const auto& file : fs::directory_iterator(work_dir / "dlc"))
+                if (file.is_directory() && fs::is_regular_file(file.path() / "iteminfo.bin")) dlc.push_back(file.path());
+            std::sort(dlc.begin(), dlc.end());
+            datasets.insert(datasets.end(), dlc.begin(), dlc.end());
+        }
         LocalizationTables loc_tables;
         std::vector<std::string> localization_failures;
         std::map<std::uint32_t, std::uint64_t> localization_categories;
         std::uint64_t localization_row_count = 0;
-        for (const auto& file : fs::directory_iterator(work_dir)) {
+        for (const auto& dataset : datasets)
+        for (const auto& file : fs::directory_iterator(dataset)) {
             if (!file.is_regular_file()) continue;
             const auto name = file.path().filename().string();
             if (name.size() <= 8 || name.compare(0, 4, "loc_") != 0 || file.path().extension() != ".bin") continue;
@@ -1679,42 +1770,53 @@ int run_item_index_job(
                 if (lang == "eng") {
                     for (const auto& row : table) ++localization_categories[row.second.category];
                 }
-                loc_tables[lang] = std::move(table);
+                for (const auto& row : table) loc_tables[lang][row.first] = row.second;
             } catch (const std::exception& exc) {
                 localization_failures.push_back(lang + ": " + exc.what());
             }
         }
-        const std::vector<char> stringinfo = read_binary_if_exists(work_dir / "stringinfo.bin");
-        PabgTable stringinfo_table;
-        const bool stringinfo_from_directory = parse_pabg_directory(
-            read_binary_if_exists(work_dir / "stringinfo.header.bin"),
-            stringinfo,
-            stringinfo_table);
-        const auto icon_hashes = stringinfo_from_directory
-            ? parse_stringinfo_rows(stringinfo, stringinfo_table)
-            : parse_stringinfo_hashes(stringinfo);
-
-        const std::vector<char> equiptypeinfo = read_binary_if_exists(work_dir / "equiptypeinfo.bin");
-        PabgTable equiptypeinfo_table;
-        std::map<std::uint32_t, std::string> equip_types;
-        if (parse_pabg_directory(
-                read_binary_if_exists(work_dir / "equiptypeinfo.header.bin"),
-                equiptypeinfo,
-                equiptypeinfo_table)) {
-            equip_types = parse_equiptypeinfo_rows(equiptypeinfo, equiptypeinfo_table);
+        std::map<std::uint32_t, std::string> icon_hashes, equip_types, prefab_names, exact_icons;
+        bool stringinfo_from_directory = true;
+        for (const auto& dataset : datasets) {
+            const auto strings = read_binary_if_exists(dataset / "stringinfo.bin");
+            PabgTable table;
+            const bool valid = parse_pabg_directory(read_binary_if_exists(dataset / "stringinfo.header.bin"),
+                strings, table, TableKeyLayout::StringInfo);
+            stringinfo_from_directory &= valid;
+            for (const auto& row : valid ? parse_stringinfo_rows(strings, table) : parse_stringinfo_hashes(strings))
+                icon_hashes[row.first] = row.second;
+            if (valid) {
+                for (const auto& row : parse_asset_stringinfo(strings, table, entries, false)) prefab_names[row.first] = row.second;
+                for (const auto& row : parse_asset_stringinfo(strings, table, entries, true)) exact_icons[row.first] = row.second;
+            }
+            const auto equip = read_binary_if_exists(dataset / "equiptypeinfo.bin");
+            if (parse_pabg_directory(read_binary_if_exists(dataset / "equiptypeinfo.header.bin"), equip, table, TableKeyLayout::Named))
+                for (const auto& row : parse_equiptypeinfo_rows(equip, table)) equip_types[row.first] = row.second;
         }
-
-        const std::vector<char> iteminfo = read_binary_if_exists(work_dir / "iteminfo.bin");
-        PabgTable iteminfo_table;
-        const bool iteminfo_from_directory = parse_pabg_directory(
-            read_binary_if_exists(work_dir / "iteminfo.header.bin"),
-            iteminfo,
-            iteminfo_table);
-        const auto hash_table = build_model_hash_table(entries);
-        auto items = iteminfo_from_directory
-            ? parse_iteminfo_rows(iteminfo, iteminfo_table, loc_tables, icon_hashes, hash_table, equip_types)
-            : parse_iteminfo_bin(iteminfo, loc_tables, icon_hashes, hash_table);
-        const size_t iteminfo_row_count = iteminfo_from_directory ? iteminfo_table.rows.size() : items.size();
+        auto hash_table = build_model_hash_table(entries);
+        for (const auto& row : prefab_names) hash_table[row.first] = row.second;
+        std::vector<NativeItemRecord> items;
+        std::map<int, size_t> positions;
+        std::set<int> base_ids;
+        bool iteminfo_from_directory = true;
+        size_t iteminfo_row_count = 0;
+        for (const auto& dataset : datasets) {
+            const auto data = read_binary_if_exists(dataset / "iteminfo.bin");
+            PabgTable table;
+            const bool valid = parse_pabg_directory(read_binary_if_exists(dataset / "iteminfo.header.bin"), data, table, TableKeyLayout::Named);
+            if (!valid && dataset != work_dir) throw std::runtime_error("DLC ItemInfo row directory is unsupported");
+            iteminfo_from_directory &= valid;
+            auto rows = valid ? parse_iteminfo_rows(data, table, loc_tables, icon_hashes, hash_table, equip_types, prefab_names, exact_icons)
+                              : parse_iteminfo_bin(data, loc_tables, icon_hashes, hash_table);
+            iteminfo_row_count += valid ? table.rows.size() : rows.size();
+            for (auto& row : rows) {
+                if (dataset == work_dir) base_ids.insert(row.item_id);
+                row.is_dlc = dataset != work_dir && !base_ids.count(row.item_id);
+                auto found = positions.find(row.item_id);
+                if (found != positions.end()) items[found->second] = std::move(row);
+                else { positions[row.item_id] = items.size(); items.push_back(std::move(row)); }
+            }
+        }
         const auto icon_index = build_icon_path_index(entries);
         std::map<std::string, std::string> aliases;
         std::map<std::string, std::string> display_names;
@@ -1734,14 +1836,24 @@ int run_item_index_job(
             else found->second += " " + value;
         };
 
+        std::set<std::string> archived_prefabs;
+        for (const auto& entry : entries)
+            if (extension_for(entry.path) == ".prefab") archived_prefabs.insert(lower_copy(stem_for_path(entry.path)));
         std::vector<NativeItemRecord> linked_items;
         for (NativeItemRecord& item : items) {
+            for (const auto& icon : item.icon_paths) {
+                const auto stem = lower_copy(stem_for_path(icon));
+                const std::string prefix = "itemicon_prefab_";
+                if (starts_with(stem, prefix) && archived_prefabs.count(stem.substr(prefix.size())))
+                    add_unique(item.model_stems, stem.substr(prefix.size()));
+            }
             std::vector<std::string> exact_models;
             std::vector<std::string> related_models = item.model_stems;
             for (std::uint32_t hash : item.prefab_hashes) {
                 auto found = hash_table.find(hash);
                 if (found != hash_table.end()) add_unique(exact_models, found->second);
             }
+            for (const auto& resolved : exact_models) add_unique(item.model_stems, resolved);
             for (const std::string& resolved : exact_models) {
                 for (const std::string& key : model_candidate_bases(resolved)) {
                     auto icons = icon_index.find(key);
@@ -1782,6 +1894,7 @@ int run_item_index_job(
             const auto& item = linked_items[i];
             if (i) out << ",";
             out << "{\"item_id\":" << item.item_id
+                << ",\"is_dlc\":" << (item.is_dlc ? "true" : "false")
                 << ",\"internal_name\":\"" << json_escape(item.internal_name)
                 << "\",\"display_name\":\"" << json_escape(item.display_name)
                 << "\",\"description\":\"" << json_escape(item.description)
@@ -1837,7 +1950,7 @@ int run_entry_read_job(const fs::path& job_path, const fs::path& output_path, co
         const std::uint64_t orig_size = static_cast<std::uint64_t>(find_int_value(job, "orig_size", 0));
         const std::uint32_t flags = static_cast<std::uint32_t>(find_int_value(job, "flags", 0));
         const bool compressed = comp_size != orig_size;
-        const bool encrypted = (flags >> 4u) != 0u;
+        const bool encrypted = ((flags >> 4u) & 0x0Fu) != 0u;
         if (compressed || encrypted) {
             std::ostringstream out;
             out << "{\"status\":\"unsupported\",\"supported\":false,\"backend\":\"" << kBackend << "\",\"protocol\":" << kProtocol

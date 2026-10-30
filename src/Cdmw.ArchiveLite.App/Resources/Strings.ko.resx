@@ -491,4 +491,76 @@
   <data name="CharacterThumbnailProgress" xml:space="preserve"><value>썸네일 준비 완료: {0:N0} / {1:N0}</value></data>
   <data name="CharacterThumbnailQueued" xml:space="preserve"><value>대기 중</value></data>
   <data name="CharacterLoadingCancelled" xml:space="preserve"><value>로딩이 취소되었습니다.</value></data>
+  <data name="ItemFinderOnlyDlc" xml:space="preserve">
+    <value>DLC 아이템만 표시</value>
+  </data>
+  <data name="ItemCategoryShips" xml:space="preserve">
+    <value>선박</value>
+  </data>
+  <data name="ItemCategoryTradeGoods" xml:space="preserve">
+    <value>무역품</value>
+  </data>
+  <data name="ItemGroupSails" xml:space="preserve">
+    <value>돛</value>
+  </data>
+  <data name="ItemGroupFigureheads" xml:space="preserve">
+    <value>선수상</value>
+  </data>
+  <data name="ItemGroupSterns" xml:space="preserve">
+    <value>선미 장식</value>
+  </data>
+  <data name="ItemGroupCannons" xml:space="preserve">
+    <value>대포</value>
+  </data>
+  <data name="ItemGroupTeleporters" xml:space="preserve">
+    <value>순간이동 장치</value>
+  </data>
+  <data name="ItemGroupBlueprintParts" xml:space="preserve">
+    <value>설계도 조각</value>
+  </data>
+  <data name="ItemGroupShipBlueprints" xml:space="preserve">
+    <value>선박 설계도</value>
+  </data>
+  <data name="ItemGroupEquipmentBlueprints" xml:space="preserve">
+    <value>장비 설계도</value>
+  </data>
+  <data name="ItemGroupShipMaterials" xml:space="preserve">
+    <value>선박 재료</value>
+  </data>
+  <data name="ItemGroupMountGear" xml:space="preserve">
+    <value>탈것 장비</value>
+  </data>
+  <data name="ItemGroupVehicleGear" xml:space="preserve">
+    <value>차량 장비</value>
+  </data>
+  <data name="ItemGroupPackagedCargo" xml:space="preserve">
+    <value>포장된 화물</value>
+  </data>
+  <data name="ItemGroupTradeGoods" xml:space="preserve">
+    <value>무역품</value>
+  </data>
+  <data name="ItemGroupUpgradeMaterial" xml:space="preserve">
+    <value>강화 재료</value>
+  </data>
+  <data name="ItemGroupMemoryFragment" xml:space="preserve">
+    <value>기억의 조각</value>
+  </data>
+  <data name="ItemGroupSeaLife" xml:space="preserve">
+    <value>해양 생물</value>
+  </data>
+  <data name="ItemGroupInsects" xml:space="preserve">
+    <value>곤충</value>
+  </data>
+  <data name="ItemGroupBuildingsTents" xml:space="preserve">
+    <value>건물 / 천막</value>
+  </data>
+  <data name="ItemGroupDoorsWindowsFences" xml:space="preserve">
+    <value>문 / 창문 / 울타리</value>
+  </data>
+  <data name="ItemGroupRelic" xml:space="preserve">
+    <value>유물</value>
+  </data>
+  <data name="ItemEvidenceRecoveredItemDefinitionEquipType" xml:space="preserve">
+    <value>확인된 아이템 정의 / 장비 유형</value>
+  </data>
 </root>

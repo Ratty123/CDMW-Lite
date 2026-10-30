@@ -69,7 +69,8 @@ public sealed record ItemCatalogSearchRequest(
     string? Category = null,
     string? Group = null,
     int PageStart = 0,
-    int PageSize = 72);
+    int PageSize = 72,
+    bool OnlyDlc = false);
 
 public sealed record ItemCatalogSearchResult(
     string SessionId,
@@ -96,7 +97,8 @@ public sealed record ItemCatalogRow(
     string Description = "",
     int StackSize = -1,
     int Grade = -1,
-    string EquipType = "");
+    string EquipType = "",
+    bool IsDlc = false);
 
 public sealed record ItemCatalogCategoryFacet(
     string Category,

@@ -1,4 +1,6 @@
 #include <algorithm>
+#include "../../common/pamt_compact.hpp"
+#include "../../common/partial_static_mesh.hpp"
 #include <array>
 #include <chrono>
 #include <cctype>

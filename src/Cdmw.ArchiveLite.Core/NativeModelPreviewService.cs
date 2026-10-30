@@ -13,8 +13,8 @@ public sealed class NativeModelPreviewService
     // resolved, so anything the native core learns to read only reaches a model whose package is
     // rebuilt. These strings key the cache: leave them alone after changing what the core writes
     // and a stale package is served instead, which reads as the change having had no effect.
-    private const string PackageVersion = "archive_lite_native_model_v21_interchange";
-    private const string TexturedPackageVersion = "archive_lite_native_model_v21_material_layers_interchange";
+    private const string PackageVersion = "archive_lite_native_model_v22_dlc";
+    private const string TexturedPackageVersion = "archive_lite_native_model_v22_material_layers_dlc";
     private static readonly TimeSpan PreviewTimeout = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan ColdBuildCoalesceDelay = TimeSpan.FromMilliseconds(35);
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _buildGates = new(StringComparer.Ordinal);

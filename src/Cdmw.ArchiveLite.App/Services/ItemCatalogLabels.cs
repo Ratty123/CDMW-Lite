@@ -30,6 +30,7 @@ public static class ItemCatalogLabels
     /// <summary>Every category the classifier can assign.</summary>
     public static IReadOnlyList<string> Categories { get; } =
     [
+        "Ships", "Trade Goods",
         "Accessory", "Armor", "Character Customization", "Consumable", "Crafting / Recipe",
         "Gimmick / Interactive", "Housing / Prop", "Item", "Material", "Mount / Pet",
         "Progression / Reward", "Quest / Document", "Tool", "Weapon",
@@ -38,6 +39,7 @@ public static class ItemCatalogLabels
     /// <summary>Every group the classifier can assign. Group names do not repeat across categories.</summary>
     public static IReadOnlyList<string> Groups { get; } =
     [
+        "Sails", "Figureheads", "Sterns", "Cannons", "Teleporters", "Blueprint Parts", "Ship Blueprints", "Equipment Blueprints", "Ship Materials", "Mount Gear", "Vehicle Gear", "Packaged Cargo", "Trade Goods", "Upgrade Material", "Memory Fragment", "Sea Life", "Insects", "Buildings / Tents", "Doors / Windows / Fences", "Relic",
         "Amulet / Charm", "Artifact", "Axe / Mace / Hammer", "Back / Cloak", "Backpack / Pack",
         "Belt / Band", "Body", "Body / Appearance", "Book / Diary", "Bow / Crossbow",
         "Cloth / Leather", "Clue / Report", "Collection Prop", "Container", "Crafting",
@@ -58,6 +60,7 @@ public static class ItemCatalogLabels
     /// </summary>
     public static IReadOnlyList<string> EvidencePhrases { get; } =
     [
+        "Recovered item definition / equip type",
         "ItemInfo prefab hash", "icon/model reference", "localized display name",
         "inventory icon path", "item database record",
         "Recovered item/model naming", "No stronger category evidence was recovered",

@@ -43,6 +43,18 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release details.
 - Switch the interface between the fourteen languages Crimson Desert itself ships; every one but English is machine translated and unreviewed.
 - Keep settings, caches, logs, and crash reports isolated from the full CDMW workbench.
 
+The October 2026 DLC archive layouts are supported for read-only browsing, previews and exports.
+Open the complete game installation to include `dlc/dlc_01` and its mount table. Item Finder merges
+base and DLC tables, resolves ship inventory icons and nested prefab model links, and provides
+Ships categories and an **Only DLC items** filter. That filter includes newly introduced item IDs;
+base-game items updated by DLC remain in the normal catalogue. Clear resets the filter.
+Body & Face Finder merges base and DLC character names while retaining base translations omitted
+by DLC tables. Earlier Finder and model-preview caches rebuild automatically.
+
+Missing installed icons, textures or model references remain unavailable. The compact mount
+table's authentication trailer is treated as opaque metadata; Lite does not modify archives.
+Compatibility is covered by synthetic fixtures, not a new real-game or visual acceptance run.
+
 Body & Face Finder builds its catalogue and previews in the worker and renderer processes. Pages contain at most 72 rows. Thumbnails appear individually with loading indicators and cancellation; up to four following pages preload in the background, with eight pages of bounded in-memory reuse. Appearance previews preserve component placement and authored scale, and bodies with an embedded face avoid adding a second head. Customization, morphs and animation are not applied; their descriptors remain available for inspection or export.
 
 ## Safety boundary

@@ -73,7 +73,8 @@ internal static class ArchiveMetadataReader
     private const uint NameHashSeed = 0xC5EDE;
     private static readonly int[] PabghCountWidths = [1, 2, 4];
     private static readonly int[] PabghKeyWidths = [1, 2, 4, 8, 12];
-    internal sealed record PabghDirectoryRow(byte[] Key, uint Offset);
+    internal sealed record PabghDirectoryRow(byte[] Key, uint Offset, int KeyOffset = 0);
+    internal enum TableKeyLayout { Inline, Named, PrefixFourZeros }
     internal static byte[] LocalizationPayload(byte[] data)
     {
         if (!data.AsSpan().StartsWith("paloc"u8)) return data;
@@ -156,7 +157,8 @@ internal static class ArchiveMetadataReader
         if (count != declared) throw new InvalidDataException("PALOC record count does not match its footer.");
         return rows;
     }
-    internal static List<PabghDirectoryRow>? ResolvePabghDirectory(byte[] header, byte[] payload)
+    internal static List<PabghDirectoryRow>? ResolvePabghDirectory(byte[] header, byte[] payload,
+        TableKeyLayout layout = TableKeyLayout.Inline)
     {
         foreach (var countWidth in PabghCountWidths)
         {
@@ -211,13 +213,38 @@ internal static class ArchiveMetadataReader
                 continue;
             }
             var inlineKeysMatch = true;
-            foreach (var row in rows)
+            for (var index = 0; index < rows.Count; index++)
             {
-                if (row.Offset + (long)keyWidth > payload.Length || !payload.AsSpan(checked((int)row.Offset), keyWidth).SequenceEqual(row.Key))
+                var row = rows[index];
+                var start = checked((int)row.Offset);
+                var end = index + 1 < rows.Count ? checked((int)rows[index + 1].Offset) : payload.Length;
+                if (start + keyWidth > end) { inlineKeysMatch = false; break; }
+                var inlineMatch = payload.AsSpan(start, keyWidth).SequenceEqual(row.Key);
+                if (layout == TableKeyLayout.Named && inlineMatch)
+                {
+                    inlineMatch = keyWidth == 4 && start + 8 <= end;
+                    if (inlineMatch)
+                    {
+                        var length = ReadUInt32(payload, start + 4);
+                        inlineMatch = length is > 0 and <= 256 && start + 8L + length <= end;
+                    }
+                }
+                if (inlineMatch) continue;
+                var keyOffset = 0;
+                if (layout == TableKeyLayout.Named && keyWidth == 4 && start + 8 <= end)
+                {
+                    var length = ReadUInt32(payload, start);
+                    if (length is 0 or > 256 || start + 8L + length > end) { inlineKeysMatch = false; break; }
+                    keyOffset = 4 + (int)length;
+                }
+                else if (layout == TableKeyLayout.PrefixFourZeros && start + 4 + keyWidth <= end
+                    && ReadUInt32(payload, start) == 0) keyOffset = 4;
+                if (keyOffset == 0 || !payload.AsSpan(start + keyOffset, keyWidth).SequenceEqual(row.Key))
                 {
                     inlineKeysMatch = false;
                     break;
                 }
+                rows[index] = row with { KeyOffset = keyOffset };
             }
             if (inlineKeysMatch)
             {
@@ -226,18 +253,20 @@ internal static class ArchiveMetadataReader
         }
         return null;
     }
-    internal static string ReadItemInfoRowInternalName(byte[] data, int rowStart, int rowEnd)
+
+    internal static string ReadItemInfoRowInternalName(byte[] data, int rowStart, int rowEnd, bool nameFirst = false)
     {
         if (rowStart + 8 > rowEnd)
         {
             return string.Empty;
         }
-        var length = ReadUInt32(data, rowStart + 4);
+        var at = rowStart + (nameFirst ? 0 : 4);
+        var length = ReadUInt32(data, at);
         if (length is 0 or > 256 || rowStart + 8 + length > rowEnd)
         {
             return string.Empty;
         }
-        var raw = data.AsSpan(rowStart + 8, checked((int)length));
+        var raw = data.AsSpan(at + 4, checked((int)length));
         var nul = raw.IndexOf((byte)0);
         return Encoding.ASCII.GetString(nul < 0 ? raw : raw[..nul]);
     }

@@ -91,6 +91,13 @@ public sealed class ItemFinderViewModel : ObservableObject
     public AsyncCommand ShowRelatedSetCommand { get; }
     public event EventHandler? CloseRequested;
 
+    private bool _onlyDlc;
+    public bool OnlyDlc
+    {
+        get => _onlyDlc;
+        set { if (SetProperty(ref _onlyDlc, value)) ScheduleFilterSearch(); }
+    }
+
     public string Query
     {
         get => _query;
@@ -379,7 +386,7 @@ public sealed class ItemFinderViewModel : ObservableObject
                     categoryName,
                     groupName,
                     _pageStart,
-                    PageSize),
+                    PageSize, OnlyDlc),
                 cancellationToken).ConfigureAwait(true);
             if (!IsCurrent(sessionId, generation))
             {
@@ -672,6 +679,7 @@ public sealed class ItemFinderViewModel : ObservableObject
         _suppressFilterSearch++;
         try
         {
+            OnlyDlc = false;
             Query = string.Empty;
             SelectedCategory = CategoryOptions.FirstOrDefault();
         }

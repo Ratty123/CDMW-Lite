@@ -1,5 +1,13 @@
 # Archive Lite validation matrix
 
+The focused gate includes synthetic October 2026 DLC coverage: compact PAMT/PAPGT,
+sparse PAZ identifiers, extension/encryption flags, malformed compact metadata,
+partial PAM/PAMLOD decode, base/DLC catalogue merges, ship icons and categories,
+nested prefab/PAMI models, character localization fallback, DLC-only filtering,
+persistent cache reloads and mount-content invalidation. Native self-tests cover
+PAMLOD descriptor bounds and character-family rig nomination. These checks do not
+establish real-game coverage or visible preview fidelity.
+
 All commands are Python-free and use system temporary directories for synthetic archives and exports. They do not launch the visible application, licensed game content, or real PAMT/PAC data. Every main gate first runs `scripts/verify_repository_independence.ps1`, which requires this Git root to own all managed, native, renderer, schema, and project-reference inputs.
 
 ## Focused validation

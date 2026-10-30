@@ -4,6 +4,16 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Item Finder has ship equipment, blueprint and material categories, plus an Only DLC items filter for newly introduced items. Category counts follow the filter, and Clear resets it.
+
+### Fixed
+
+- Read the October 2026 DLC's compact archives and mount tables, including sparse PAZ numbers and separate filename extensions. Updated partial PAM and PAMLOD models decode for preview and export.
+- Merge base and DLC item and character tables, preserve base translations, resolve ship icons without the older naming prefix, and follow nested prefab model links. Empty placeholder icons are excluded, and icon-derived links retain related evidence.
+- Keep Abyss socket gear out of wearable armor categories. Character previews can resolve rigs declared by their own or family descriptors, and PAMLOD material names no longer create false mesh parts. Earlier incomplete Finder and preview caches rebuild automatically.
+
 ## [1.1.0] - 2026-09-20
 
 ### Added

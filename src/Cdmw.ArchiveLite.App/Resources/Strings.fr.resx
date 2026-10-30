@@ -491,4 +491,76 @@
   <data name="CharacterThumbnailProgress" xml:space="preserve"><value>Miniatures prêtes : {0:N0} / {1:N0}</value></data>
   <data name="CharacterThumbnailQueued" xml:space="preserve"><value>En attente</value></data>
   <data name="CharacterLoadingCancelled" xml:space="preserve"><value>Chargement annulé.</value></data>
+  <data name="ItemFinderOnlyDlc" xml:space="preserve">
+    <value>Objets du DLC uniquement</value>
+  </data>
+  <data name="ItemCategoryShips" xml:space="preserve">
+    <value>Navires</value>
+  </data>
+  <data name="ItemCategoryTradeGoods" xml:space="preserve">
+    <value>Marchandises</value>
+  </data>
+  <data name="ItemGroupSails" xml:space="preserve">
+    <value>Voiles</value>
+  </data>
+  <data name="ItemGroupFigureheads" xml:space="preserve">
+    <value>Figures de proue</value>
+  </data>
+  <data name="ItemGroupSterns" xml:space="preserve">
+    <value>Ornements de poupe</value>
+  </data>
+  <data name="ItemGroupCannons" xml:space="preserve">
+    <value>Canons</value>
+  </data>
+  <data name="ItemGroupTeleporters" xml:space="preserve">
+    <value>Téléporteurs</value>
+  </data>
+  <data name="ItemGroupBlueprintParts" xml:space="preserve">
+    <value>Fragments de plans</value>
+  </data>
+  <data name="ItemGroupShipBlueprints" xml:space="preserve">
+    <value>Plans de navires</value>
+  </data>
+  <data name="ItemGroupEquipmentBlueprints" xml:space="preserve">
+    <value>Plans d’équipement</value>
+  </data>
+  <data name="ItemGroupShipMaterials" xml:space="preserve">
+    <value>Matériaux de navires</value>
+  </data>
+  <data name="ItemGroupMountGear" xml:space="preserve">
+    <value>Équipement de monture</value>
+  </data>
+  <data name="ItemGroupVehicleGear" xml:space="preserve">
+    <value>Équipement de véhicule</value>
+  </data>
+  <data name="ItemGroupPackagedCargo" xml:space="preserve">
+    <value>Cargaison emballée</value>
+  </data>
+  <data name="ItemGroupTradeGoods" xml:space="preserve">
+    <value>Marchandises</value>
+  </data>
+  <data name="ItemGroupUpgradeMaterial" xml:space="preserve">
+    <value>Matériau d’amélioration</value>
+  </data>
+  <data name="ItemGroupMemoryFragment" xml:space="preserve">
+    <value>Fragment de souvenir</value>
+  </data>
+  <data name="ItemGroupSeaLife" xml:space="preserve">
+    <value>Vie marine</value>
+  </data>
+  <data name="ItemGroupInsects" xml:space="preserve">
+    <value>Insectes</value>
+  </data>
+  <data name="ItemGroupBuildingsTents" xml:space="preserve">
+    <value>Bâtiments / Tentes</value>
+  </data>
+  <data name="ItemGroupDoorsWindowsFences" xml:space="preserve">
+    <value>Portes / Fenêtres / Clôtures</value>
+  </data>
+  <data name="ItemGroupRelic" xml:space="preserve">
+    <value>Relique</value>
+  </data>
+  <data name="ItemEvidenceRecoveredItemDefinitionEquipType" xml:space="preserve">
+    <value>Définition d’objet / type d’équipement récupérés</value>
+  </data>
 </root>

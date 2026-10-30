@@ -68,6 +68,7 @@ internal static partial class ArchiveLiteTestRunner
             ("a string table that disagrees with its own footer is rejected, not truncated", TestLocalizationTableIntegrityAsync),
             ("Item Finder shares the Full catalog contract and keeps icon work bounded", TestItemFinderCatalogAsync),
             ("current mounted item tables retain every item and localized search across cache reloads", TestCurrentItemCatalogAsync),
+            ("compact DLC archives, merged finders, ship icons and nested models remain read-only", TestDlcCompatibilityAsync),
             ("Body & Face Finder preserves mounted models, names, relationships and unresolved appearances", CharacterCatalogTests.CatalogueAsync),
             ("character catalogue caching, cancellation and archive scopes are read-only", TestCharacterCatalogServiceAsync),
             ("character preview assembly retains component coordinates and resources", TestCharacterPreviewAssemblyAsync),
@@ -4351,8 +4352,8 @@ internal static partial class ArchiveLiteTestRunner
         {
             var root = cacheManifest.RootElement;
             Require(
-                root.GetProperty("version").GetString() == "archive_lite_native_model_v21_interchange",
-                "the default preview reused geometry from before the interchange decoder fixes");
+                root.GetProperty("version").GetString() == "archive_lite_native_model_v22_dlc",
+                "the default preview reused geometry from before the DLC decoder fixes");
             Require(root.GetProperty("validation_mode").GetString() == "dependency_v1", "native package cache fell back to whole-session invalidation");
             Require(
                 root.GetProperty("dependencies").EnumerateArray().Any(dependency =>
@@ -4564,8 +4565,8 @@ internal static partial class ArchiveLiteTestRunner
         Require(
             modelPreviewSource.Contains("NativeModelPreviewCache.ComputeKey(packageVersion, session, entry, companion)", StringComparison.Ordinal)
             && modelPreviewSource.Contains("includeTextures ? TexturedPackageVersion : PackageVersion", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v21_interchange\"", StringComparison.Ordinal)
-            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v21_material_layers_interchange\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("PackageVersion = \"archive_lite_native_model_v22_dlc\"", StringComparison.Ordinal)
+            && modelPreviewSource.Contains("TexturedPackageVersion = \"archive_lite_native_model_v22_material_layers_dlc\"", StringComparison.Ordinal)
             && modelPreviewSource.Contains("NativeModelPreviewCache.IsReusableAsync", StringComparison.Ordinal)
             && !modelPreviewSource.Contains("PackageVersion,\n            session.Fingerprint", StringComparison.Ordinal),
             "native model packages do not preserve the fast default cache while isolating textured packages");
@@ -5550,10 +5551,19 @@ internal static partial class ArchiveLiteTestRunner
                 await Task.Delay(320).ConfigureAwait(true);
                 Require(fakeWorker.SearchCount == 3, "a language round trip triggered an Item Finder search");
 
+                viewModel.OnlyDlc = true;
+                await WaitUntilAsync(() => fakeWorker.SearchCount == 4 && !viewModel.IsBusy, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
+                Require(fakeWorker.SearchRequests.Last().OnlyDlc, "the DLC filter did not reach the worker");
+                viewModel.ClearCommand.Execute(null);
+                await WaitUntilAsync(() => fakeWorker.SearchCount == 5 && !viewModel.IsBusy, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
+                await Task.Delay(320).ConfigureAwait(true);
+                Require(fakeWorker.SearchCount == 5 && !viewModel.OnlyDlc && !fakeWorker.SearchRequests.Last().OnlyDlc,
+                    "Clear did not reset the DLC filter with exactly one search");
+
                 fakeWorker.SearchDelay = TimeSpan.FromMilliseconds(350);
                 fakeWorker.IgnoreSearchCancellation = true;
                 viewModel.Query = "late-session";
-                await WaitUntilAsync(() => fakeWorker.SearchCount == 4, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
+                await WaitUntilAsync(() => fakeWorker.SearchCount == 6, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
                 sessionId = "session-b";
                 viewModel.NotifyArchiveSessionChanged();
                 Require(viewModel.Items.Count == 0, "session change did not clear the prior Item Finder page");
@@ -5561,7 +5571,7 @@ internal static partial class ArchiveLiteTestRunner
                 Require(viewModel.Items.Count == 0, "a late prior-session Item Finder result repopulated the page");
 
                 viewModel.Query = "late-close";
-                await WaitUntilAsync(() => fakeWorker.SearchCount == 5, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
+                await WaitUntilAsync(() => fakeWorker.SearchCount == 7, TimeSpan.FromSeconds(2)).ConfigureAwait(true);
                 viewModel.Deactivate();
                 await Task.Delay(430).ConfigureAwait(true);
                 Require(viewModel.Items.Count == 0, "a late Item Finder result published after dialog close");

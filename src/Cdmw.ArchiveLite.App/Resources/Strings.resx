@@ -491,4 +491,76 @@
   <data name="CharacterThumbnailProgress" xml:space="preserve"><value>Thumbnails ready: {0:N0} / {1:N0}</value></data>
   <data name="CharacterThumbnailQueued" xml:space="preserve"><value>Queued</value></data>
   <data name="CharacterLoadingCancelled" xml:space="preserve"><value>Loading cancelled.</value></data>
+  <data name="ItemFinderOnlyDlc" xml:space="preserve">
+    <value>Only DLC items</value>
+  </data>
+  <data name="ItemCategoryShips" xml:space="preserve">
+    <value>Ships</value>
+  </data>
+  <data name="ItemCategoryTradeGoods" xml:space="preserve">
+    <value>Trade Goods</value>
+  </data>
+  <data name="ItemGroupSails" xml:space="preserve">
+    <value>Sails</value>
+  </data>
+  <data name="ItemGroupFigureheads" xml:space="preserve">
+    <value>Figureheads</value>
+  </data>
+  <data name="ItemGroupSterns" xml:space="preserve">
+    <value>Sterns</value>
+  </data>
+  <data name="ItemGroupCannons" xml:space="preserve">
+    <value>Cannons</value>
+  </data>
+  <data name="ItemGroupTeleporters" xml:space="preserve">
+    <value>Teleporters</value>
+  </data>
+  <data name="ItemGroupBlueprintParts" xml:space="preserve">
+    <value>Blueprint Parts</value>
+  </data>
+  <data name="ItemGroupShipBlueprints" xml:space="preserve">
+    <value>Ship Blueprints</value>
+  </data>
+  <data name="ItemGroupEquipmentBlueprints" xml:space="preserve">
+    <value>Equipment Blueprints</value>
+  </data>
+  <data name="ItemGroupShipMaterials" xml:space="preserve">
+    <value>Ship Materials</value>
+  </data>
+  <data name="ItemGroupMountGear" xml:space="preserve">
+    <value>Mount Gear</value>
+  </data>
+  <data name="ItemGroupVehicleGear" xml:space="preserve">
+    <value>Vehicle Gear</value>
+  </data>
+  <data name="ItemGroupPackagedCargo" xml:space="preserve">
+    <value>Packaged Cargo</value>
+  </data>
+  <data name="ItemGroupTradeGoods" xml:space="preserve">
+    <value>Trade Goods</value>
+  </data>
+  <data name="ItemGroupUpgradeMaterial" xml:space="preserve">
+    <value>Upgrade Material</value>
+  </data>
+  <data name="ItemGroupMemoryFragment" xml:space="preserve">
+    <value>Memory Fragment</value>
+  </data>
+  <data name="ItemGroupSeaLife" xml:space="preserve">
+    <value>Sea Life</value>
+  </data>
+  <data name="ItemGroupInsects" xml:space="preserve">
+    <value>Insects</value>
+  </data>
+  <data name="ItemGroupBuildingsTents" xml:space="preserve">
+    <value>Buildings / Tents</value>
+  </data>
+  <data name="ItemGroupDoorsWindowsFences" xml:space="preserve">
+    <value>Doors / Windows / Fences</value>
+  </data>
+  <data name="ItemGroupRelic" xml:space="preserve">
+    <value>Relic</value>
+  </data>
+  <data name="ItemEvidenceRecoveredItemDefinitionEquipType" xml:space="preserve">
+    <value>Recovered item definition / equip type</value>
+  </data>
 </root>

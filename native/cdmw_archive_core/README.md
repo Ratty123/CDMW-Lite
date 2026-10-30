@@ -8,6 +8,14 @@ The ABI has no archive mutation, replacement, patch, or restore functions. The
 source archive tree is opened read-only. Index publication is staged beside the
 cache destination and then replaced atomically.
 
+Both legacy and October 2026 compact PAMT layouts are supported. Compact names
+use backward parent distances and a separate extension table; the upper flag
+byte selects an extension, while only bits 4–7 select encryption. PAZ identifiers
+come from the directory and need not be consecutive. Invalid name, extension or
+PAZ references are rejected. Partial PAM (including version `0x01001806`) and
+PAMLOD geometry blocks decode through the repository-owned shared static-mesh
+reader, with size and offset checks.
+
 Callers that need user-facing progress can use
 `cdmw_archive_build_index_with_progress_utf8`. Its callback reports discovery,
 PAMT parsing, entry sorting, index writing, and atomic publication. Phases with

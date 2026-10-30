@@ -10,7 +10,7 @@ public sealed class ArchiveItemNameIndexService(
     NativeArchiveCore native,
     ArchiveWorkPriority? workPriority = null)
 {
-    private const int CacheSchemaVersion = 9;
+    private const int CacheSchemaVersion = 10;
     private const int NativeCatalogSchemaVersion = 4;
     private const int MaximumDiagnosticCharacters = 64 * 1024;
     private static readonly TimeSpan IndexerTimeout = TimeSpan.FromMinutes(3);
@@ -91,6 +91,7 @@ public sealed class ArchiveItemNameIndexService(
                 var catalogue = await ReadReportAsync(reportPath, cancellationToken).ConfigureAwait(false);
                 if (localizationWarnings.Count > 0)
                     catalogue = catalogue with { Warning = string.Join(" ", localizationWarnings.Append(catalogue.Warning).Where(value => !string.IsNullOrEmpty(value))) };
+                catalogue = ResolvePrefabModels(session, sources, catalogue, cancellationToken);
                 await SaveCacheAsync(cachePath, catalogue, cancellationToken).ConfigureAwait(false);
                 session.SetCatalogue(catalogue.NameIndex, catalogue.ItemCatalog, catalogue.Warning);
                 if (publishProgress is not null)
@@ -108,6 +109,76 @@ public sealed class ArchiveItemNameIndexService(
         {
             session.NameIndexBuildGate.Release();
         }
+    }
+
+    private CatalogueBuildState ResolvePrefabModels(ArchiveSession session, ArchiveItemSources sources,
+        CatalogueBuildState state, CancellationToken token)
+    {
+        var assets = new Dictionary<string, ArchiveEntryDto>(StringComparer.OrdinalIgnoreCase);
+        for (long id = 0; id < session.Index.EntryCount; id++)
+        {
+            if ((id & 0x1FFF) == 0) token.ThrowIfCancellationRequested();
+            var entry = session.Index.ReadEntry(id);
+            if (entry.Extension is not (".prefab" or ".pami" or ".pac" or ".pam" or ".pamlod") || !sources.Accepts(entry)) continue;
+            var path = entry.Path.Replace('\\', '/');
+            if (!assets.TryGetValue(path, out var previous) || sources.Order(entry).CompareTo(sources.Order(previous)) > 0)
+                assets[path] = entry;
+        }
+        var byName = assets.Values.GroupBy(static entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static group => group.Key, static group => group.ToArray(), StringComparer.OrdinalIgnoreCase);
+        var resolved = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        var exact = new Dictionary<string, string>(state.NameIndex.ExactNames, StringComparer.OrdinalIgnoreCase);
+        var related = new Dictionary<string, string>(state.NameIndex.RelatedNames, StringComparer.OrdinalIgnoreCase);
+        var enriched = new List<ArchiveItemCatalogRecord>();
+        foreach (var item in state.ItemCatalog.Items)
+        {
+            token.ThrowIfCancellationRequested();
+            var models = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var stem in item.ModelStems)
+            {
+                if (!resolved.TryGetValue(stem, out var paths))
+                {
+                    var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var pending = new Queue<ArchiveEntryDto>();
+                    if (byName.TryGetValue(stem + ".prefab", out var prefabs) && prefabs.Length == 1) pending.Enqueue(prefabs[0]);
+                    var visited = new HashSet<long>();
+                    long bytes = 0;
+                    while (pending.TryDequeue(out var entry) && visited.Count < 256)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (!visited.Add(entry.EntryId)) continue;
+                        if (entry.Extension is ".pac" or ".pam" or ".pamlod") { found.Add(entry.Path); continue; }
+                        if (entry.OriginalSize is <= 0 or > 4 * 1024 * 1024 || bytes + entry.OriginalSize > 32 * 1024 * 1024) continue;
+                        bytes += entry.OriginalSize;
+                        byte[] decoded;
+                        try { decoded = native.Decode(entry).Bytes; }
+                        catch (Exception error) when (error is IOException or InvalidDataException or NativeArchiveException) { continue; }
+                        foreach (var reference in ArchivePreviewReferenceScanner.Extract(decoded, token, false).Tokens)
+                        {
+                            ArchiveEntryDto? target = null;
+                            if (!assets.TryGetValue(reference.Replace('\\', '/'), out target)
+                                && byName.TryGetValue(Path.GetFileName(reference.Replace('\\', '/')), out var named) && named.Length == 1) target = named[0];
+                            if (target is not null && !visited.Contains(target.EntryId) && pending.Count < 256) pending.Enqueue(target);
+                        }
+                    }
+                    resolved[stem] = paths = found.Order(StringComparer.OrdinalIgnoreCase).ToArray();
+                }
+                models.UnionWith(paths);
+                var names = item.PrefabHashes.Contains(ArchiveMetadataReader.ModelNameHash(stem)) ? exact : related;
+                if (item.LocalizedNames.Count == 0) continue;
+                foreach (var path in paths)
+                {
+                    var key = Path.GetFileNameWithoutExtension(path);
+                    if (!names.TryGetValue(key, out var previous)) names[key] = item.DisplayName;
+                    else if (!previous.Split(" / ").Contains(item.DisplayName)) names[key] = previous + " / " + item.DisplayName;
+                }
+            }
+            enriched.Add(item with {
+                PacFiles = item.PacFiles.Concat(models).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                ModelStems = item.ModelStems.Concat(models.Select(Path.GetFileNameWithoutExtension).OfType<string>()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            });
+        }
+        return state with { NameIndex = ArchiveItemNameIndex.FromMappings(exact, related), ItemCatalog = ArchiveItemCatalog.FromRecords(enriched) };
     }
 
     private Task WaitForForegroundAsync(bool yieldToForeground, CancellationToken cancellationToken) =>
@@ -216,6 +287,7 @@ public sealed class ArchiveItemNameIndexService(
         }
 
         payloads.AddRange(sources.Localizations.Select(pair => ($"loc_{pair.Key}.bin", pair.Value)));
+        payloads.AddRange(sources.DlcItemPayloads());
 
         void AddRowDirectory(string name, ArchiveEntryDto? header)
         {
@@ -236,7 +308,7 @@ public sealed class ArchiveItemNameIndexService(
             }
             var decoded = await Task.Run(() => native.Decode(entry), cancellationToken).ConfigureAwait(false);
             var bytes = decoded.Bytes;
-            if (name.StartsWith("loc_", StringComparison.Ordinal))
+            if (Path.GetFileName(name).StartsWith("loc_", StringComparison.Ordinal))
             {
                 try { bytes = ArchiveMetadataReader.LocalizationPayload(bytes); }
                 catch (InvalidDataException error)
@@ -245,7 +317,9 @@ public sealed class ArchiveItemNameIndexService(
                     continue;
                 }
             }
-            await File.WriteAllBytesAsync(Path.Combine(payloadRoot, name), bytes, cancellationToken).ConfigureAwait(false);
+            var destination = Path.Combine(payloadRoot, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await File.WriteAllBytesAsync(destination, bytes, cancellationToken).ConfigureAwait(false);
         }
         if (publishProgress is not null)
         {
@@ -410,7 +484,8 @@ public sealed class ArchiveItemNameIndexService(
                 Description: ReadString(row, "description"),
                 StackSize: ReadInt(row, "stack_size"),
                 Grade: ReadInt(row, "grade"),
-                EquipType: ReadString(row, "equip_type")));
+                EquipType: ReadString(row, "equip_type"),
+                IsDlc: row.TryGetProperty("is_dlc", out var dlc) && dlc.ValueKind == JsonValueKind.True));
         }
         return result;
     }

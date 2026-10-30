@@ -36,14 +36,15 @@ public sealed class ArchiveItemCatalogService(
             request.Category,
             request.Group,
             request.PageStart,
-            request.PageSize);
+            request.PageSize,
+            request.OnlyDlc);
         return new ItemCatalogSearchResult(
             request.SessionId,
             page.TotalMatches,
             request.PageStart,
             request.PageSize,
             page.Items.Select(ToContract).ToArray(),
-            catalog.CategoryFacets,
+            request.OnlyDlc ? ArchiveItemCatalog.FromRecords(catalog.Items.Where(static item => item.IsDlc)).CategoryFacets : catalog.CategoryFacets,
             session.ItemCatalogWarning);
     }
 
@@ -63,5 +64,6 @@ public sealed class ArchiveItemCatalogService(
         item.Description,
         item.StackSize,
         item.Grade,
-        item.EquipType);
+        item.EquipType,
+        item.IsDlc);
 }

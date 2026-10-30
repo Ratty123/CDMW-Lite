@@ -491,4 +491,76 @@
   <data name="CharacterThumbnailProgress" xml:space="preserve"><value>Hazır küçük resimler: {0:N0} / {1:N0}</value></data>
   <data name="CharacterThumbnailQueued" xml:space="preserve"><value>Sırada</value></data>
   <data name="CharacterLoadingCancelled" xml:space="preserve"><value>Yükleme iptal edildi.</value></data>
+  <data name="ItemFinderOnlyDlc" xml:space="preserve">
+    <value>Yalnızca DLC eşyaları</value>
+  </data>
+  <data name="ItemCategoryShips" xml:space="preserve">
+    <value>Gemiler</value>
+  </data>
+  <data name="ItemCategoryTradeGoods" xml:space="preserve">
+    <value>Ticaret malları</value>
+  </data>
+  <data name="ItemGroupSails" xml:space="preserve">
+    <value>Yelkenler</value>
+  </data>
+  <data name="ItemGroupFigureheads" xml:space="preserve">
+    <value>Pruva figürleri</value>
+  </data>
+  <data name="ItemGroupSterns" xml:space="preserve">
+    <value>Kıç süslemeleri</value>
+  </data>
+  <data name="ItemGroupCannons" xml:space="preserve">
+    <value>Toplar</value>
+  </data>
+  <data name="ItemGroupTeleporters" xml:space="preserve">
+    <value>Işınlayıcılar</value>
+  </data>
+  <data name="ItemGroupBlueprintParts" xml:space="preserve">
+    <value>Plan parçaları</value>
+  </data>
+  <data name="ItemGroupShipBlueprints" xml:space="preserve">
+    <value>Gemi planları</value>
+  </data>
+  <data name="ItemGroupEquipmentBlueprints" xml:space="preserve">
+    <value>Ekipman planları</value>
+  </data>
+  <data name="ItemGroupShipMaterials" xml:space="preserve">
+    <value>Gemi malzemeleri</value>
+  </data>
+  <data name="ItemGroupMountGear" xml:space="preserve">
+    <value>Binek ekipmanı</value>
+  </data>
+  <data name="ItemGroupVehicleGear" xml:space="preserve">
+    <value>Araç ekipmanı</value>
+  </data>
+  <data name="ItemGroupPackagedCargo" xml:space="preserve">
+    <value>Paketlenmiş yük</value>
+  </data>
+  <data name="ItemGroupTradeGoods" xml:space="preserve">
+    <value>Ticaret malları</value>
+  </data>
+  <data name="ItemGroupUpgradeMaterial" xml:space="preserve">
+    <value>Yükseltme malzemesi</value>
+  </data>
+  <data name="ItemGroupMemoryFragment" xml:space="preserve">
+    <value>Anı parçası</value>
+  </data>
+  <data name="ItemGroupSeaLife" xml:space="preserve">
+    <value>Deniz canlıları</value>
+  </data>
+  <data name="ItemGroupInsects" xml:space="preserve">
+    <value>Böcekler</value>
+  </data>
+  <data name="ItemGroupBuildingsTents" xml:space="preserve">
+    <value>Binalar / Çadırlar</value>
+  </data>
+  <data name="ItemGroupDoorsWindowsFences" xml:space="preserve">
+    <value>Kapılar / Pencereler / Çitler</value>
+  </data>
+  <data name="ItemGroupRelic" xml:space="preserve">
+    <value>Kalıntı</value>
+  </data>
+  <data name="ItemEvidenceRecoveredItemDefinitionEquipType" xml:space="preserve">
+    <value>Okunan eşya tanımı / ekipman türü</value>
+  </data>
 </root>

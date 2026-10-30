@@ -21,7 +21,7 @@ public sealed record ArchiveEntryDto(
 {
     public bool IsCompressed => StoredSize != OriginalSize;
     public int CompressionType => Flags & 0x0F;
-    public bool IsEncrypted => (Flags >> 4) != 0;
+    public bool IsEncrypted => EncryptionType != 0;
     public int EncryptionType => (Flags >> 4) & 0x0F;
     public string Name => System.IO.Path.GetFileName(Path.Replace('/', System.IO.Path.DirectorySeparatorChar));
     public string CompressionLabel => IsCompressed ? $"Type {CompressionType}" : "None";

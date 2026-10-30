@@ -491,4 +491,76 @@
   <data name="CharacterThumbnailProgress" xml:space="preserve"><value>Миниатюры готовы: {0:N0} / {1:N0}</value></data>
   <data name="CharacterThumbnailQueued" xml:space="preserve"><value>В очереди</value></data>
   <data name="CharacterLoadingCancelled" xml:space="preserve"><value>Загрузка отменена.</value></data>
+  <data name="ItemFinderOnlyDlc" xml:space="preserve">
+    <value>Только предметы DLC</value>
+  </data>
+  <data name="ItemCategoryShips" xml:space="preserve">
+    <value>Корабли</value>
+  </data>
+  <data name="ItemCategoryTradeGoods" xml:space="preserve">
+    <value>Торговые товары</value>
+  </data>
+  <data name="ItemGroupSails" xml:space="preserve">
+    <value>Паруса</value>
+  </data>
+  <data name="ItemGroupFigureheads" xml:space="preserve">
+    <value>Носовые фигуры</value>
+  </data>
+  <data name="ItemGroupSterns" xml:space="preserve">
+    <value>Кормовые украшения</value>
+  </data>
+  <data name="ItemGroupCannons" xml:space="preserve">
+    <value>Пушки</value>
+  </data>
+  <data name="ItemGroupTeleporters" xml:space="preserve">
+    <value>Телепорты</value>
+  </data>
+  <data name="ItemGroupBlueprintParts" xml:space="preserve">
+    <value>Части чертежей</value>
+  </data>
+  <data name="ItemGroupShipBlueprints" xml:space="preserve">
+    <value>Чертежи кораблей</value>
+  </data>
+  <data name="ItemGroupEquipmentBlueprints" xml:space="preserve">
+    <value>Чертежи снаряжения</value>
+  </data>
+  <data name="ItemGroupShipMaterials" xml:space="preserve">
+    <value>Корабельные материалы</value>
+  </data>
+  <data name="ItemGroupMountGear" xml:space="preserve">
+    <value>Снаряжение ездовых животных</value>
+  </data>
+  <data name="ItemGroupVehicleGear" xml:space="preserve">
+    <value>Оснащение транспорта</value>
+  </data>
+  <data name="ItemGroupPackagedCargo" xml:space="preserve">
+    <value>Упакованный груз</value>
+  </data>
+  <data name="ItemGroupTradeGoods" xml:space="preserve">
+    <value>Торговые товары</value>
+  </data>
+  <data name="ItemGroupUpgradeMaterial" xml:space="preserve">
+    <value>Материал для улучшения</value>
+  </data>
+  <data name="ItemGroupMemoryFragment" xml:space="preserve">
+    <value>Фрагмент воспоминания</value>
+  </data>
+  <data name="ItemGroupSeaLife" xml:space="preserve">
+    <value>Морские существа</value>
+  </data>
+  <data name="ItemGroupInsects" xml:space="preserve">
+    <value>Насекомые</value>
+  </data>
+  <data name="ItemGroupBuildingsTents" xml:space="preserve">
+    <value>Здания / Палатки</value>
+  </data>
+  <data name="ItemGroupDoorsWindowsFences" xml:space="preserve">
+    <value>Двери / Окна / Ограды</value>
+  </data>
+  <data name="ItemGroupRelic" xml:space="preserve">
+    <value>Реликвия</value>
+  </data>
+  <data name="ItemEvidenceRecoveredItemDefinitionEquipType" xml:space="preserve">
+    <value>Прочитанное определение предмета / тип снаряжения</value>
+  </data>
 </root>

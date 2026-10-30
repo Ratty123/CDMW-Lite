@@ -73,4 +73,30 @@ static void run_interchange_decode_self_test() {
     require(unpacked.size() == entry.orig_size && read_u32(unpacked, 0x44) == 0, "Partial PAM was not decompressed");
     require(std::string(unpacked.end() - 4, unpacked.end()) == "tail", "Partial PAM lost its trailer");
     for (size_t i = 0; i < 256; ++i) require(unpacked[0x50 + i] == "ABCD"[i % 4], "Partial PAM changed geometry bytes");
+
+    put32(pam, 4, 0x01001806);
+    require(decode_archive_ref_bytes(entry, pam).size() == entry.orig_size, "Current PAM version was not decompressed");
+    std::vector<char> lod(0x60, 0);
+    put32(lod, 0, 1); put32(lod, 4, 0x60);
+    put32(lod, 0x50, 0x60); put32(lod, 0x54, 256); put32(lod, 0x58, sizeof(compressed));
+    lod.insert(lod.end(), std::begin(compressed), std::end(compressed));
+    entry.extension = ".pamlod"; entry.flags = 0x101;
+    entry.comp_size = lod.size(); entry.orig_size = 0x60 + 256;
+    const auto expanded_lod = decode_archive_ref_bytes(entry, lod);
+    require(expanded_lod.size() == entry.orig_size && read_u32(expanded_lod, 0x58) == 0, "Partial PAMLOD was not decompressed");
+    for (size_t i = 0; i < 256; ++i) require(expanded_lod[0x60 + i] == "ABCD"[i % 4], "Partial PAMLOD changed geometry bytes");
+    put32(lod, 0x50, 0x61);
+    bool rejected = false;
+    try { decode_archive_ref_bytes(entry, lod); } catch (const std::exception&) { rejected = true; }
+    require(rejected, "Invalid PAMLOD block offset was accepted");
+
+    const auto descriptors = skeleton_descriptor_paths("character/model/1_pc/8_pdw/head/head/cd_pdw_00_head_00_0005.pac");
+    require(std::find(descriptors.begin(), descriptors.end(), "character/prefab/1_pc/08_pdw/nude/cd_pdw_00_nude_00_0001.prefabdata_xml") != descriptors.end(),
+        "Head preview lost its normalized family rig descriptor");
+    const auto creature = skeleton_descriptor_paths("character/model/2_mon/stone/stone_0002.pac");
+    require(std::find(creature.begin(), creature.end(), "character/prefab/2_mon/stone/stone_nude_0002.prefabdata_xml") != creature.end(),
+        "Creature preview lost its exact nude variant descriptor");
+    const std::string descriptor = "<BodyPrefabData><SkeletonName FileName=\"1_pc/2_phw/phw_01.pab\"/><SkeletonVariationName FileName=\"unrelated/body.pabc\"/></BodyPrefabData>";
+    const auto rigs = declared_skeleton_paths(std::vector<char>(descriptor.begin(), descriptor.end()));
+    require(rigs == std::vector<std::string>{"character/model/1_pc/2_phw/phw_01.pab"}, "Family body supplied unrelated appearance inputs");
 }

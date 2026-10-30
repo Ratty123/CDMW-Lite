@@ -269,6 +269,48 @@ static PacSkinBinding classify_pac_skin(const std::vector<NativeSubmesh>& meshes
     return saw_any ? PacSkinBinding::Rigid : PacSkinBinding::None;
 }
 
+// Exact descriptors can nominate a rig shared with another character family.
+// Read only SkeletonName: a family body must not supply the head's shape or materials.
+static std::vector<std::string> skeleton_descriptor_paths(const std::string& path) {
+    std::string normalized = lower_copy(path);
+    std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    if (!normalized.starts_with("character/model/") || !normalized.ends_with(".pac")) return {};
+    std::vector<std::string> paths{ "character/prefab/" + normalized.substr(16, normalized.size() - 20) + ".prefabdata_xml" };
+    std::smatch family;
+    if (std::regex_search(normalized, family, std::regex(R"(^character/model/1_pc/([0-9]{1,3})_([a-z]{2,5})/)"))) {
+        const auto number = std::stoi(family[1].str());
+        const auto code = family[2].str();
+        for (const auto& folder : {family[1].str() + "_" + code, (number < 10 ? "0" : "") + std::to_string(number) + "_" + code}) {
+            for (const auto& prefix : {"", "cd_"}) {
+                const auto descriptor = "character/prefab/1_pc/" + folder + "/nude/" + prefix + code + "_00_nude_00_0001.prefabdata_xml";
+                if (std::find(paths.begin(), paths.end(), descriptor) == paths.end()) paths.push_back(descriptor);
+            }
+        }
+    }
+    if (normalized.starts_with("character/model/2_mon/")) {
+        const auto stem = stem_from_path(normalized);
+        const auto separator = stem.rfind('_');
+        const auto folder = dirname_from_path(normalized);
+        if (separator != std::string::npos && stem.substr(0, separator) == basename_from_path(folder)
+            && separator + 1 < stem.size() && std::all_of(stem.begin() + separator + 1, stem.end(), [](unsigned char ch) { return std::isdigit(ch); }))
+            paths.push_back("character/prefab/" + folder.substr(16) + "/" + stem.substr(0, separator) + "_nude" + stem.substr(separator) + ".prefabdata_xml");
+    }
+    return paths;
+}
+
+static std::vector<std::string> declared_skeleton_paths(const std::vector<char>& bytes) {
+    const std::string text(bytes.begin(), bytes.end());
+    static const std::regex pattern(R"rx(<SkeletonName\b[^>]*\bFileName\s*=\s*['"]([^'"<>]+\.pab)['"])rx", std::regex_constants::icase);
+    std::vector<std::string> paths;
+    for (auto it = std::sregex_iterator(text.begin(), text.end(), pattern); it != std::sregex_iterator() && paths.size() < 8; ++it) {
+        auto path = (*it)[1].str();
+        std::replace(path.begin(), path.end(), '\\', '/');
+        if (!lower_copy(path).starts_with("character/")) path = "character/model/" + path;
+        paths.push_back(path);
+    }
+    return paths;
+}
+
 static NativePackageSkeleton resolve_native_package_skeleton(
     const EntryJob& job,
     const PamtIndex& index,
@@ -303,19 +345,31 @@ static NativePackageSkeleton resolve_native_package_skeleton(
     std::vector<SkeletonCandidate> candidates;
     std::vector<std::string> attempted;
     std::set<std::string> tried_paths;
-    for (const std::string& basename : iter_pab_candidate_basenames(job.path)) {
-        if (tried_paths.size() >= kMaximumSkeletonsTried) break;
-        for (const ArchiveEntryRef& ref : lookup_basename_candidates_across_package(job, index, basename, 4)) {
-            if (tried_paths.size() >= kMaximumSkeletonsTried) break;
-            if (!tried_paths.insert(lower_copy(ref.path)).second) continue;
-            try {
-                std::vector<NativeBone> bones = parse_pab_skeleton(read_archive_ref_decoded_bytes(ref));
-                if (bones.empty()) continue;
-                attempted.push_back(ref.path + " (" + std::to_string(bones.size()) + " bones)");
-                candidates.push_back(SkeletonCandidate{ref.path, std::move(bones)});
-            } catch (const std::exception& exc) {
-                attempted.push_back(ref.path + " (" + exc.what() + ")");
+    std::vector<ArchiveEntryRef> nominated;
+    for (const auto& path : skeleton_descriptor_paths(job.path)) {
+        const auto descriptor = resolve_archive_path_across_package(job, index, path);
+        if (!descriptor || lower_copy(descriptor->path) != lower_copy(path) || descriptor->orig_size > 4 * 1024 * 1024) continue;
+        try {
+            for (const auto& rig_path : declared_skeleton_paths(read_archive_ref_decoded_bytes(*descriptor))) {
+                const auto rig = resolve_archive_path_across_package(job, index, rig_path);
+                if (rig && lower_copy(rig->path) == lower_copy(rig_path)) nominated.push_back(*rig);
             }
+        } catch (const std::exception&) { }
+    }
+    for (const auto& basename : iter_pab_candidate_basenames(job.path)) {
+        const auto found = lookup_basename_candidates_across_package(job, index, basename, 4);
+        nominated.insert(nominated.end(), found.begin(), found.end());
+    }
+    for (const ArchiveEntryRef& ref : nominated) {
+        if (tried_paths.size() >= kMaximumSkeletonsTried) break;
+        if (!tried_paths.insert(lower_copy(ref.path)).second) continue;
+        try {
+            std::vector<NativeBone> bones = parse_pab_skeleton(read_archive_ref_decoded_bytes(ref));
+            if (bones.empty()) continue;
+            attempted.push_back(ref.path + " (" + std::to_string(bones.size()) + " bones)");
+            candidates.push_back(SkeletonCandidate{ref.path, std::move(bones)});
+        } catch (const std::exception& exc) {
+            attempted.push_back(ref.path + " (" + exc.what() + ")");
         }
     }
 
