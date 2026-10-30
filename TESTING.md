@@ -1,6 +1,7 @@
 # Archive Lite validation matrix
 
-The focused gate includes synthetic October 2026 DLC coverage: compact PAMT/PAPGT,
+Version 1.2.0's focused gate contains 63 scenarios, including synthetic October 2026
+DLC coverage: compact PAMT/PAPGT,
 sparse PAZ identifiers, extension/encryption flags, malformed compact metadata,
 partial PAM/PAMLOD decode, base/DLC catalogue merges, ship icons and categories,
 nested prefab/PAMI models, character localization fallback, DLC-only filtering,
@@ -72,6 +73,6 @@ The script takes either rig-carrying format and fails with a nonzero status rath
 
 ## Proof boundaries
 
-The 2026-09-19 material audit and the older Blender reference runs are dated evidence, not gates rerun by either command above. The current release adds material and export changes after those earlier measurements; its automated checks use synthetic fixtures. Real-asset visual and Blender claims require new runs against the intended release build.
+The 2026-09-19 material audit and the older Blender reference runs are dated evidence, not gates rerun by either command above. Version 1.1.0 added material and export changes after those earlier measurements, and 1.2.0 adds DLC archive and preview compatibility; the automated checks use synthetic fixtures. Real-asset visual and Blender claims require new runs against the intended release build.
 
 Passing these gates proves synthetic archive correctness, shared semantic routing for the covered decoder fixtures, Item Finder and Body & Face Finder catalogue/search/scope and thumbnail-cache invariants, exact and same-family associated-asset routing for the covered metadata shapes, full text-document handoff, native DDS decode, the managed HKX/HKT metadata-only route, native model-package-to-renderer compatibility, synthetic Blender-interchange structure, hidden production-backend initialization, process lifecycle, portable and standalone packaging composition, first-run/cached launcher behavior, and the absence of a packaged Python runtime/import. Associated-asset name-family matches are intentionally labeled as hints and are not a claim of a dependency-complete game graph. Headless XAML/source checks prove the shared chrome contract but are not visual proof that the outer top-edge artifact is absent on a real desktop; that remains a separately authorized visible UI smoke. The gates also do not prove byte-for-byte semantic parity across every licensed game asset, real-corpus Item Finder completeness or cold/warm latency, Blender import or visible fidelity for real PAC/PAM/PAMLOD/PAT content, identify every real HKX/HKT container variant, cover every game DDS/WEM/BK2 variant, prove that an installed Windows codec can play proprietary BK2, or provide publisher code signing. Real-asset, performance-corpus, Blender, HKX/media-corpus, release-package, and visible UI/model-fidelity validation remain separately authorized gates.

@@ -4,6 +4,8 @@ Notable changes to CDMW Archive Lite are recorded here. The format follows [Keep
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-30
+
 ### Added
 
 - Item Finder has ship equipment, blueprint and material categories, plus an Only DLC items filter for newly introduced items. Category counts follow the filter, and Clear resets it.

@@ -1,7 +1,7 @@
 # CDMW Archive Lite
 
 [![Archive Lite](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml/badge.svg)](https://github.com/Ratty123/CDMW-Lite/actions/workflows/archive-lite.yml)
-![version](https://img.shields.io/badge/version-1.1.0-blue)
+![version](https://img.shields.io/badge/version-1.2.0-blue)
 ![platform](https://img.shields.io/badge/platform-Windows%2011%20x64-lightgrey)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![read-only](https://img.shields.io/badge/archives-read--only-brightgreen)
@@ -14,18 +14,18 @@ The application is self-contained in this repository and keeps archive queries, 
 
 [Download the latest release](https://github.com/Ratty123/CDMW-Lite/releases/latest) for Windows 11 x64. Both packages include the required runtime; no separate .NET or Python installation is needed.
 
-- **Standalone EXE:** download `CDMW-Archive-Lite-1.1.0-Standalone-win-x64.exe` to a writable folder and run it. The first launch extracts and verifies the bundled runtime; later launches reuse it.
-- **Portable ZIP:** extract `CDMW-Archive-Lite-1.1.0-win-x64.zip` and run `CdmwArchiveLite.exe` from the extracted folder. Keep its companion files and folders together.
+- **Standalone EXE:** download `CDMW-Archive-Lite-1.2.0-Standalone-win-x64.exe` to a writable folder and run it. The first launch extracts and verifies the bundled runtime; later launches reuse it.
+- **Portable ZIP:** extract `CDMW-Archive-Lite-1.2.0-win-x64.zip` and run `CdmwArchiveLite.exe` from the extracted folder. Keep its companion files and folders together.
 
 Open your Crimson Desert installation or archive folder, then build or reuse its index. Use Item Finder for equipment names and Body & Face Finder for character assets and appearances. Select a separate output folder when exporting.
 
-## New in 1.1.0
+## New in 1.2.0
 
-- Body & Face Finder with searchable assets and appearances, body/face filters, thumbnails, interactive previews, and linked archive files.
-- Current ItemInfo and compressed localization support, preserving distinct items and names across mounted packages and cache reloads.
-- More faithful authored material colours, dye strength, DDS channels, and layered normal, height, roughness and metalness maps.
-- Faster layered texture preparation and Finder previews, with geometry shown while uncached full textures load.
-- OBJ, FBX and GLB export fixes for source vertices, PAC normals, eight skin influences, PAMLOD materials, texture references, and complete output publication.
+- Read-only support for the October 2026 DLC's compact archives and mount tables, including updated partial PAM and PAMLOD model decoding.
+- Ship equipment, blueprint and material categories, plus an **Only DLC items** filter for newly introduced items.
+- Merged base and DLC item and character names, ship inventory icons, and nested prefab/PAMI model links. Base translations remain available when DLC tables omit them.
+- Character previews can use rigs declared by their own or family descriptors. PAMLOD material names no longer create false mesh parts, and Abyss socket gear stays out of wearable armor categories.
+- Automatic refresh of older Finder and model-preview caches.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release details.
 
